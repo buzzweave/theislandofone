@@ -27,6 +27,7 @@ import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminChatGPT from "./pages/admin/AdminChatGPT";
 import AdminHeroBanners from "./pages/admin/AdminHeroBanners";
+import AdminMembershipPlans from "./pages/admin/AdminMembershipPlans";
 import SermonDetail from "./pages/SermonDetail";
 import NotFound from "./pages/NotFound";
 import Copyright from "./pages/Copyright";
@@ -71,6 +72,7 @@ const App = () => (
               <Route path="members" element={<AdminMembers />} />
               <Route path="analytics" element={<AdminAnalytics />} />
               <Route path="chatgpt" element={<AdminChatGPT />} />
+              <Route path="plans" element={<AdminMembershipPlans />} />
               <Route path="settings" element={<AdminSettings />} />
             </Route>
 

@@ -17,6 +17,7 @@ import {
   LogOut,
   MessageSquare,
   ImageIcon,
+  Crown,
 } from "lucide-react";
 import AISidebar from "./AISidebar";
 
@@ -30,6 +31,7 @@ const navItems = [
   { to: "/admin/members", label: "Members", icon: Users },
   { to: "/admin/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/admin/chatgpt", label: "ChatGPT", icon: MessageSquare },
+  { to: "/admin/plans", label: "Plans", icon: Crown },
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
