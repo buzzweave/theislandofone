@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Link, useLocation, Outlet } from "react-router-dom";
+import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
+import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import {
   LayoutDashboard,
   BookOpen,
@@ -32,6 +33,8 @@ export default function AdminLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [aiSidebarOpen, setAiSidebarOpen] = useState(true);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout } = useAdminAuth();
 
   const isActive = (path: string, end?: boolean) => {
     if (end) return location.pathname === path;
@@ -82,14 +85,14 @@ export default function AdminLayout() {
 
         {/* Bottom controls */}
         <div className="border-t border-border p-2 space-y-1">
-          <Link
-            to="/"
-            className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            title={sidebarCollapsed ? "Back to site" : undefined}
+          <button
+            onClick={() => { logout(); navigate("/admin/login"); }}
+            className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors w-full"
+            title={sidebarCollapsed ? "Sign out" : undefined}
           >
             <LogOut className="h-4 w-4 shrink-0" />
-            {!sidebarCollapsed && <span>Back to Site</span>}
-          </Link>
+            {!sidebarCollapsed && <span>Sign Out</span>}
+          </button>
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors w-full"
