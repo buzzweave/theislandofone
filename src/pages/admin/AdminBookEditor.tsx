@@ -19,13 +19,11 @@ import {
   Star,
   DollarSign,
   BookOpen,
-  GripVertical,
   Image,
-  ChevronDown,
-  ChevronRight,
 } from "lucide-react";
 import { type Book, type BookChapter } from "@/data/content";
 import { useBooks } from "@/hooks/useBooks";
+import SortableChapterList from "@/components/admin/SortableChapterList";
 
 const CATEGORIES = ["Devotional", "Faith", "Leadership", "Ministry", "Prayer", "Family"];
 
@@ -33,7 +31,7 @@ export default function AdminBookEditor() {
   const { books: bookList, setBooks: setBookList } = useBooks();
   const [activeId, setActiveId] = useState<string | null>(bookList[0]?.id ?? null);
   const [saved, setSaved] = useState(false);
-  const [expandedChapter, setExpandedChapter] = useState<string | null>(null);
+  
 
   const active = bookList.find((b) => b.id === activeId) ?? null;
 
@@ -77,7 +75,6 @@ export default function AdminBookEditor() {
       content: "",
     };
     update({ chapters: [...active.chapters, newChapter] });
-    setExpandedChapter(newChapter.id);
   };
 
   const updateChapter = (chapterId: string, fields: Partial<BookChapter>) => {
@@ -92,7 +89,6 @@ export default function AdminBookEditor() {
   const deleteChapter = (chapterId: string) => {
     if (!active) return;
     update({ chapters: active.chapters.filter((ch) => ch.id !== chapterId) });
-    if (expandedChapter === chapterId) setExpandedChapter(null);
   };
 
   const handleSave = () => {
@@ -231,70 +227,13 @@ export default function AdminBookEditor() {
                 </Button>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
-              {active.chapters.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No chapters yet. Click "Add Chapter" to begin.
-                </p>
-              )}
-              {active.chapters.map((ch, idx) => (
-                <div
-                  key={ch.id}
-                  className="border border-border rounded-lg overflow-hidden"
-                >
-                  <button
-                    onClick={() =>
-                      setExpandedChapter(expandedChapter === ch.id ? null : ch.id)
-                    }
-                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted transition-colors text-left"
-                  >
-                    <GripVertical className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    {expandedChapter === ch.id ? (
-                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    ) : (
-                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    )}
-                    <span className="text-muted-foreground text-xs w-6">{idx + 1}.</span>
-                    <span className="font-medium truncate flex-1">{ch.title}</span>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-6 w-6 shrink-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteChapter(ch.id);
-                      }}
-                    >
-                      <Trash2 className="h-3 w-3 text-destructive" />
-                    </Button>
-                  </button>
-                  {expandedChapter === ch.id && (
-                    <div className="px-3 pb-3 space-y-2 border-t border-border pt-3">
-                      <div>
-                        <Label className="text-xs">Chapter Title</Label>
-                        <Input
-                          value={ch.title}
-                          onChange={(e) =>
-                            updateChapter(ch.id, { title: e.target.value })
-                          }
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs">Content</Label>
-                        <Textarea
-                          value={ch.content}
-                          onChange={(e) =>
-                            updateChapter(ch.id, { content: e.target.value })
-                          }
-                          rows={8}
-                          className="font-body text-sm leading-relaxed"
-                          placeholder="Write chapter content here..."
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+            <CardContent>
+              <SortableChapterList
+                chapters={active.chapters}
+                onReorder={(reordered) => update({ chapters: reordered })}
+                onUpdateChapter={updateChapter}
+                onDeleteChapter={deleteChapter}
+              />
             </CardContent>
           </Card>
 
