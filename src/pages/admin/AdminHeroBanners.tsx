@@ -2,8 +2,9 @@ import { useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useHeroBanners, HeroBanner } from "@/hooks/useHeroBanners";
 import { useSiteLogo } from "@/hooks/useSiteLogo";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, GripVertical, Upload, Eye, EyeOff, Image, X } from "lucide-react";
+import { Plus, Trash2, GripVertical, Upload, Eye, EyeOff, Image, X, Droplets } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   DndContext,
@@ -129,6 +130,7 @@ function SortableBannerItem({
 
 function LogoUploadSection() {
   const { logoUrl, updateLogo } = useSiteLogo();
+  const { value: logoSize, updateValue: updateLogoSize } = useSiteSettings("logo_size", "28");
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
 
@@ -185,11 +187,11 @@ function LogoUploadSection() {
             <span className="text-xs text-muted-foreground text-center px-1">No logo</span>
           )}
         </div>
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 flex-1">
           <button
             onClick={handleLogoUpload}
             disabled={uploading}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 w-fit"
           >
             <Upload className="h-3.5 w-3.5" />
             {uploading ? "Uploading…" : logoUrl ? "Replace Logo" : "Upload Logo"}
@@ -197,9 +199,98 @@ function LogoUploadSection() {
           {logoUrl && (
             <button
               onClick={removeLogo}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-border text-sm text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-border text-sm text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-colors w-fit"
             >
               <X className="h-3.5 w-3.5" /> Remove Logo
+            </button>
+          )}
+          <div className="mt-2">
+            <label className="text-xs text-muted-foreground block mb-1">
+              Logo Size: {logoSize}px
+            </label>
+            <input
+              type="range"
+              min="16"
+              max="64"
+              step="2"
+              value={parseInt(logoSize) || 28}
+              onChange={(e) => updateLogoSize(e.target.value)}
+              className="w-full max-w-[200px] accent-primary"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WatermarkSection() {
+  const { value: watermarkUrl, updateValue: updateWatermark } = useSiteSettings("watermark_url");
+  const { toast } = useToast();
+  const [uploading, setUploading] = useState(false);
+
+  const handleUpload = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/png,image/svg+xml,image/webp";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      setUploading(true);
+      try {
+        const ext = file.name.split(".").pop();
+        const path = `watermark-${Date.now()}.${ext}`;
+        const { error } = await supabase.storage.from("site-assets").upload(path, file);
+        if (error) throw error;
+        const { data } = supabase.storage.from("site-assets").getPublicUrl(path);
+        await updateWatermark(data.publicUrl);
+        toast({ title: "Watermark uploaded!" });
+      } catch (err: any) {
+        toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+      } finally {
+        setUploading(false);
+      }
+    };
+    input.click();
+  };
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-5">
+      <div className="flex items-center gap-3 mb-4">
+        <Droplets className="h-5 w-5 text-primary" />
+        <div>
+          <h3 className="font-display text-sm font-semibold">Graphics Watermark</h3>
+          <p className="text-xs text-muted-foreground">
+            Upload a watermark (PNG with transparency recommended). It overlays on graphic previews but is removed when customers download.
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-4">
+        <div className="w-20 h-20 rounded-lg border border-border bg-muted flex items-center justify-center overflow-hidden shrink-0">
+          {watermarkUrl ? (
+            <img src={watermarkUrl} alt="Watermark" className="w-full h-full object-contain p-1" />
+          ) : (
+            <span className="text-xs text-muted-foreground text-center px-1">None</span>
+          )}
+        </div>
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={handleUpload}
+            disabled={uploading}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            <Upload className="h-3.5 w-3.5" />
+            {uploading ? "Uploading…" : watermarkUrl ? "Replace Watermark" : "Upload Watermark"}
+          </button>
+          {watermarkUrl && (
+            <button
+              onClick={async () => {
+                await updateWatermark("");
+                toast({ title: "Watermark removed" });
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-border text-sm text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-colors"
+            >
+              <X className="h-3.5 w-3.5" /> Remove Watermark
             </button>
           )}
         </div>
@@ -322,6 +413,7 @@ export default function AdminHeroBanners() {
     <div className="space-y-6">
       {/* Logo Upload Section */}
       <LogoUploadSection />
+      <WatermarkSection />
 
       {/* Hero Banners Section */}
       <div className="flex items-center justify-between">

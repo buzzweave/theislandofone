@@ -3,10 +3,12 @@ import { useGraphics, Graphic } from "@/hooks/useGraphics";
 import { Download, ShoppingCart, Image, Crown, Search } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 export default function Graphics() {
   const { graphics, isLoading } = useGraphics();
   const { toast } = useToast();
+  const { value: watermarkUrl } = useSiteSettings("watermark_url");
   const [activeCategory, setActiveCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [purchased, setPurchased] = useState<Set<string>>(new Set());
@@ -104,6 +106,16 @@ export default function Graphics() {
                     alt={graphic.title}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
+                  {watermarkUrl && !canDownload(graphic) && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <img
+                        src={watermarkUrl}
+                        alt=""
+                        className="w-2/3 h-2/3 object-contain opacity-40 select-none"
+                        draggable={false}
+                      />
+                    </div>
+                  )}
                   {isInnerCircle && (
                     <span className="absolute top-2 left-2 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary text-primary-foreground font-semibold">
                       <Crown className="h-2.5 w-2.5 inline mr-1" />Included
