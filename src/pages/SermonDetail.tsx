@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { sermons, membershipPlans } from "@/data/content";
+import { membershipPlans } from "@/data/content";
+import { useSermons } from "@/hooks/useSermons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -19,6 +20,7 @@ import {
 export default function SermonDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { sermons } = useSermons();
   const sermon = sermons.find((s) => s.id === id);
   const [purchased, setPurchased] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);

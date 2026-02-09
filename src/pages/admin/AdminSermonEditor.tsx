@@ -24,10 +24,11 @@ import {
   Lock,
   BookOpen,
 } from "lucide-react";
-import { sermons as seedSermons, type Sermon } from "@/data/content";
+import { type Sermon } from "@/data/content";
+import { useSermons } from "@/hooks/useSermons";
 
 export default function AdminSermonEditor() {
-  const [sermonList, setSermonList] = useState<Sermon[]>(seedSermons);
+  const { sermons: sermonList, setSermons: setSermonList } = useSermons();
   const [activeId, setActiveId] = useState<string | null>(sermonList[0]?.id ?? null);
   const [saved, setSaved] = useState(false);
 
