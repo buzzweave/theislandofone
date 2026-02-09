@@ -1,12 +1,12 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, BookOpen, Mic, Play, Users } from "lucide-react";
-import heroBg from "@/assets/hero-bg.jpg";
 import bookCover1 from "@/assets/book-cover-1.jpg";
 import bookCover2 from "@/assets/book-cover-2.jpg";
 import bookCover3 from "@/assets/book-cover-3.jpg";
 import { videos, membershipPlans } from "@/data/content";
 import { useBooks } from "@/hooks/useBooks";
 import { useSermons } from "@/hooks/useSermons";
+import HeroCarousel from "@/components/HeroCarousel";
 
 const bookCovers: Record<string, string> = {
   "book-cover-1": bookCover1,
@@ -20,36 +20,7 @@ export default function Index() {
   return (
     <div>
       {/* HERO */}
-      <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
-        <img src={heroBg} alt="" className="absolute inset-0 w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-hero" />
-        <div className="relative z-10 container mx-auto px-4 text-center animate-fade-up">
-          <p className="text-primary font-body text-sm tracking-[0.3em] uppercase mb-6">
-            Author · Speaker · Pastor
-          </p>
-          <h1 className="font-display text-5xl md:text-7xl lg:text-8xl font-bold leading-tight mb-6">
-            The Island<br />
-            <span className="text-gradient-gold">of One</span>
-          </h1>
-          <p className="text-muted-foreground text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
-            Empowering believers to stand firm in faith, discover purpose in solitude, and lead with unshakeable conviction.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              to="/books"
-              className="inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-all shadow-gold"
-            >
-              Explore Books <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link
-              to="/sermons"
-              className="inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full border border-primary/30 text-foreground font-semibold text-sm hover:bg-primary/10 transition-all"
-            >
-              Browse Sermons
-            </Link>
-          </div>
-        </div>
-      </section>
+      <HeroCarousel />
 
       {/* FEATURED BOOKS */}
       <section className="bg-gradient-section py-24">
