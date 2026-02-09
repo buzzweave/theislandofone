@@ -14,7 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      speaking_requests: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          email: string
+          event_date: string
+          event_location: string | null
+          event_name: string
+          id: string
+          message: string | null
+          name: string
+          organization: string | null
+          status: string
+          topic: string | null
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          email: string
+          event_date: string
+          event_location?: string | null
+          event_name: string
+          id?: string
+          message?: string | null
+          name: string
+          organization?: string | null
+          status?: string
+          topic?: string | null
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          email?: string
+          event_date?: string
+          event_location?: string | null
+          event_name?: string
+          id?: string
+          message?: string | null
+          name?: string
+          organization?: string | null
+          status?: string
+          topic?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
