@@ -27,6 +27,7 @@ import {
 import { type Sermon } from "@/data/content";
 import { useSermons } from "@/hooks/useSermons";
 import { useAIContent } from "@/contexts/AIContentContext";
+import AudioGenerator from "@/components/admin/AudioGenerator";
 
 export default function AdminSermonEditor() {
   const { sermons: sermonList, setSermons: setSermonList } = useSermons();
@@ -301,6 +302,21 @@ export default function AdminSermonEditor() {
                   <span>Full access</span>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Audio Generation */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm">Audio Version</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AudioGenerator
+                getText={() => active.manuscript}
+                getTitle={() => active.title}
+                audioUrl={active.audioUrl}
+                onAudioGenerated={(url) => update({ audioUrl: url })}
+              />
             </CardContent>
           </Card>
 
