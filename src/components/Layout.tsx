@@ -119,6 +119,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <Link to="/speaking" className="hover:text-foreground transition-colors">Book a Speaker</Link>
               </div>
             </div>
+            <div>
+              <h4 className="font-display text-sm font-semibold mb-4 text-primary">Legal</h4>
+              <div className="flex flex-col gap-2 text-sm text-muted-foreground">
+                <Link to="/copyright" className="hover:text-foreground transition-colors">Copyright</Link>
+                <Link to="/terms" className="hover:text-foreground transition-colors">Terms of Service</Link>
+                <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link>
+              </div>
+            </div>
           </div>
           <div className="mt-10 pt-6 border-t border-border text-center text-xs text-muted-foreground">
             © {new Date().getFullYear()} The Island of One Ministries. All rights reserved.

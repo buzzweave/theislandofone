@@ -28,6 +28,9 @@ import AdminSettings from "./pages/admin/AdminSettings";
 import AdminChatGPT from "./pages/admin/AdminChatGPT";
 import SermonDetail from "./pages/SermonDetail";
 import NotFound from "./pages/NotFound";
+import Copyright from "./pages/Copyright";
+import TermsOfService from "./pages/TermsOfService";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 
 const queryClient = new QueryClient();
 
@@ -49,6 +52,9 @@ const App = () => (
             <Route path="/about" element={<Layout><About /></Layout>} />
             <Route path="/speaking" element={<Layout><Speaking /></Layout>} />
             <Route path="/membership" element={<Layout><Membership /></Layout>} />
+            <Route path="/copyright" element={<Layout><Copyright /></Layout>} />
+            <Route path="/terms" element={<Layout><TermsOfService /></Layout>} />
+            <Route path="/privacy" element={<Layout><PrivacyPolicy /></Layout>} />
 
             {/* Admin login (public) */}
             <Route path="/admin/login" element={<AdminLogin />} />
