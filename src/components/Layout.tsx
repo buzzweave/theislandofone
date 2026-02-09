@@ -7,6 +7,7 @@ const navLinks = [
   { to: "/books", label: "Books" },
   { to: "/sermons", label: "Sermons" },
   { to: "/videos", label: "Videos" },
+  { to: "/graphics", label: "Graphics" },
   { to: "/speaking", label: "Speaking" },
   { to: "/about", label: "About" },
 ];
