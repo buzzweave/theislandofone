@@ -19,6 +19,7 @@ import AdminPlaceholder from "./pages/admin/AdminPlaceholder";
 import AdminSermonEditor from "./pages/admin/AdminSermonEditor";
 import AdminBookEditor from "./pages/admin/AdminBookEditor";
 import AdminLogin from "./pages/admin/AdminLogin";
+import AdminSpeakingRequests from "./pages/admin/AdminSpeakingRequests";
 import SermonDetail from "./pages/SermonDetail";
 import NotFound from "./pages/NotFound";
 
@@ -51,7 +52,7 @@ const App = () => (
               <Route path="books" element={<AdminBookEditor />} />
               <Route path="sermons" element={<AdminSermonEditor />} />
               <Route path="videos" element={<AdminPlaceholder title="Video Manager" />} />
-              <Route path="speaking" element={<AdminPlaceholder title="Speaking Requests" />} />
+              <Route path="speaking" element={<AdminSpeakingRequests />} />
               <Route path="members" element={<AdminPlaceholder title="Members" />} />
               <Route path="analytics" element={<AdminPlaceholder title="Analytics" />} />
               <Route path="settings" element={<AdminPlaceholder title="Settings" />} />
