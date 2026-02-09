@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, Download, Lock, ShoppingCart } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, Download, FileText, Lock, ShoppingCart } from "lucide-react";
+import { exportBookToPdf, exportBookToEpub } from "@/lib/bookExport";
 import { useBooks } from "@/hooks/useBooks";
 import bookCover1 from "@/assets/book-cover-1.jpg";
 import bookCover2 from "@/assets/book-cover-2.jpg";
@@ -87,15 +88,40 @@ export default function BookDetail() {
                 {book.description}
               </p>
 
-              <div className="flex items-center gap-4 mb-4">
+              <div className="flex flex-wrap items-center gap-3 mb-4">
                 {book.isFree ? (
-                  <button className="inline-flex items-center gap-2 px-8 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-gold">
-                    <Download className="h-4 w-4" /> Free Download
-                  </button>
+                  <>
+                    <button
+                      onClick={() => exportBookToPdf(book)}
+                      className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-gold"
+                    >
+                      <Download className="h-4 w-4" /> Download PDF
+                    </button>
+                    <button
+                      onClick={() => exportBookToEpub(book)}
+                      className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-primary/30 text-primary text-sm font-semibold hover:bg-primary/10 transition-colors"
+                    >
+                      <FileText className="h-4 w-4" /> Download EPUB
+                    </button>
+                  </>
                 ) : purchased ? (
-                  <span className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary/10 text-primary border border-primary/20 text-sm font-semibold">
-                    ✓ Purchased — Full Access
-                  </span>
+                  <>
+                    <span className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-sm font-semibold">
+                      ✓ Purchased
+                    </span>
+                    <button
+                      onClick={() => exportBookToPdf(book)}
+                      className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-gold"
+                    >
+                      <Download className="h-4 w-4" /> PDF
+                    </button>
+                    <button
+                      onClick={() => exportBookToEpub(book)}
+                      className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-primary/30 text-primary text-sm font-semibold hover:bg-primary/10 transition-colors"
+                    >
+                      <FileText className="h-4 w-4" /> EPUB
+                    </button>
+                  </>
                 ) : (
                   <button
                     onClick={() => setPurchased(true)}
