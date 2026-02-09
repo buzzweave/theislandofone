@@ -40,7 +40,7 @@ export default function HeroCarousel() {
   const next = () => setCurrent((c) => (c + 1) % slides.length);
 
   return (
-    <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
+    <section className="relative min-h-[70vh] sm:min-h-[80vh] md:min-h-[90vh] flex items-center justify-center overflow-hidden">
       {/* Background with crossfade */}
       {slides.map((s, i) => (
         <img
@@ -54,11 +54,11 @@ export default function HeroCarousel() {
       ))}
       <div className="absolute inset-0 bg-gradient-hero" />
 
-      <div className="relative z-10 container mx-auto px-4 text-center animate-fade-up">
-        <p className="text-primary font-body text-sm tracking-[0.3em] uppercase mb-6">
+      <div className="relative z-10 container mx-auto px-4 sm:px-6 text-center animate-fade-up">
+        <p className="text-primary font-body text-xs sm:text-sm tracking-[0.2em] sm:tracking-[0.3em] uppercase mb-4 sm:mb-6">
           Author · Speaker · Pastor
         </p>
-        <h1 className="font-display text-5xl md:text-7xl lg:text-8xl font-bold leading-tight mb-6 whitespace-pre-line">
+        <h1 className="font-display text-3xl sm:text-5xl md:text-7xl lg:text-8xl font-bold leading-tight mb-4 sm:mb-6 whitespace-pre-line">
           {slide.title.includes("\n") ? (
             slide.title.split("\n").map((line, i) => (
               <span key={i}>
@@ -70,21 +70,21 @@ export default function HeroCarousel() {
             <span className="text-gradient-gold">{slide.title}</span>
           )}
         </h1>
-        <p className="text-muted-foreground text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
+        <p className="text-muted-foreground text-base sm:text-lg md:text-xl max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed px-2">
           {slide.subtitle}
         </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4 sm:px-0">
           {slide.cta_text && slide.cta_link && (
             <Link
               to={slide.cta_link}
-              className="inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-all shadow-gold"
+              className="inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-3.5 rounded-full bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-all shadow-gold"
             >
               {slide.cta_text} <ArrowRight className="h-4 w-4" />
             </Link>
           )}
           <Link
             to="/sermons"
-            className="inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full border border-primary/30 text-foreground font-semibold text-sm hover:bg-primary/10 transition-all"
+            className="inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-3.5 rounded-full border border-primary/30 text-foreground font-semibold text-sm hover:bg-primary/10 transition-all"
           >
             Browse Sermons
           </Link>

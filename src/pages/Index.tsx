@@ -23,13 +23,13 @@ export default function Index() {
       <HeroCarousel />
 
       {/* FEATURED BOOKS */}
-      <section className="bg-gradient-section py-24">
+      <section className="bg-gradient-section py-16 sm:py-24">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
+          <div className="text-center mb-10 sm:mb-16">
             <p className="text-primary text-sm tracking-[0.2em] uppercase mb-3">Library</p>
-            <h2 className="font-display text-4xl md:text-5xl font-bold">Featured Books</h2>
+            <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold">Featured Books</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 max-w-5xl mx-auto">
             {books.map((book) => (
               <Link
                 key={book.id}
@@ -41,9 +41,10 @@ export default function Index() {
                     src={bookCovers[book.coverImage]}
                     alt={book.title}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    loading="lazy"
                   />
                 </div>
-                <div className="p-5">
+                <div className="p-4 sm:p-5">
                   <h3 className="font-display text-lg font-semibold mb-1">{book.title}</h3>
                   <p className="text-muted-foreground text-sm mb-3 line-clamp-2">{book.subtitle}</p>
                   <span className="text-primary text-sm font-semibold">
@@ -53,7 +54,7 @@ export default function Index() {
               </Link>
             ))}
           </div>
-          <div className="text-center mt-12">
+          <div className="text-center mt-10 sm:mt-12">
             <Link to="/books" className="text-primary text-sm font-semibold hover:underline inline-flex items-center gap-1">
               View All Books <ArrowRight className="h-4 w-4" />
             </Link>
@@ -62,18 +63,18 @@ export default function Index() {
       </section>
 
       {/* FEATURED SERMONS */}
-      <section className="py-24">
+      <section className="py-16 sm:py-24">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
+          <div className="text-center mb-10 sm:mb-16">
             <p className="text-primary text-sm tracking-[0.2em] uppercase mb-3">For Pastors</p>
-            <h2 className="font-display text-4xl md:text-5xl font-bold">Latest Sermons</h2>
+            <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold">Latest Sermons</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-w-5xl mx-auto">
             {sermons.slice(0, 3).map((sermon) => (
               <Link
                 key={sermon.id}
                 to="/sermons"
-                className="group p-6 rounded-xl bg-card border border-border hover:border-primary/30 transition-all duration-300"
+                className="group p-5 sm:p-6 rounded-xl bg-card border border-border hover:border-primary/30 transition-all duration-300"
               >
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-xs font-semibold uppercase tracking-wider text-primary">{sermon.category}</span>
@@ -83,13 +84,13 @@ export default function Index() {
                     </span>
                   )}
                 </div>
-                <h3 className="font-display text-xl font-semibold mb-2 group-hover:text-primary transition-colors">{sermon.title}</h3>
+                <h3 className="font-display text-lg sm:text-xl font-semibold mb-2 group-hover:text-primary transition-colors">{sermon.title}</h3>
                 <p className="text-sm text-muted-foreground mb-3">{sermon.scripture}</p>
                 <p className="text-sm text-muted-foreground line-clamp-2">{sermon.excerpt}</p>
               </Link>
             ))}
           </div>
-          <div className="text-center mt-12">
+          <div className="text-center mt-10 sm:mt-12">
             <Link to="/sermons" className="text-primary text-sm font-semibold hover:underline inline-flex items-center gap-1">
               Browse Sermon Library <ArrowRight className="h-4 w-4" />
             </Link>
@@ -98,35 +99,35 @@ export default function Index() {
       </section>
 
       {/* FEATURED VIDEOS */}
-      <section className="bg-gradient-section py-24">
+      <section className="bg-gradient-section py-16 sm:py-24">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
+          <div className="text-center mb-10 sm:mb-16">
             <p className="text-primary text-sm tracking-[0.2em] uppercase mb-3">Watch</p>
-            <h2 className="font-display text-4xl md:text-5xl font-bold">Featured Videos</h2>
+            <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold">Featured Videos</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-w-5xl mx-auto">
             {videos.filter(v => v.featured).map((video) => (
               <div
                 key={video.id}
                 className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300 cursor-pointer"
               >
                 <div className="relative aspect-video overflow-hidden">
-                  <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
                   <div className="absolute inset-0 bg-background/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="w-14 h-14 rounded-full bg-primary/90 flex items-center justify-center">
-                      <Play className="h-6 w-6 text-primary-foreground ml-0.5" />
+                    <div className="w-12 sm:w-14 h-12 sm:h-14 rounded-full bg-primary/90 flex items-center justify-center">
+                      <Play className="h-5 sm:h-6 w-5 sm:w-6 text-primary-foreground ml-0.5" />
                     </div>
                   </div>
                   <span className="absolute bottom-2 right-2 text-xs bg-background/80 px-2 py-0.5 rounded text-foreground">{video.duration}</span>
                 </div>
-                <div className="p-4">
+                <div className="p-3 sm:p-4">
                   <p className="text-xs text-primary uppercase tracking-wider mb-1">{video.category}</p>
                   <h3 className="font-display text-sm font-semibold">{video.title}</h3>
                 </div>
               </div>
             ))}
           </div>
-          <div className="text-center mt-12">
+          <div className="text-center mt-10 sm:mt-12">
             <Link to="/videos" className="text-primary text-sm font-semibold hover:underline inline-flex items-center gap-1">
               View All Videos <ArrowRight className="h-4 w-4" />
             </Link>
@@ -135,25 +136,25 @@ export default function Index() {
       </section>
 
       {/* MEMBERSHIP CTA */}
-      <section className="py-24">
+      <section className="py-16 sm:py-24">
         <div className="container mx-auto px-4 text-center">
           <p className="text-primary text-sm tracking-[0.2em] uppercase mb-3">Community</p>
-          <h2 className="font-display text-4xl md:text-5xl font-bold mb-6">Join the Inner Circle</h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto mb-12 text-lg">
+          <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold mb-4 sm:mb-6">Join the Inner Circle</h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto mb-10 sm:mb-12 text-base sm:text-lg">
             Get exclusive access to sermons, books, live sessions, and a community of believers walking the same path.
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 max-w-4xl mx-auto">
             {membershipPlans.map((plan) => (
               <div
                 key={plan.id}
-                className={`rounded-xl border p-6 text-left transition-all duration-300 ${
+                className={`rounded-xl border p-5 sm:p-6 text-left transition-all duration-300 ${
                   plan.id === "inner-circle"
                     ? "border-primary bg-primary/5 shadow-gold"
                     : "border-border bg-card hover:border-primary/30"
                 }`}
               >
-                <h3 className="font-display text-xl font-semibold mb-1">{plan.name}</h3>
-                <p className="text-3xl font-bold text-primary mb-4">
+                <h3 className="font-display text-lg sm:text-xl font-semibold mb-1">{plan.name}</h3>
+                <p className="text-2xl sm:text-3xl font-bold text-primary mb-4">
                   ${plan.price}<span className="text-sm text-muted-foreground font-normal">/mo</span>
                 </p>
                 <ul className="space-y-2 mb-6">
@@ -180,17 +181,17 @@ export default function Index() {
       </section>
 
       {/* SPEAKING CTA */}
-      <section className="bg-gradient-section py-24">
+      <section className="bg-gradient-section py-16 sm:py-24">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center">
-            <Mic className="h-10 w-10 text-primary mx-auto mb-6" />
-            <h2 className="font-display text-4xl md:text-5xl font-bold mb-6">Book Bryant Clark to Speak</h2>
-            <p className="text-muted-foreground text-lg mb-8 leading-relaxed">
+            <Mic className="h-8 sm:h-10 w-8 sm:w-10 text-primary mx-auto mb-4 sm:mb-6" />
+            <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold mb-4 sm:mb-6">Book Bryant Clark to Speak</h2>
+            <p className="text-muted-foreground text-base sm:text-lg mb-6 sm:mb-8 leading-relaxed px-2">
               Invite Bryant Clark to your church, conference, or event. Powerful messages on faith, leadership, and purpose.
             </p>
             <Link
               to="/speaking"
-              className="inline-flex items-center gap-2 px-8 py-3.5 rounded-full bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-all shadow-gold"
+              className="inline-flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-3.5 rounded-full bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-all shadow-gold"
             >
               Request a Speaker <ArrowRight className="h-4 w-4" />
             </Link>
@@ -199,15 +200,15 @@ export default function Index() {
       </section>
 
       {/* EMAIL SIGNUP */}
-      <section className="py-24">
+      <section className="py-16 sm:py-24">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="font-display text-3xl md:text-4xl font-bold mb-4">Stay Connected</h2>
-          <p className="text-muted-foreground mb-8 max-w-lg mx-auto">
+          <h2 className="font-display text-2xl sm:text-3xl md:text-4xl font-bold mb-4">Stay Connected</h2>
+          <p className="text-muted-foreground mb-6 sm:mb-8 max-w-lg mx-auto text-sm sm:text-base">
             Get weekly devotionals, book updates, and exclusive content delivered to your inbox.
           </p>
           <form
             onSubmit={(e) => e.preventDefault()}
-            className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto"
+            className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto px-2 sm:px-0"
           >
             <input
               type="email"

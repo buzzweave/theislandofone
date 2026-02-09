@@ -36,11 +36,11 @@ export default function Speaking() {
 
   return (
     <div className="min-h-screen">
-      <section className="py-20 bg-gradient-section">
+      <section className="py-14 sm:py-20 bg-gradient-section">
         <div className="container mx-auto px-4 text-center">
-          <Mic className="h-10 w-10 text-primary mx-auto mb-4" />
-          <h1 className="font-display text-5xl md:text-6xl font-bold mb-4">Speaking Engagements</h1>
-          <p className="text-muted-foreground text-lg max-w-xl mx-auto">
+          <Mic className="h-8 sm:h-10 w-8 sm:w-10 text-primary mx-auto mb-4" />
+          <h1 className="font-display text-3xl sm:text-5xl md:text-6xl font-bold mb-4">Speaking Engagements</h1>
+          <p className="text-muted-foreground text-base sm:text-lg max-w-xl mx-auto">
             Invite Bryant Clark to bring a powerful, faith-filled message to your event.
           </p>
         </div>
