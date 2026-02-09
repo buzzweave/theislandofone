@@ -9,6 +9,7 @@ import AdminGuard from "./components/admin/AdminGuard";
 import { AdminAuthProvider } from "./contexts/AdminAuthContext";
 import Index from "./pages/Index";
 import Books from "./pages/Books";
+import BookDetail from "./pages/BookDetail";
 import Sermons from "./pages/Sermons";
 import Videos from "./pages/Videos";
 import About from "./pages/About";
@@ -36,6 +37,7 @@ const App = () => (
             {/* Public routes */}
             <Route path="/" element={<Layout><Index /></Layout>} />
             <Route path="/books" element={<Layout><Books /></Layout>} />
+            <Route path="/books/:id" element={<Layout><BookDetail /></Layout>} />
             <Route path="/sermons" element={<Layout><Sermons /></Layout>} />
             <Route path="/sermons/:id" element={<Layout><SermonDetail /></Layout>} />
             <Route path="/videos" element={<Layout><Videos /></Layout>} />
