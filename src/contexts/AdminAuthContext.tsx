@@ -11,8 +11,8 @@ interface AdminAuthContextType {
 
 const AdminAuthContext = createContext<AdminAuthContextType | null>(null);
 
-const ADMIN_USERNAME = "admin";
-const ADMIN_PASSWORD = "Island0ne!2025";
+const ADMIN_USERNAME = "support@buzzweave.com";
+const ADMIN_PASSWORD = "Blairbo361!";
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_DURATION = 5 * 60 * 1000; // 5 minutes
 
