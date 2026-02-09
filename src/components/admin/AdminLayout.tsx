@@ -15,6 +15,7 @@ import {
   PanelRightClose,
   PanelRightOpen,
   LogOut,
+  MessageSquare,
 } from "lucide-react";
 import AISidebar from "./AISidebar";
 
@@ -26,6 +27,7 @@ const navItems = [
   { to: "/admin/speaking", label: "Speaking", icon: Mic },
   { to: "/admin/members", label: "Members", icon: Users },
   { to: "/admin/analytics", label: "Analytics", icon: BarChart3 },
+  { to: "/admin/chatgpt", label: "ChatGPT", icon: MessageSquare },
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
