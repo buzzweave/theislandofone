@@ -1,0 +1,155 @@
+export const books = [
+  {
+    id: "1",
+    title: "Finding Your Island",
+    subtitle: "A Journey to Purpose in Isolation",
+    author: "Bryant Clark",
+    description: "Discover how God uses seasons of solitude to shape your destiny. This powerful guide walks you through the wilderness to find your promised land.",
+    price: 14.99,
+    isFree: false,
+    category: "Devotional",
+    coverImage: "book-cover-1",
+  },
+  {
+    id: "2",
+    title: "Standing Alone",
+    subtitle: "Faith When the World Walks Away",
+    author: "Bryant Clark",
+    description: "When everyone else leaves, God remains. Learn to stand firm in faith even when you're the only one standing.",
+    price: 12.99,
+    isFree: false,
+    category: "Faith",
+    coverImage: "book-cover-2",
+  },
+  {
+    id: "3",
+    title: "The Shepherd's Voice",
+    subtitle: "Leading with Grace and Authority",
+    author: "Bryant Clark",
+    description: "A leadership manual for pastors and ministry leaders who want to lead with both strength and compassion.",
+    price: 0,
+    isFree: true,
+    category: "Leadership",
+    coverImage: "book-cover-3",
+  },
+];
+
+export const sermons = [
+  {
+    id: "1",
+    title: "The Power of One",
+    scripture: "Deuteronomy 32:30",
+    excerpt: "One person fully surrendered to God can change the course of a nation. Explore what it means to be that one.",
+    accessLevel: "free" as const,
+    date: "2025-12-15",
+    category: "Faith",
+  },
+  {
+    id: "2",
+    title: "Wilderness Worship",
+    scripture: "Psalm 63:1-4",
+    excerpt: "Your most powerful worship doesn't happen in the sanctuary — it happens in the desert. Learn to praise in the dry season.",
+    accessLevel: "free" as const,
+    date: "2025-11-28",
+    category: "Worship",
+  },
+  {
+    id: "3",
+    title: "Called to the Deep",
+    scripture: "Luke 5:4",
+    excerpt: "Jesus didn't call Peter to stay at the shore. He called him to launch out into the deep. Are you ready?",
+    accessLevel: "member" as const,
+    date: "2025-11-10",
+    category: "Calling",
+  },
+  {
+    id: "4",
+    title: "The Weight of the Anointing",
+    scripture: "1 Samuel 16:13",
+    excerpt: "The anointing isn't light — it's heavy. Understanding the responsibility that comes with God's hand on your life.",
+    accessLevel: "pastor" as const,
+    date: "2025-10-22",
+    category: "Leadership",
+  },
+  {
+    id: "5",
+    title: "Breaking Generational Chains",
+    scripture: "Galatians 5:1",
+    excerpt: "Freedom isn't just for you — it's for every generation after you. Learn to break the chains that bind your bloodline.",
+    accessLevel: "free" as const,
+    date: "2025-10-05",
+    category: "Deliverance",
+  },
+];
+
+export const videos = [
+  {
+    id: "1",
+    title: "The Island of One – Ministry Vision",
+    thumbnail: "https://images.unsplash.com/photo-1504052434569-70ad5836ab65?w=640&h=360&fit=crop",
+    duration: "12:34",
+    category: "Ministry",
+    featured: true,
+  },
+  {
+    id: "2",
+    title: "Sunday Message: Stand Firm",
+    thumbnail: "https://images.unsplash.com/photo-1438232992991-995b7058bbb3?w=640&h=360&fit=crop",
+    duration: "45:12",
+    category: "Sermons",
+    featured: true,
+  },
+  {
+    id: "3",
+    title: "Leadership Conference Keynote",
+    thumbnail: "https://images.unsplash.com/photo-1475721027785-f74eccf877e2?w=640&h=360&fit=crop",
+    duration: "58:30",
+    category: "Speaking",
+    featured: false,
+  },
+  {
+    id: "4",
+    title: "Behind the Book: Finding Your Island",
+    thumbnail: "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=640&h=360&fit=crop",
+    duration: "18:45",
+    category: "Books",
+    featured: false,
+  },
+  {
+    id: "5",
+    title: "Devotional: Morning with God",
+    thumbnail: "https://images.unsplash.com/photo-1506748686214-e9df14d4d9d0?w=640&h=360&fit=crop",
+    duration: "8:20",
+    category: "Devotional",
+    featured: true,
+  },
+];
+
+export const speakingTopics = [
+  "Faith in Isolation — Finding God in the Wilderness",
+  "The Power of One — Individual Impact in a Collective World",
+  "Leading from the Island — Pastoral Leadership",
+  "Breaking Chains — Generational Freedom",
+  "The Author's Journey — Writing for Ministry",
+];
+
+export const membershipPlans = [
+  {
+    id: "reader",
+    name: "Reader",
+    price: 9.99,
+    features: ["Access to all books", "Monthly devotional", "Community forum", "Early access to new releases"],
+  },
+  {
+    id: "pastor",
+    name: "Pastor",
+    price: 19.99,
+    features: ["Everything in Reader", "Full sermon library", "Sermon notes & outlines", "Pastor-only resources", "Ministry support group"],
+  },
+  {
+    id: "inner-circle",
+    name: "Inner Circle",
+    price: 39.99,
+    features: ["Everything in Pastor", "Monthly live Q&A", "Exclusive video content", "Direct messaging", "Priority speaking requests", "Signed book editions"],
+  },
+];
