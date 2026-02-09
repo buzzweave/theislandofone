@@ -22,7 +22,7 @@ export default function BookDetail() {
   const { id } = useParams<{ id: string }>();
   const { books } = useBooks();
   const book = books.find((b) => b.id === id);
-  const [openChapter, setOpenChapter] = useState<string | null>(null);
+  const [openChapter, setOpenChapter] = useState<string | null>(book?.chapters[0]?.id ?? null);
   const [purchased, setPurchased] = useState(false);
 
   if (!book) {
