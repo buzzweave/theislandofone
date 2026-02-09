@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +24,7 @@ import {
 import { type Book, type BookChapter } from "@/data/content";
 import { useBooks } from "@/hooks/useBooks";
 import SortableChapterList from "@/components/admin/SortableChapterList";
+import { useAIContent } from "@/contexts/AIContentContext";
 
 const CATEGORIES = ["Devotional", "Faith", "Leadership", "Ministry", "Prayer", "Family"];
 
@@ -31,9 +32,61 @@ export default function AdminBookEditor() {
   const { books: bookList, setBooks: setBookList } = useBooks();
   const [activeId, setActiveId] = useState<string | null>(bookList[0]?.id ?? null);
   const [saved, setSaved] = useState(false);
-  
+  const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
+  const aiContent = useAIContent();
 
   const active = bookList.find((b) => b.id === activeId) ?? null;
+
+  // Register AI insert/replace for the active chapter's content
+  useEffect(() => {
+    if (!active) {
+      aiContent.unregister();
+      return;
+    }
+    aiContent.register({
+      onInsert: (text) => {
+        setBookList((prev) =>
+          prev.map((b) => {
+            if (b.id !== activeId) return b;
+            // If a chapter is active, insert into that chapter
+            if (activeChapterId) {
+              return {
+                ...b,
+                chapters: b.chapters.map((ch) =>
+                  ch.id === activeChapterId
+                    ? { ...ch, content: ch.content + "\n\n" + text }
+                    : ch
+                ),
+              };
+            }
+            // Otherwise insert into description
+            return { ...b, description: b.description + "\n\n" + text };
+          })
+        );
+        setSaved(false);
+      },
+      onReplace: (text) => {
+        setBookList((prev) =>
+          prev.map((b) => {
+            if (b.id !== activeId) return b;
+            if (activeChapterId) {
+              return {
+                ...b,
+                chapters: b.chapters.map((ch) =>
+                  ch.id === activeChapterId
+                    ? { ...ch, content: text }
+                    : ch
+                ),
+              };
+            }
+            return { ...b, description: text };
+          })
+        );
+        setSaved(false);
+      },
+    });
+    return () => aiContent.unregister();
+  }, [activeId, activeChapterId, active, aiContent, setBookList]);
 
   const update = (fields: Partial<Book>) => {
     if (!activeId) return;
@@ -233,6 +286,7 @@ export default function AdminBookEditor() {
                 onReorder={(reordered) => update({ chapters: reordered })}
                 onUpdateChapter={updateChapter}
                 onDeleteChapter={deleteChapter}
+                onExpandedChange={(id) => setActiveChapterId(id)}
               />
             </CardContent>
           </Card>

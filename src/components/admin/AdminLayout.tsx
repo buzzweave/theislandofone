@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
+import { AIContentProvider } from "@/contexts/AIContentContext";
 import {
   LayoutDashboard,
   BookOpen,
@@ -57,6 +58,7 @@ export default function AdminLayout() {
   };
 
   return (
+    <AIContentProvider>
     <div className="min-h-screen flex bg-background">
       {/* ─── Left Navigation Sidebar ─── */}
       <aside
@@ -155,5 +157,6 @@ export default function AdminLayout() {
         </div>
       </div>
     </div>
+    </AIContentProvider>
   );
 }

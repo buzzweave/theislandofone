@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,20 +26,55 @@ import {
 } from "lucide-react";
 import { type Sermon } from "@/data/content";
 import { useSermons } from "@/hooks/useSermons";
+import { useAIContent } from "@/contexts/AIContentContext";
 
 export default function AdminSermonEditor() {
   const { sermons: sermonList, setSermons: setSermonList } = useSermons();
   const [activeId, setActiveId] = useState<string | null>(sermonList[0]?.id ?? null);
   const [saved, setSaved] = useState(false);
+  const aiContent = useAIContent();
 
   const active = sermonList.find((s) => s.id === activeId) ?? null;
 
-  const update = (fields: Partial<Sermon>) => {
+  const updateManuscript = useCallback((fields: Partial<Sermon>) => {
     if (!activeId) return;
     setSermonList((prev) =>
       prev.map((s) => (s.id === activeId ? { ...s, ...fields } : s)),
     );
     setSaved(false);
+  }, [activeId, setSermonList]);
+
+  useEffect(() => {
+    if (!active) {
+      aiContent.unregister();
+      return;
+    }
+    aiContent.register({
+      onInsert: (text) => {
+        setSermonList((prev) =>
+          prev.map((s) =>
+            s.id === activeId
+              ? { ...s, manuscript: s.manuscript + "\n\n" + text }
+              : s
+          )
+        );
+        setSaved(false);
+      },
+      onReplace: (text) => {
+        setSermonList((prev) =>
+          prev.map((s) =>
+            s.id === activeId ? { ...s, manuscript: text } : s
+          )
+        );
+        setSaved(false);
+      },
+    });
+    return () => aiContent.unregister();
+  }, [activeId, active, aiContent, setSermonList]);
+
+
+  const update = (fields: Partial<Sermon>) => {
+    updateManuscript(fields);
   };
 
   const addNew = () => {

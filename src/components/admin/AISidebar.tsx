@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAIContent } from "@/contexts/AIContentContext";
 
 // --- Types ---
 interface DraftCard {
@@ -66,6 +67,7 @@ export default function AISidebar({
   contentType?: "book" | "sermon" | "chapter" | "notes";
 }) {
   const { toast } = useToast();
+  const aiContent = useAIContent();
   const [aiEnabled, setAiEnabled] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<"connected" | "disabled" | "error">("connected");
   const [selectedContext, setSelectedContext] = useState("Selected Text");
@@ -363,10 +365,24 @@ export default function AISidebar({
                         {draft.text}
                       </p>
                       <div className="flex flex-wrap gap-1.5">
-                        <button className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors">
+                        <button
+                          onClick={() => {
+                            aiContent.insert(draft.text);
+                            toast({ title: "Inserted into editor" });
+                          }}
+                          disabled={!aiContent.hasEditor()}
+                          className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
                           <Plus className="h-2.5 w-2.5" /> Insert
                         </button>
-                        <button className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors">
+                        <button
+                          onClick={() => {
+                            aiContent.replace(draft.text);
+                            toast({ title: "Replaced editor content" });
+                          }}
+                          disabled={!aiContent.hasEditor()}
+                          className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
                           <RotateCcw className="h-2.5 w-2.5" /> Replace
                         </button>
                         <button
