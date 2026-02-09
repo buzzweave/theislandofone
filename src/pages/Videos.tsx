@@ -1,12 +1,21 @@
 import { useState } from "react";
-import { Play } from "lucide-react";
+import { Play, Facebook, Twitter, Link2 } from "lucide-react";
 import { videos } from "@/data/content";
+import { useToast } from "@/hooks/use-toast";
 
 const categories = ["All", ...Array.from(new Set(videos.map((v) => v.category)))];
 
 export default function Videos() {
   const [activeCategory, setActiveCategory] = useState("All");
+  const { toast } = useToast();
   const filtered = activeCategory === "All" ? videos : videos.filter((v) => v.category === activeCategory);
+
+  const shareVideo = (title: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const url = window.location.href;
+    navigator.clipboard.writeText(url);
+    toast({ title: "Link copied", description: `Share link for "${title}" copied.` });
+  };
 
   return (
     <div className="min-h-screen">
@@ -57,7 +66,33 @@ export default function Videos() {
               </div>
               <div className="p-4">
                 <p className="text-xs text-primary uppercase tracking-wider mb-1">{video.category}</p>
-                <h3 className="font-display text-sm font-semibold group-hover:text-primary transition-colors">{video.title}</h3>
+                <h3 className="font-display text-sm font-semibold group-hover:text-primary transition-colors mb-2">{video.title}</h3>
+                <div className="flex items-center gap-1.5">
+                  <a
+                    href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="p-1.5 rounded border border-border text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors"
+                  >
+                    <Facebook className="h-3 w-3" />
+                  </a>
+                  <a
+                    href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(video.title)}&url=${encodeURIComponent(window.location.href)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="p-1.5 rounded border border-border text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors"
+                  >
+                    <Twitter className="h-3 w-3" />
+                  </a>
+                  <button
+                    onClick={(e) => shareVideo(video.title, e)}
+                    className="p-1.5 rounded border border-border text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors"
+                  >
+                    <Link2 className="h-3 w-3" />
+                  </button>
+                </div>
               </div>
             </div>
           ))}
