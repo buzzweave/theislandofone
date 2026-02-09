@@ -3,7 +3,7 @@ import { Download, ShoppingCart } from "lucide-react";
 import bookCover1 from "@/assets/book-cover-1.jpg";
 import bookCover2 from "@/assets/book-cover-2.jpg";
 import bookCover3 from "@/assets/book-cover-3.jpg";
-import { books } from "@/data/content";
+import { useBooks } from "@/hooks/useBooks";
 
 const bookCovers: Record<string, string> = {
   "book-cover-1": bookCover1,
@@ -11,9 +11,9 @@ const bookCovers: Record<string, string> = {
   "book-cover-3": bookCover3,
 };
 
-const categories = ["All", ...Array.from(new Set(books.map((b) => b.category)))];
-
 export default function Books() {
+  const { books } = useBooks();
+  const categories = ["All", ...Array.from(new Set(books.map((b) => b.category)))];
   const [activeCategory, setActiveCategory] = useState("All");
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
 

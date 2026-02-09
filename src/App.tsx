@@ -17,6 +17,7 @@ import Membership from "./pages/Membership";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminPlaceholder from "./pages/admin/AdminPlaceholder";
 import AdminSermonEditor from "./pages/admin/AdminSermonEditor";
+import AdminBookEditor from "./pages/admin/AdminBookEditor";
 import AdminLogin from "./pages/admin/AdminLogin";
 import SermonDetail from "./pages/SermonDetail";
 import NotFound from "./pages/NotFound";
@@ -47,7 +48,7 @@ const App = () => (
             {/* Protected admin routes */}
             <Route path="/admin" element={<AdminGuard><AdminLayout /></AdminGuard>}>
               <Route index element={<AdminDashboard />} />
-              <Route path="books" element={<AdminPlaceholder title="Books Manager" />} />
+              <Route path="books" element={<AdminBookEditor />} />
               <Route path="sermons" element={<AdminSermonEditor />} />
               <Route path="videos" element={<AdminPlaceholder title="Video Manager" />} />
               <Route path="speaking" element={<AdminPlaceholder title="Speaking Requests" />} />

@@ -4,7 +4,8 @@ import heroBg from "@/assets/hero-bg.jpg";
 import bookCover1 from "@/assets/book-cover-1.jpg";
 import bookCover2 from "@/assets/book-cover-2.jpg";
 import bookCover3 from "@/assets/book-cover-3.jpg";
-import { books, videos, membershipPlans } from "@/data/content";
+import { videos, membershipPlans } from "@/data/content";
+import { useBooks } from "@/hooks/useBooks";
 import { useSermons } from "@/hooks/useSermons";
 
 const bookCovers: Record<string, string> = {
@@ -14,6 +15,7 @@ const bookCovers: Record<string, string> = {
 };
 
 export default function Index() {
+  const { books } = useBooks();
   const { sermons } = useSermons();
   return (
     <div>

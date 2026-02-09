@@ -1,4 +1,24 @@
-export const books = [
+export interface BookChapter {
+  id: string;
+  title: string;
+  content: string;
+}
+
+export interface Book {
+  id: string;
+  title: string;
+  subtitle: string;
+  author: string;
+  description: string;
+  price: number;
+  isFree: boolean;
+  category: string;
+  coverImage: string;
+  chapters: BookChapter[];
+  featured: boolean;
+}
+
+export const books: Book[] = [
   {
     id: "1",
     title: "Finding Your Island",
@@ -9,6 +29,12 @@ export const books = [
     isFree: false,
     category: "Devotional",
     coverImage: "book-cover-1",
+    chapters: [
+      { id: "1-1", title: "The Call to Solitude", content: "Every great leader in scripture experienced a season of isolation..." },
+      { id: "1-2", title: "Finding Purpose in the Desert", content: "The desert is not a punishment — it's a classroom..." },
+      { id: "1-3", title: "Your Promised Land Awaits", content: "After the wilderness comes the promise..." },
+    ],
+    featured: true,
   },
   {
     id: "2",
@@ -20,6 +46,11 @@ export const books = [
     isFree: false,
     category: "Faith",
     coverImage: "book-cover-2",
+    chapters: [
+      { id: "2-1", title: "When the Crowd Leaves", content: "There comes a moment in every believer's life when the crowd thins..." },
+      { id: "2-2", title: "The Strength of One", content: "One person with God is always a majority..." },
+    ],
+    featured: false,
   },
   {
     id: "3",
@@ -31,6 +62,13 @@ export const books = [
     isFree: true,
     category: "Leadership",
     coverImage: "book-cover-3",
+    chapters: [
+      { id: "3-1", title: "The Heart of a Shepherd", content: "Leadership begins with the heart, not the title..." },
+      { id: "3-2", title: "Leading with Grace", content: "Grace is not weakness — it's strength under control..." },
+      { id: "3-3", title: "Authority and Humility", content: "True authority flows from humility..." },
+      { id: "3-4", title: "Protecting the Flock", content: "A shepherd's first duty is protection..." },
+    ],
+    featured: true,
   },
 ];
 
