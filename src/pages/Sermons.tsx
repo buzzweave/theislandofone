@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { BookOpen, Lock, Eye, ShoppingCart } from "lucide-react";
-import { sermons } from "@/data/content";
+import { useSermons } from "@/hooks/useSermons";
 
-const categories = ["All", ...Array.from(new Set(sermons.map((s) => s.category)))];
 const accessFilters = ["All", "free", "member", "pastor"];
 
 export default function Sermons() {
+  const { sermons } = useSermons();
+  const categories = ["All", ...Array.from(new Set(sermons.map((s) => s.category)))];
   const [activeCategory, setActiveCategory] = useState("All");
   const [accessFilter, setAccessFilter] = useState("All");
 
