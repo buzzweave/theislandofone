@@ -25,6 +25,7 @@ import AdminVideoManager from "./pages/admin/AdminVideoManager";
 import AdminMembers from "./pages/admin/AdminMembers";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import AdminSettings from "./pages/admin/AdminSettings";
+import AdminChatGPT from "./pages/admin/AdminChatGPT";
 import SermonDetail from "./pages/SermonDetail";
 import NotFound from "./pages/NotFound";
 
@@ -61,6 +62,7 @@ const App = () => (
               <Route path="speaking" element={<AdminSpeakingRequests />} />
               <Route path="members" element={<AdminMembers />} />
               <Route path="analytics" element={<AdminAnalytics />} />
+              <Route path="chatgpt" element={<AdminChatGPT />} />
               <Route path="settings" element={<AdminSettings />} />
             </Route>
 
