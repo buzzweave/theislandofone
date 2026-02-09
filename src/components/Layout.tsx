@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Menu, X, BookOpen } from "lucide-react";
 import { useSiteLogo } from "@/hooks/useSiteLogo";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 const navLinks = [
   { to: "/", label: "Home" },
@@ -13,20 +14,23 @@ const navLinks = [
   { to: "/about", label: "About" },
 ];
 
-function SiteLogo({ className = "h-8 w-8" }: { className?: string }) {
+function SiteLogo({ sizeOverride }: { sizeOverride?: number }) {
   const { logoUrl } = useSiteLogo();
+  const { value: logoSize } = useSiteSettings("logo_size", "28");
+  const size = sizeOverride ?? (parseInt(logoSize) || 28);
 
   if (logoUrl) {
     return (
       <img
         src={logoUrl}
         alt="Site Logo"
-        className={`${className} object-contain`}
+        className="object-contain transition-all"
+        style={{ width: `${size}px`, height: `${size}px` }}
       />
     );
   }
 
-  return <BookOpen className={`${className} text-primary`} />;
+  return <BookOpen className="text-primary" style={{ width: `${size}px`, height: `${size}px` }} />;
 }
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -39,7 +43,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <header className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <nav className="container mx-auto flex items-center justify-between h-14 sm:h-16 px-4 md:px-8">
           <Link to="/" className="flex items-center gap-2 group shrink-0">
-            <SiteLogo className="h-6 w-6 sm:h-7 sm:w-7 transition-transform group-hover:scale-110" />
+            <SiteLogo />
             <span className="font-display text-base sm:text-lg font-semibold tracking-wide text-foreground hidden xs:inline">
               The Island of One
             </span>
@@ -115,7 +119,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
             <div className="col-span-2">
               <div className="flex items-center gap-2 mb-4">
-                <SiteLogo className="h-5 w-5" />
+                <SiteLogo sizeOverride={20} />
                 <span className="font-display text-base sm:text-lg font-semibold">The Island of One Ministries</span>
               </div>
               <p className="text-muted-foreground text-sm max-w-md leading-relaxed">
