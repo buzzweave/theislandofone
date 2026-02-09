@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, Download, FileText, Lock, ShoppingCart } from "lucide-react";
 import { exportBookToPdf, exportBookToEpub } from "@/lib/bookExport";
@@ -22,7 +22,13 @@ export default function BookDetail() {
   const { id } = useParams<{ id: string }>();
   const { books } = useBooks();
   const book = books.find((b) => b.id === id);
-  const [openChapter, setOpenChapter] = useState<string | null>(book?.chapters[0]?.id ?? null);
+  const [openChapter, setOpenChapter] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (book?.chapters[0]?.id && !openChapter) {
+      setOpenChapter(book.chapters[0].id);
+    }
+  }, [book]);
   const [purchased, setPurchased] = useState(false);
 
   if (!book) {
