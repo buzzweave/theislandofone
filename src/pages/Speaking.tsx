@@ -1,12 +1,36 @@
 import { useState } from "react";
-import { Mic, Send, CheckCircle } from "lucide-react";
+import { Mic, Send, CheckCircle, Loader2 } from "lucide-react";
 import { speakingTopics } from "@/data/content";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
 export default function Speaking() {
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setLoading(true);
+
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+
+    const { error } = await supabase.from("speaking_requests").insert({
+      name: formData.get("name") as string,
+      email: formData.get("email") as string,
+      organization: (formData.get("organization") as string) || null,
+      event_name: (formData.get("event_type") as string) || "Event",
+      event_date: (formData.get("event_date") as string) || new Date().toISOString().split("T")[0],
+      message: (formData.get("message") as string) || null,
+    });
+
+    setLoading(false);
+
+    if (error) {
+      toast({ title: "Something went wrong", description: "Please try again later.", variant: "destructive" });
+      return;
+    }
+
     setSubmitted(true);
   };
 
@@ -51,15 +75,15 @@ export default function Speaking() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
                     <label className="block text-sm font-medium mb-1.5 text-foreground">Your Name *</label>
-                    <input required type="text" className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                    <input required name="name" type="text" className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1.5 text-foreground">Email *</label>
-                    <input required type="email" className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                    <input required name="email" type="email" className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1.5 text-foreground">Organization</label>
-                    <input type="text" className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                    <input name="organization" type="text" className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1.5 text-foreground">Phone</label>
@@ -68,7 +92,7 @@ export default function Speaking() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1.5 text-foreground">Event Type</label>
-                  <select className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
+                  <select name="event_type" className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
                     <option>Church Service</option>
                     <option>Conference</option>
                     <option>Leadership Summit</option>
@@ -78,18 +102,20 @@ export default function Speaking() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1.5 text-foreground">Event Date (Approximate)</label>
-                  <input type="date" className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                  <label className="block text-sm font-medium mb-1.5 text-foreground">Event Date (Approximate) *</label>
+                  <input required name="event_date" type="date" className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1.5 text-foreground">Tell us about your event *</label>
-                  <textarea required rows={4} className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none" />
+                  <textarea required name="message" rows={4} className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none" />
                 </div>
                 <button
                   type="submit"
-                  className="inline-flex items-center gap-2 px-8 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-gold"
+                  disabled={loading}
+                  className="inline-flex items-center gap-2 px-8 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-gold disabled:opacity-50"
                 >
-                  <Send className="h-4 w-4" /> Submit Request
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  {loading ? "Submitting..." : "Submit Request"}
                 </button>
               </form>
             )}
