@@ -26,6 +26,7 @@ import AdminMembers from "./pages/admin/AdminMembers";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminChatGPT from "./pages/admin/AdminChatGPT";
+import AdminHeroBanners from "./pages/admin/AdminHeroBanners";
 import SermonDetail from "./pages/SermonDetail";
 import NotFound from "./pages/NotFound";
 import Copyright from "./pages/Copyright";
@@ -63,6 +64,7 @@ const App = () => (
             <Route path="/admin" element={<AdminGuard><AdminLayout /></AdminGuard>}>
               <Route index element={<AdminDashboard />} />
               <Route path="books" element={<AdminBookEditor />} />
+              <Route path="hero" element={<AdminHeroBanners />} />
               <Route path="sermons" element={<AdminSermonEditor />} />
               <Route path="videos" element={<AdminVideoManager />} />
               <Route path="speaking" element={<AdminSpeakingRequests />} />

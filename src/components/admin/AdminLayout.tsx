@@ -16,11 +16,13 @@ import {
   PanelRightOpen,
   LogOut,
   MessageSquare,
+  ImageIcon,
 } from "lucide-react";
 import AISidebar from "./AISidebar";
 
 const navItems = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/admin/hero", label: "Hero Banners", icon: ImageIcon },
   { to: "/admin/books", label: "Books", icon: BookOpen },
   { to: "/admin/sermons", label: "Sermons", icon: FileText },
   { to: "/admin/videos", label: "Videos", icon: Video },
