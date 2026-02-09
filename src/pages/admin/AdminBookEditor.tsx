@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,12 +20,16 @@ import {
   DollarSign,
   BookOpen,
   Image,
+  Upload,
+  Loader2,
 } from "lucide-react";
 import { type Book, type BookChapter } from "@/data/content";
 import { useBooks } from "@/hooks/useBooks";
 import SortableChapterList from "@/components/admin/SortableChapterList";
 import { useAIContent } from "@/contexts/AIContentContext";
 import AudioGenerator from "@/components/admin/AudioGenerator";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
 const CATEGORIES = ["Devotional", "Faith", "Leadership", "Ministry", "Prayer", "Family"];
 
@@ -34,6 +38,8 @@ export default function AdminBookEditor() {
   const [activeId, setActiveId] = useState<string | null>(bookList[0]?.id ?? null);
   const [saved, setSaved] = useState(false);
   const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const aiContent = useAIContent();
 
   const active = bookList.find((b) => b.id === activeId) ?? null;
@@ -234,26 +240,59 @@ export default function AdminBookEditor() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div>
-                <Label>Cover Image Key or URL</Label>
-                <Input
-                  value={active.coverImage}
-                  onChange={(e) => update({ coverImage: e.target.value })}
-                  placeholder="e.g. book-cover-1 or https://..."
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Use an existing key (book-cover-1, book-cover-2, book-cover-3) or paste an image URL.
-                </p>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <Label>Cover Image URL</Label>
+                  <Input
+                    value={active.coverImage}
+                    onChange={(e) => update({ coverImage: e.target.value })}
+                    placeholder="Upload an image or paste a URL"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setUploading(true);
+                      try {
+                        const ext = file.name.split(".").pop();
+                        const path = `book-covers/${active.id}.${ext}`;
+                        const { error: uploadError } = await supabase.storage
+                          .from("site-assets")
+                          .upload(path, file, { upsert: true });
+                        if (uploadError) throw uploadError;
+                        const { data: { publicUrl } } = supabase.storage
+                          .from("site-assets")
+                          .getPublicUrl(path);
+                        update({ coverImage: publicUrl });
+                        toast({ title: "Cover uploaded", description: "Book cover image saved." });
+                      } catch (err: any) {
+                        toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+                      } finally {
+                        setUploading(false);
+                        if (fileInputRef.current) fileInputRef.current.value = "";
+                      }
+                    }}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                  >
+                    {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
+                    {uploading ? "Uploading…" : "Upload"}
+                  </Button>
+                </div>
               </div>
               {active.coverImage && (
                 <div className="w-32 aspect-[2/3] rounded-lg border border-border overflow-hidden bg-muted">
-                  {active.coverImage.startsWith("http") ? (
-                    <img src={active.coverImage} alt="Cover preview" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
-                      {active.coverImage}
-                    </div>
-                  )}
+                  <img src={active.coverImage} alt="Cover preview" className="w-full h-full object-cover" />
                 </div>
               )}
             </CardContent>
