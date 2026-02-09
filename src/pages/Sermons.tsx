@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { BookOpen, Lock } from "lucide-react";
+import { Link } from "react-router-dom";
+import { BookOpen, Lock, Eye, ShoppingCart } from "lucide-react";
 import { sermons } from "@/data/content";
 
 const categories = ["All", ...Array.from(new Set(sermons.map((s) => s.category)))];
@@ -67,17 +68,27 @@ export default function Sermons() {
         {/* Sermons List */}
         <div className="max-w-3xl mx-auto space-y-4 pb-24">
           {filtered.map((sermon) => (
-            <div
+            <Link
               key={sermon.id}
-              className="group p-6 rounded-xl border border-border bg-card hover:border-primary/30 transition-all duration-300 cursor-pointer"
+              to={`/sermons/${sermon.id}`}
+              className="group block p-6 rounded-xl border border-border bg-card hover:border-primary/30 transition-all duration-300"
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-xs font-semibold uppercase tracking-wider text-primary">{sermon.category}</span>
-                    {sermon.accessLevel !== "free" && (
+                    {sermon.isFree ? (
+                      <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/5 text-primary/70 border border-primary/10">
+                        Free
+                      </span>
+                    ) : (
                       <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                        <Lock className="h-2.5 w-2.5" /> {sermon.accessLevel}
+                        <Lock className="h-2.5 w-2.5" /> ${sermon.price?.toFixed(2)}
+                      </span>
+                    )}
+                    {sermon.accessLevel !== "free" && (
+                      <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                        {sermon.accessLevel}
                       </span>
                     )}
                   </div>
@@ -85,9 +96,18 @@ export default function Sermons() {
                   <p className="text-sm text-primary/80 mb-2">{sermon.scripture}</p>
                   <p className="text-sm text-muted-foreground line-clamp-2">{sermon.excerpt}</p>
                 </div>
-                <span className="text-xs text-muted-foreground whitespace-nowrap mt-1">{sermon.date}</span>
+                <div className="flex flex-col items-end gap-2 shrink-0">
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">{sermon.date}</span>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground group-hover:text-primary transition-colors">
+                    {sermon.isFree ? (
+                      <><Eye className="h-3 w-3" /> Read</>
+                    ) : (
+                      <><ShoppingCart className="h-3 w-3" /> Preview</>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
+            </Link>
           ))}
           {filtered.length === 0 && (
             <p className="text-center text-muted-foreground py-12">No sermons match your filters.</p>
