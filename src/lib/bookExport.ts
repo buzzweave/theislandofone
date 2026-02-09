@@ -1,6 +1,41 @@
 import { jsPDF } from "jspdf";
 import type { Book } from "@/data/content";
 
+/**
+ * Normalize pasted text into clean paragraphs.
+ * - Joins lines that were broken mid-sentence (orphaned words like "I" on their own line)
+ * - Preserves intentional paragraph breaks (double newlines or lines ending with sentence-ending punctuation)
+ */
+function normalizeParagraphs(text: string): string {
+  // Split into lines and trim each
+  const lines = text.split("\n").map((l) => l.trim());
+  const paragraphs: string[] = [];
+  let current = "";
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Empty line = paragraph break
+    if (!line) {
+      if (current) {
+        paragraphs.push(current);
+        current = "";
+      }
+      continue;
+    }
+
+    if (!current) {
+      current = line;
+    } else {
+      // Join to current paragraph with a space
+      current += " " + line;
+    }
+  }
+  if (current) paragraphs.push(current);
+
+  return paragraphs.join("\n\n");
+}
+
 export function exportBookToPdf(book: Book) {
   const doc = new jsPDF({ unit: "mm", format: "a5" });
   const pageW = doc.internal.pageSize.getWidth();
@@ -36,19 +71,29 @@ export function exportBookToPdf(book: Book) {
     doc.setFontSize(14);
     doc.text(chapter.title, margin, margin + 13);
 
-    // Content
+    // Content – normalize pasted text into clean paragraphs
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    const lines = doc.splitTextToSize(chapter.content, contentW);
+    const normalized = normalizeParagraphs(chapter.content);
+    const paras = normalized.split("\n\n").filter((p) => p.trim());
     let y = margin + 22;
 
-    lines.forEach((line: string) => {
-      if (y > pageH - margin) {
+    paras.forEach((para) => {
+      const wrapped = doc.splitTextToSize(para, contentW);
+      // Check if whole paragraph fits, otherwise start new page first
+      if (y + wrapped.length * 4.5 > pageH - margin && y > margin + 22) {
         doc.addPage();
         y = margin;
       }
-      doc.text(line, margin, y);
-      y += 4.5;
+      wrapped.forEach((line: string) => {
+        if (y > pageH - margin) {
+          doc.addPage();
+          y = margin;
+        }
+        doc.text(line, margin, y);
+        y += 4.5;
+      });
+      y += 3; // paragraph spacing
     });
   });
 
@@ -129,8 +174,8 @@ ${tocItems}
 <head><title>${sanitize(ch.title)}</title></head>
 <body>
   <h1>Chapter ${i + 1}: ${sanitize(ch.title)}</h1>
-  ${ch.content
-    .split("\n")
+  ${normalizeParagraphs(ch.content)
+    .split("\n\n")
     .filter((p) => p.trim())
     .map((p) => `<p>${sanitize(p)}</p>`)
     .join("\n  ")}
