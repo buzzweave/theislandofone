@@ -21,6 +21,10 @@ import AdminSermonEditor from "./pages/admin/AdminSermonEditor";
 import AdminBookEditor from "./pages/admin/AdminBookEditor";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminSpeakingRequests from "./pages/admin/AdminSpeakingRequests";
+import AdminVideoManager from "./pages/admin/AdminVideoManager";
+import AdminMembers from "./pages/admin/AdminMembers";
+import AdminAnalytics from "./pages/admin/AdminAnalytics";
+import AdminSettings from "./pages/admin/AdminSettings";
 import SermonDetail from "./pages/SermonDetail";
 import NotFound from "./pages/NotFound";
 
@@ -53,11 +57,11 @@ const App = () => (
               <Route index element={<AdminDashboard />} />
               <Route path="books" element={<AdminBookEditor />} />
               <Route path="sermons" element={<AdminSermonEditor />} />
-              <Route path="videos" element={<AdminPlaceholder title="Video Manager" />} />
+              <Route path="videos" element={<AdminVideoManager />} />
               <Route path="speaking" element={<AdminSpeakingRequests />} />
-              <Route path="members" element={<AdminPlaceholder title="Members" />} />
-              <Route path="analytics" element={<AdminPlaceholder title="Analytics" />} />
-              <Route path="settings" element={<AdminPlaceholder title="Settings" />} />
+              <Route path="members" element={<AdminMembers />} />
+              <Route path="analytics" element={<AdminAnalytics />} />
+              <Route path="settings" element={<AdminSettings />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
