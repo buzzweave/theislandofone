@@ -12,6 +12,7 @@ import Books from "./pages/Books";
 import BookDetail from "./pages/BookDetail";
 import Sermons from "./pages/Sermons";
 import Videos from "./pages/Videos";
+import Graphics from "./pages/Graphics";
 import About from "./pages/About";
 import Speaking from "./pages/Speaking";
 import Membership from "./pages/Membership";
@@ -28,6 +29,7 @@ import AdminSettings from "./pages/admin/AdminSettings";
 import AdminChatGPT from "./pages/admin/AdminChatGPT";
 import AdminHeroBanners from "./pages/admin/AdminHeroBanners";
 import AdminMembershipPlans from "./pages/admin/AdminMembershipPlans";
+import AdminGraphics from "./pages/admin/AdminGraphics";
 import SermonDetail from "./pages/SermonDetail";
 import NotFound from "./pages/NotFound";
 import Copyright from "./pages/Copyright";
@@ -51,6 +53,7 @@ const App = () => (
             <Route path="/sermons" element={<Layout><Sermons /></Layout>} />
             <Route path="/sermons/:id" element={<Layout><SermonDetail /></Layout>} />
             <Route path="/videos" element={<Layout><Videos /></Layout>} />
+            <Route path="/graphics" element={<Layout><Graphics /></Layout>} />
             <Route path="/about" element={<Layout><About /></Layout>} />
             <Route path="/speaking" element={<Layout><Speaking /></Layout>} />
             <Route path="/membership" element={<Layout><Membership /></Layout>} />
@@ -73,6 +76,7 @@ const App = () => (
               <Route path="analytics" element={<AdminAnalytics />} />
               <Route path="chatgpt" element={<AdminChatGPT />} />
               <Route path="plans" element={<AdminMembershipPlans />} />
+              <Route path="graphics" element={<AdminGraphics />} />
               <Route path="settings" element={<AdminSettings />} />
             </Route>
 
