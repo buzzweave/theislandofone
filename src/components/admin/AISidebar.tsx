@@ -5,6 +5,7 @@ import {
   ChevronRight,
   ClipboardCopy,
   FileText,
+  Loader2,
   PenLine,
   Plus,
   RotateCcw,
@@ -13,6 +14,8 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 // --- Types ---
 interface DraftCard {
@@ -56,32 +59,24 @@ const BOOK_ACTIONS = [
   "Improve narrative continuity",
 ];
 
-// --- Mock for demo ---
-const DEMO_DRAFTS: DraftCard[] = [
-  {
-    id: "demo-1",
-    timestamp: new Date(),
-    context: "Selected Text",
-    text: "AI drafts will appear here when you run an action. Each draft is a suggestion — nothing touches your content until you choose to insert it.",
-  },
-];
-
 // --- Component ---
 export default function AISidebar({
   contentType = "sermon",
 }: {
   contentType?: "book" | "sermon" | "chapter" | "notes";
 }) {
+  const { toast } = useToast();
   const [aiEnabled, setAiEnabled] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<"connected" | "disabled" | "error">("connected");
   const [selectedContext, setSelectedContext] = useState("Selected Text");
   const [customPrompt, setCustomPrompt] = useState("");
   const [notesMode, setNotesMode] = useState(false);
-  const [drafts, setDrafts] = useState<DraftCard[]>(DEMO_DRAFTS);
+  const [drafts, setDrafts] = useState<DraftCard[]>([]);
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [maxResponses, setMaxResponses] = useState(25);
   const [dailyLimit, setDailyLimit] = useState(50);
-  const [callsToday] = useState(3);
+  const [callsToday, setCallsToday] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
 
   const statusColor =
     connectionStatus === "connected"
@@ -97,30 +92,67 @@ export default function AISidebar({
       ? "Key Present · AI Disabled"
       : "No Key / Error";
 
+  const callAI = async (action: string, customPromptText?: string) => {
+    if (isLoading) return;
+    setIsLoading(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-writing", {
+        body: {
+          action,
+          context: selectedContext,
+          contentType,
+          customPrompt: customPromptText || undefined,
+        },
+      });
+
+      if (error) {
+        throw new Error(error.message || "Failed to get AI response");
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      const draft: DraftCard = {
+        id: Date.now().toString(),
+        timestamp: new Date(),
+        context: selectedContext,
+        text: data.text || "No response received.",
+      };
+      setDrafts((prev) => [draft, ...prev]);
+      setCallsToday((prev) => prev + 1);
+    } catch (err: any) {
+      console.error("AI action error:", err);
+      toast({
+        title: "AI Error",
+        description: err.message || "Something went wrong with the AI request.",
+        variant: "destructive",
+      });
+      setConnectionStatus("error");
+      setTimeout(() => setConnectionStatus("connected"), 5000);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleQuickAction = (action: string) => {
-    const draft: DraftCard = {
-      id: Date.now().toString(),
-      timestamp: new Date(),
-      context: selectedContext,
-      text: `[AI Draft] Response to "${action}" will appear here once the AI backend is connected. This is a placeholder demonstrating the workflow.`,
-    };
-    setDrafts((prev) => [draft, ...prev]);
+    callAI(action);
   };
 
   const handleCustomSubmit = () => {
     if (!customPrompt.trim()) return;
-    const draft: DraftCard = {
-      id: Date.now().toString(),
-      timestamp: new Date(),
-      context: selectedContext,
-      text: `[AI Draft] Response to your prompt: "${customPrompt}" — will appear here once connected.`,
-    };
-    setDrafts((prev) => [draft, ...prev]);
+    callAI("custom prompt", customPrompt);
     setCustomPrompt("");
   };
 
   const removeDraft = (id: string) => {
     setDrafts((prev) => prev.filter((d) => d.id !== id));
+  };
+
+  const copyDraft = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ title: "Copied to clipboard" });
   };
 
   const toggleAi = () => {
@@ -137,6 +169,7 @@ export default function AISidebar({
             <BrainCircuit className="h-4 w-4 text-primary" />
             <span className="font-display text-sm font-semibold tracking-wide">AI Assistant</span>
           </div>
+          {isLoading && <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />}
         </div>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -156,7 +189,7 @@ export default function AISidebar({
             />
           </button>
         </div>
-        <p className="text-[10px] text-muted-foreground mt-2">ChatGPT (Admin-configured)</p>
+        <p className="text-[10px] text-muted-foreground mt-2">Lovable AI (Admin-configured)</p>
       </div>
 
       {/* ─── Scrollable body ─── */}
@@ -195,7 +228,8 @@ export default function AISidebar({
                   <button
                     key={action}
                     onClick={() => handleQuickAction(action)}
-                    className="flex items-center gap-2 px-3 py-2 rounded-md text-xs text-secondary-foreground bg-background border border-border hover:border-primary/30 hover:bg-primary/5 transition-colors text-left"
+                    disabled={isLoading}
+                    className="flex items-center gap-2 px-3 py-2 rounded-md text-xs text-secondary-foreground bg-background border border-border hover:border-primary/30 hover:bg-primary/5 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Zap className="h-3 w-3 text-primary shrink-0" />
                     {action}
@@ -214,7 +248,8 @@ export default function AISidebar({
                       <button
                         key={action}
                         onClick={() => handleQuickAction(action)}
-                        className="flex items-center gap-2 px-3 py-2 rounded-md text-xs text-secondary-foreground bg-background border border-border hover:border-primary/30 hover:bg-primary/5 transition-colors text-left"
+                        disabled={isLoading}
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-xs text-secondary-foreground bg-background border border-border hover:border-primary/30 hover:bg-primary/5 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <PenLine className="h-3 w-3 text-primary shrink-0" />
                         {action}
@@ -235,7 +270,8 @@ export default function AISidebar({
                       <button
                         key={action}
                         onClick={() => handleQuickAction(action)}
-                        className="flex items-center gap-2 px-3 py-2 rounded-md text-xs text-secondary-foreground bg-background border border-border hover:border-primary/30 hover:bg-primary/5 transition-colors text-left"
+                        disabled={isLoading}
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-xs text-secondary-foreground bg-background border border-border hover:border-primary/30 hover:bg-primary/5 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <PenLine className="h-3 w-3 text-primary shrink-0" />
                         {action}
@@ -261,10 +297,10 @@ export default function AISidebar({
               <div className="flex gap-2 mt-2">
                 <button
                   onClick={handleCustomSubmit}
-                  disabled={!customPrompt.trim()}
+                  disabled={!customPrompt.trim() || isLoading}
                   className="flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  <Send className="h-3 w-3" /> Submit
+                  {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />} Submit
                 </button>
                 <button
                   onClick={() => setCustomPrompt("")}
@@ -323,7 +359,7 @@ export default function AISidebar({
                           {draft.timestamp.toLocaleTimeString()} · {draft.context}
                         </span>
                       </div>
-                      <p className="text-xs text-secondary-foreground leading-relaxed mb-3">
+                      <p className="text-xs text-secondary-foreground leading-relaxed mb-3 whitespace-pre-wrap">
                         {draft.text}
                       </p>
                       <div className="flex flex-wrap gap-1.5">
@@ -333,7 +369,10 @@ export default function AISidebar({
                         <button className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors">
                           <RotateCcw className="h-2.5 w-2.5" /> Replace
                         </button>
-                        <button className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-muted text-muted-foreground border border-border hover:text-foreground transition-colors">
+                        <button
+                          onClick={() => copyDraft(draft.text)}
+                          className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-muted text-muted-foreground border border-border hover:text-foreground transition-colors"
+                        >
                           <ClipboardCopy className="h-2.5 w-2.5" /> Copy
                         </button>
                         <button className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-muted text-muted-foreground border border-border hover:text-foreground transition-colors">
@@ -390,9 +429,11 @@ export default function AISidebar({
                   <div className="pt-2 space-y-1 text-[10px] text-muted-foreground">
                     <p>Calls today: <span className="text-foreground font-medium">{callsToday}</span></p>
                     <p>Estimated tokens: <span className="text-foreground font-medium">~{callsToday * 450}</span></p>
-                    <p>Last AI call: <span className="text-foreground font-medium">Just now</span></p>
                   </div>
-                  <button className="w-full py-1.5 rounded-md border border-border text-[10px] text-muted-foreground hover:text-foreground transition-colors">
+                  <button
+                    onClick={() => setCallsToday(0)}
+                    className="w-full py-1.5 rounded-md border border-border text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                  >
                     Reset Usage Counter
                   </button>
                 </div>
