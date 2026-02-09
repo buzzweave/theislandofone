@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, Download, FileText, Lock, ShoppingCart } from "lucide-react";
 import { exportBookToPdf, exportBookToEpub } from "@/lib/bookExport";
 import { useBooks } from "@/hooks/useBooks";
+import SocialShareLinks from "@/components/SocialShareLinks";
 import bookCover1 from "@/assets/book-cover-1.jpg";
 import bookCover2 from "@/assets/book-cover-2.jpg";
 import bookCover3 from "@/assets/book-cover-3.jpg";
@@ -138,10 +139,12 @@ export default function BookDetail() {
                 )}
               </div>
 
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground mb-4">
                 {book.chapters.length} chapter{book.chapters.length !== 1 ? "s" : ""}
                 {!book.isFree && !purchased && ` · Preview first chapter free`}
               </p>
+
+              <SocialShareLinks title={book.title} />
             </div>
           </div>
         </div>

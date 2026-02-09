@@ -4,6 +4,7 @@ import { membershipPlans } from "@/data/content";
 import { useSermons } from "@/hooks/useSermons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import SocialShareLinks from "@/components/SocialShareLinks";
 import {
   ArrowLeft,
   Lock,
@@ -91,10 +92,11 @@ export default function SermonDetail() {
             </h1>
             <p className="text-lg text-primary/80 mb-2">{sermon.scripture}</p>
             <p className="text-muted-foreground">{sermon.excerpt}</p>
-            <p className="text-sm text-muted-foreground mt-3">
+            <p className="text-sm text-muted-foreground mt-3 mb-4">
               Published {new Date(sermon.date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
               {" · "}By Bryant Clark
             </p>
+            <SocialShareLinks title={sermon.title} />
           </div>
         </div>
       </section>
