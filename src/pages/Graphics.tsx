@@ -38,16 +38,16 @@ export default function Graphics() {
 
   return (
     <div className="min-h-screen">
-      <section className="py-20 bg-gradient-section">
+      <section className="py-14 sm:py-20 bg-gradient-section">
         <div className="container mx-auto px-4 text-center">
           <p className="text-primary text-sm tracking-[0.2em] uppercase mb-3">Church Media</p>
-          <h1 className="font-display text-5xl md:text-6xl font-bold mb-4">Graphics</h1>
-          <p className="text-muted-foreground text-lg max-w-xl mx-auto mb-6">
+          <h1 className="font-display text-3xl sm:text-5xl md:text-6xl font-bold mb-4">Graphics</h1>
+          <p className="text-muted-foreground text-base sm:text-lg max-w-xl mx-auto mb-6">
             Professional graphics for your church screens, social media, and print. Purchase individually or get unlimited access with Inner Circle membership.
           </p>
           <Link
             to="/membership"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary/10 text-primary border border-primary/20 text-sm font-semibold hover:bg-primary/20 transition-colors"
+            className="inline-flex items-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 rounded-full bg-primary/10 text-primary border border-primary/20 text-sm font-semibold hover:bg-primary/20 transition-colors"
           >
             <Crown className="h-4 w-4" /> Inner Circle: Unlimited Downloads
           </Link>

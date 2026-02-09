@@ -5,11 +5,11 @@ export default function About() {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <section className="py-20 bg-gradient-section">
+      <section className="py-14 sm:py-20 bg-gradient-section">
         <div className="container mx-auto px-4 text-center">
           <p className="text-primary text-sm tracking-[0.2em] uppercase mb-3">About</p>
-          <h1 className="font-display text-5xl md:text-6xl font-bold mb-4">Bryant Clark</h1>
-          <p className="text-muted-foreground text-lg max-w-xl mx-auto">
+          <h1 className="font-display text-3xl sm:text-5xl md:text-6xl font-bold mb-4">Bryant Clark</h1>
+          <p className="text-muted-foreground text-base sm:text-lg max-w-xl mx-auto">
             Author, Speaker, Pastor — Founder of The Island of One Ministries
           </p>
         </div>
