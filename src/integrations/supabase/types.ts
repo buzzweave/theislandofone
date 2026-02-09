@@ -53,6 +53,42 @@ export type Database = {
         }
         Relationships: []
       }
+      membership_plans: {
+        Row: {
+          created_at: string
+          features: string[]
+          id: string
+          is_featured: boolean
+          name: string
+          price: number
+          slug: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          features?: string[]
+          id?: string
+          is_featured?: boolean
+          name: string
+          price?: number
+          slug: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          features?: string[]
+          id?: string
+          is_featured?: boolean
+          name?: string
+          price?: number
+          slug?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       speaking_requests: {
         Row: {
           admin_notes: string | null
