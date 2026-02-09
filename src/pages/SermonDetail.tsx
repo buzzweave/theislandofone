@@ -5,6 +5,7 @@ import { useSermons } from "@/hooks/useSermons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import SocialShareLinks from "@/components/SocialShareLinks";
+import AudioPlayer from "@/components/AudioPlayer";
 import {
   ArrowLeft,
   Lock,
@@ -97,6 +98,12 @@ export default function SermonDetail() {
               {" · "}By Bryant Clark
             </p>
             <SocialShareLinks title={sermon.title} />
+
+            {isFullAccess && sermon.audioUrl && (
+              <div className="mt-6">
+                <AudioPlayer audioUrl={sermon.audioUrl} title={sermon.title} />
+              </div>
+            )}
           </div>
         </div>
       </section>

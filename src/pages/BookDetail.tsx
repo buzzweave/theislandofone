@@ -4,6 +4,7 @@ import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, Download, FileText, Loc
 import { exportBookToPdf, exportBookToEpub } from "@/lib/bookExport";
 import { useBooks } from "@/hooks/useBooks";
 import SocialShareLinks from "@/components/SocialShareLinks";
+import AudioPlayer from "@/components/AudioPlayer";
 import bookCover1 from "@/assets/book-cover-1.jpg";
 import bookCover2 from "@/assets/book-cover-2.jpg";
 import bookCover3 from "@/assets/book-cover-3.jpg";
@@ -145,6 +146,12 @@ export default function BookDetail() {
               </p>
 
               <SocialShareLinks title={book.title} />
+
+              {canRead && book.audioUrl && (
+                <div className="mt-6">
+                  <AudioPlayer audioUrl={book.audioUrl} title={book.title} />
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -25,6 +25,7 @@ import { type Book, type BookChapter } from "@/data/content";
 import { useBooks } from "@/hooks/useBooks";
 import SortableChapterList from "@/components/admin/SortableChapterList";
 import { useAIContent } from "@/contexts/AIContentContext";
+import AudioGenerator from "@/components/admin/AudioGenerator";
 
 const CATEGORIES = ["Devotional", "Faith", "Leadership", "Ministry", "Prayer", "Family"];
 
@@ -291,7 +292,21 @@ export default function AdminBookEditor() {
             </CardContent>
           </Card>
 
-          {/* Publishing controls */}
+          {/* Audio Generation */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm">Audio Version</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AudioGenerator
+                getText={() => active.chapters.map(ch => `${ch.title}\n\n${ch.content}`).join("\n\n")}
+                getTitle={() => active.title}
+                audioUrl={active.audioUrl}
+                onAudioGenerated={(url) => update({ audioUrl: url })}
+              />
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">

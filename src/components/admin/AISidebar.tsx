@@ -5,6 +5,7 @@ import {
   ChevronRight,
   ClipboardCopy,
   FileText,
+  Headphones,
   Loader2,
   PenLine,
   Plus,
@@ -17,6 +18,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAIContent } from "@/contexts/AIContentContext";
+import AudioGenerator from "@/components/admin/AudioGenerator";
 
 // --- Types ---
 interface DraftCard {
@@ -58,6 +60,12 @@ const BOOK_ACTIONS = [
   "Improve chapter closing",
   "Add reflective depth",
   "Improve narrative continuity",
+];
+
+const AUDIO_ACTIONS = [
+  "Prepare text for audiobook narration",
+  "Add natural pauses and pacing cues",
+  "Simplify complex sentences for listening",
 ];
 
 // --- Component ---
@@ -282,6 +290,33 @@ export default function AISidebar({
                   </div>
                 </div>
               )}
+              {/* Audio prep actions */}
+              <div className="mt-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                  Audio Prep
+                </p>
+                <div className="flex flex-col gap-1.5">
+                  {AUDIO_ACTIONS.map((action) => (
+                    <button
+                      key={action}
+                      onClick={() => handleQuickAction(action)}
+                      disabled={isLoading}
+                      className="flex items-center gap-2 px-3 py-2 rounded-md text-xs text-secondary-foreground bg-background border border-border hover:border-primary/30 hover:bg-primary/5 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Headphones className="h-3 w-3 text-primary shrink-0" />
+                      {action}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* ─── AUDIO GENERATION ─── */}
+            <div className="px-4 py-4">
+              <AudioGenerator
+                getText={() => ""}
+                getTitle={() => contentType}
+              />
             </div>
 
             {/* ─── 4) CUSTOM PROMPT BOX ─── */}

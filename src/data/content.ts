@@ -16,6 +16,7 @@ export interface Book {
   coverImage: string;
   chapters: BookChapter[];
   featured: boolean;
+  audioUrl?: string;
 }
 
 export const books: Book[] = [
@@ -83,8 +84,9 @@ export interface Sermon {
   category: string;
   price: number;
   isFree: boolean;
-  previewCutoff: number; // paragraph index where preview ends (0-based, content shown up to this index)
+  previewCutoff: number;
   featured: boolean;
+  audioUrl?: string;
 }
 
 export const sermons: Sermon[] = [
