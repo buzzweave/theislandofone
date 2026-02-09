@@ -199,7 +199,7 @@ export default function AISidebar({
             />
           </button>
         </div>
-        <p className="text-[10px] text-muted-foreground mt-2">Lovable AI (Admin-configured)</p>
+        <p className="text-[10px] text-muted-foreground mt-2">AI Assistant (Admin-configured)</p>
       </div>
 
       {/* ─── Scrollable body ─── */}
