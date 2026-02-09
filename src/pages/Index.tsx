@@ -38,7 +38,7 @@ export default function Index() {
               >
                 <div className="aspect-[2/3] overflow-hidden">
                   <img
-                    src={bookCovers[book.coverImage]}
+                    src={book.coverImage.startsWith("http") ? book.coverImage : bookCovers[book.coverImage]}
                     alt={book.title}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     loading="lazy"
