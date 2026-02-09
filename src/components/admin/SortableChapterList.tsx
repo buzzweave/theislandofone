@@ -126,6 +126,7 @@ interface SortableChapterListProps {
   onReorder: (chapters: BookChapter[]) => void;
   onUpdateChapter: (id: string, fields: Partial<BookChapter>) => void;
   onDeleteChapter: (id: string) => void;
+  onExpandedChange?: (chapterId: string | null) => void;
 }
 
 export default function SortableChapterList({
@@ -133,8 +134,15 @@ export default function SortableChapterList({
   onReorder,
   onUpdateChapter,
   onDeleteChapter,
+  onExpandedChange,
 }: SortableChapterListProps) {
   const [expandedChapter, setExpandedChapter] = useState<string | null>(null);
+
+  const handleToggle = (id: string) => {
+    const next = expandedChapter === id ? null : id;
+    setExpandedChapter(next);
+    onExpandedChange?.(next);
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -180,9 +188,7 @@ export default function SortableChapterList({
               chapter={ch}
               index={idx}
               isExpanded={expandedChapter === ch.id}
-              onToggle={() =>
-                setExpandedChapter(expandedChapter === ch.id ? null : ch.id)
-              }
+              onToggle={() => handleToggle(ch.id)}
               onUpdate={(fields) => onUpdateChapter(ch.id, fields)}
               onDelete={() => onDeleteChapter(ch.id)}
             />
