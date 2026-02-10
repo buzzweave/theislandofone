@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useGraphics, Graphic } from "@/hooks/useGraphics";
-import { Download, ShoppingCart, Image, Crown, Search } from "lucide-react";
+import { ShoppingCart, Image, Crown, Search } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
@@ -11,7 +11,6 @@ export default function Graphics() {
   const { value: watermarkUrl } = useSiteSettings("watermark_url");
   const [activeCategory, setActiveCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const [purchased, setPurchased] = useState<Set<string>>(new Set());
   const [isInnerCircle] = useState(false); // Will be connected to real membership later
 
   const categories = ["All", ...Array.from(new Set(graphics.map((g) => g.category)))];
@@ -22,21 +21,9 @@ export default function Graphics() {
     return matchesCategory && matchesSearch;
   });
 
-  const handlePurchase = (graphic: Graphic) => {
-    setPurchased((prev) => new Set(prev).add(graphic.id));
-    toast({ title: "Purchased!", description: `"${graphic.title}" is ready to download.` });
+  const handleContactPurchase = (graphic: Graphic) => {
+    toast({ title: "Coming Soon", description: `Purchase for "${graphic.title}" will be available soon. Contact us for details.` });
   };
-
-  const handleDownload = (graphic: Graphic) => {
-    const link = document.createElement("a");
-    link.href = graphic.file_url;
-    link.download = graphic.title.replace(/\s+/g, "-").toLowerCase();
-    link.target = "_blank";
-    link.click();
-    toast({ title: "Download started", description: graphic.title });
-  };
-
-  const canDownload = (graphic: Graphic) => isInnerCircle || purchased.has(graphic.id);
 
   return (
     <div className="min-h-screen">
@@ -106,7 +93,7 @@ export default function Graphics() {
                     alt={graphic.title}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
-                  {watermarkUrl && !canDownload(graphic) && (
+                  {watermarkUrl && !isInnerCircle && (
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                       <img
                         src={watermarkUrl}
@@ -136,21 +123,12 @@ export default function Graphics() {
                     <span className="text-lg font-bold text-primary">
                       {isInnerCircle ? "Free" : `$${graphic.price}`}
                     </span>
-                    {canDownload(graphic) ? (
-                      <button
-                        onClick={() => handleDownload(graphic)}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors"
-                      >
-                        <Download className="h-3.5 w-3.5" /> Download
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handlePurchase(graphic)}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-primary/30 text-primary text-xs font-semibold hover:bg-primary/10 transition-colors"
-                      >
-                        <ShoppingCart className="h-3.5 w-3.5" /> Buy
-                      </button>
-                    )}
+                    <button
+                      onClick={() => handleContactPurchase(graphic)}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-primary/30 text-primary text-xs font-semibold hover:bg-primary/10 transition-colors"
+                    >
+                      <ShoppingCart className="h-3.5 w-3.5" /> Buy
+                    </button>
                   </div>
                 </div>
               </div>

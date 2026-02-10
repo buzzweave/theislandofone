@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, Download, FileText, Lock, ShoppingCart } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, Download, FileText, Lock, Mail } from "lucide-react";
 import { exportBookToPdf, exportBookToEpub } from "@/lib/bookExport";
 import { useBook } from "@/hooks/useBooks";
 import SocialShareLinks from "@/components/SocialShareLinks";
@@ -17,7 +17,7 @@ export default function BookDetail() {
       setOpenChapter(book.chapters[0].id);
     }
   }, [book]);
-  const [purchased, setPurchased] = useState(false);
+  
 
   if (isLoading) {
     return (
@@ -38,8 +38,8 @@ export default function BookDetail() {
     );
   }
 
-  const canRead = book.is_free || purchased;
-  const previewChapterCount = 1;
+  const canRead = book.is_free;
+  const previewChapterCount = book.is_free ? book.chapters.length : 1;
 
   const toggleChapter = (chapterId: string) => {
     setOpenChapter(openChapter === chapterId ? null : chapterId);
@@ -120,37 +120,19 @@ export default function BookDetail() {
                       <FileText className="h-4 w-4" /> Download EPUB
                     </button>
                   </>
-                ) : purchased ? (
-                  <>
-                    <span className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-sm font-semibold">
-                      ✓ Purchased
-                    </span>
-                    <button
-                      onClick={() => exportBookToPdf(book)}
-                      className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-gold"
-                    >
-                      <Download className="h-4 w-4" /> PDF
-                    </button>
-                    <button
-                      onClick={() => exportBookToEpub(book)}
-                      className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-primary/30 text-primary text-sm font-semibold hover:bg-primary/10 transition-colors"
-                    >
-                      <FileText className="h-4 w-4" /> EPUB
-                    </button>
-                  </>
                 ) : (
-                  <button
-                    onClick={() => setPurchased(true)}
+                  <a
+                    href="/speaking"
                     className="inline-flex items-center gap-2 px-8 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-gold"
                   >
-                    <ShoppingCart className="h-4 w-4" /> Buy — ${book.price}
-                  </button>
+                    <Mail className="h-4 w-4" /> Contact to Purchase — ${book.price}
+                  </a>
                 )}
               </div>
 
               <p className="text-xs text-muted-foreground mb-4">
                 {book.chapters.length} chapter{book.chapters.length !== 1 ? "s" : ""}
-                {!book.is_free && !purchased && ` · Preview first chapter free`}
+                {!book.is_free && ` · Preview first chapter free`}
               </p>
 
               <SocialShareLinks title={book.title} />
@@ -222,14 +204,14 @@ export default function BookDetail() {
                               Enjoying the preview?
                             </p>
                             <p className="text-xs text-muted-foreground mb-3">
-                              Purchase this book to unlock all {book.chapters.length} chapters.
+                              Contact us to purchase this book and unlock all {book.chapters.length} chapters.
                             </p>
-                            <button
-                              onClick={() => setPurchased(true)}
+                            <a
+                              href="/speaking"
                               className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors shadow-gold"
                             >
-                              <ShoppingCart className="h-3.5 w-3.5" /> Buy — ${book.price}
-                            </button>
+                              <Mail className="h-3.5 w-3.5" /> Contact to Purchase
+                            </a>
                           </div>
                         )}
                       </div>
@@ -247,14 +229,14 @@ export default function BookDetail() {
                 Unlock the Full Book
               </h3>
               <p className="text-muted-foreground text-sm mb-5 max-w-md mx-auto">
-                Get instant access to all {book.chapters.length} chapters of "{book.title}" by {book.author}.
+                Get access to all {book.chapters.length} chapters of "{book.title}" by {book.author}. Contact us to purchase.
               </p>
-              <button
-                onClick={() => setPurchased(true)}
+              <a
+                href="/speaking"
                 className="inline-flex items-center gap-2 px-8 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-gold"
               >
-                <ShoppingCart className="h-4 w-4" /> Purchase for ${book.price}
-              </button>
+                <Mail className="h-4 w-4" /> Contact to Purchase
+              </a>
             </div>
           )}
         </div>

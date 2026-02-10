@@ -8,7 +8,6 @@ export interface Graphic {
   category: string;
   price: number;
   preview_url: string;
-  file_url: string;
   is_active: boolean;
   sort_order: number;
   created_at: string;
@@ -20,7 +19,7 @@ export function useGraphics() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("graphics")
-        .select("*")
+        .select("id, title, description, category, price, preview_url, is_active, sort_order, created_at")
         .order("sort_order", { ascending: true });
       if (error) throw error;
       return data as Graphic[];
