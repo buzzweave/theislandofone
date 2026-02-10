@@ -3,6 +3,16 @@ import { Mic, Send, CheckCircle, Loader2, Phone } from "lucide-react";
 import { speakingTopics } from "@/data/content";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { z } from "zod";
+
+const speakingRequestSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(100, "Name must be under 100 characters"),
+  email: z.string().trim().email("Invalid email address").max(255, "Email must be under 255 characters"),
+  organization: z.string().trim().max(200, "Organization must be under 200 characters").optional().nullable(),
+  event_name: z.string().trim().min(1, "Event type is required").max(200, "Event type must be under 200 characters"),
+  event_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format"),
+  message: z.string().trim().max(2000, "Message must be under 2000 characters").optional().nullable(),
+});
 
 export default function Speaking() {
   const [submitted, setSubmitted] = useState(false);
@@ -15,23 +25,41 @@ export default function Speaking() {
     const form = e.currentTarget;
     const formData = new FormData(form);
 
-    const { error } = await supabase.from("speaking_requests").insert({
-      name: formData.get("name") as string,
-      email: formData.get("email") as string,
-      organization: (formData.get("organization") as string) || null,
-      event_name: (formData.get("event_type") as string) || "Event",
-      event_date: (formData.get("event_date") as string) || new Date().toISOString().split("T")[0],
-      message: (formData.get("message") as string) || null,
-    });
+    try {
+      const validated = speakingRequestSchema.parse({
+        name: formData.get("name"),
+        email: formData.get("email"),
+        organization: (formData.get("organization") as string) || null,
+        event_name: (formData.get("event_type") as string) || "Event",
+        event_date: formData.get("event_date"),
+        message: (formData.get("message") as string) || null,
+      });
 
-    setLoading(false);
+      const { error } = await supabase.from("speaking_requests").insert({
+        name: validated.name,
+        email: validated.email,
+        organization: validated.organization ?? null,
+        event_name: validated.event_name,
+        event_date: validated.event_date,
+        message: validated.message ?? null,
+      });
 
-    if (error) {
+      setLoading(false);
+
+      if (error) {
+        toast({ title: "Something went wrong", description: "Please try again later.", variant: "destructive" });
+        return;
+      }
+
+      setSubmitted(true);
+    } catch (err) {
+      setLoading(false);
+      if (err instanceof z.ZodError) {
+        toast({ title: "Validation Error", description: err.errors[0].message, variant: "destructive" });
+        return;
+      }
       toast({ title: "Something went wrong", description: "Please try again later.", variant: "destructive" });
-      return;
     }
-
-    setSubmitted(true);
   };
 
   return (
@@ -82,15 +110,15 @@ export default function Speaking() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
                     <label className="block text-sm font-medium mb-1.5 text-foreground">Your Name *</label>
-                    <input required name="name" type="text" className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                    <input required name="name" type="text" maxLength={100} className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1.5 text-foreground">Email *</label>
-                    <input required name="email" type="email" className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                    <input required name="email" type="email" maxLength={255} className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1.5 text-foreground">Organization</label>
-                    <input name="organization" type="text" className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                    <input name="organization" type="text" maxLength={200} className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1.5 text-foreground">Phone</label>
@@ -114,7 +142,7 @@ export default function Speaking() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1.5 text-foreground">Tell us about your event *</label>
-                  <textarea required name="message" rows={4} className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none" />
+                  <textarea required name="message" rows={4} maxLength={2000} className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none" />
                 </div>
                 <button
                   type="submit"
