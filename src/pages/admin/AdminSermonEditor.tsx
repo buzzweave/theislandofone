@@ -30,6 +30,7 @@ import { useSermons } from "@/hooks/useSermons";
 import { useAIContent } from "@/contexts/AIContentContext";
 import AudioGenerator from "@/components/admin/AudioGenerator";
 import RichTextEditor from "@/components/admin/RichTextEditor";
+import PdfUploadButton from "@/components/admin/PdfUploadButton";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function AdminSermonEditor() {
@@ -225,9 +226,22 @@ export default function AdminSermonEditor() {
 
           {/* Manuscript - Rich Text Editor */}
           <div>
-            <Label className="flex items-center gap-2 mb-1.5">
-              <FileText className="h-4 w-4" /> Manuscript
-            </Label>
+            <div className="flex items-center justify-between mb-1.5">
+              <Label className="flex items-center gap-2">
+                <FileText className="h-4 w-4" /> Manuscript
+              </Label>
+              <PdfUploadButton
+                mode="sermon"
+                onSermonParsed={(data) => {
+                  update({
+                    title: data.title || active.title,
+                    scripture: data.scripture || active.scripture,
+                    excerpt: data.excerpt || active.excerpt,
+                    manuscript: data.manuscript,
+                  });
+                }}
+              />
+            </div>
             <RichTextEditor
               content={active.manuscript}
               onChange={(html) => update({ manuscript: html })}
