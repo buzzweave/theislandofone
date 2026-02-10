@@ -1,10 +1,60 @@
-import { useEditor, EditorContent, type Editor } from "@tiptap/react";
+import { useEditor, EditorContent, type Editor, Extension } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import { TextStyle } from "@tiptap/extension-text-style";
 import Color from "@tiptap/extension-color";
 import TextAlign from "@tiptap/extension-text-align";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { Slice, Fragment } from "@tiptap/pm/model";
 import { useEffect, useCallback } from "react";
+
+/**
+ * Custom extension that converts pasted plain text into proper paragraph nodes
+ * instead of TipTap's default behaviour of using <br> for every newline.
+ * Double-newlines become paragraph breaks; single newlines become hard breaks.
+ */
+const PasteAsParas = Extension.create({
+  name: "pasteAsParas",
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: new PluginKey("pasteAsParas"),
+        props: {
+          handlePaste(view, event) {
+            // Only intercept plain-text pastes (no HTML on the clipboard)
+            const html = event.clipboardData?.getData("text/html");
+            if (html) return false; // let TipTap handle rich HTML pastes
+
+            const text = event.clipboardData?.getData("text/plain");
+            if (!text) return false;
+
+            const { schema } = view.state;
+            const blocks = text.split(/\n{2,}/);
+            const nodes = blocks
+              .map((b) => b.trim())
+              .filter(Boolean)
+              .map((block) => {
+                const lines = block.split(/\n/);
+                const inline: any[] = [];
+                lines.forEach((line, i) => {
+                  if (i > 0) inline.push(schema.nodes.hardBreak.create());
+                  if (line) inline.push(schema.text(line));
+                });
+                return schema.nodes.paragraph.create(null, inline);
+              });
+
+            if (nodes.length === 0) return false;
+
+            const slice = new Slice(Fragment.from(nodes), 0, 0);
+            const tr = view.state.tr.replaceSelection(slice);
+            view.dispatch(tr);
+            return true;
+          },
+        },
+      }),
+    ];
+  },
+});
 import { Toggle } from "@/components/ui/toggle";
 import {
   Bold,
@@ -217,6 +267,7 @@ export default function RichTextEditor({
       TextStyle,
       Color,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
+      PasteAsParas,
     ],
     content,
     editorProps: {
@@ -227,7 +278,7 @@ export default function RichTextEditor({
         ),
         style: `min-height: ${minHeight}`,
       },
-      // Preserve pasted formatting (bold, italic, lists, etc.)
+      // Preserve pasted rich-HTML formatting (bold, italic, lists, etc.)
       transformPastedHTML(html) {
         return html;
       },
