@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { Save, Globe, Bell, Shield, CheckCircle2, Cloud, Bot, Headphones } from "lucide-react";
+import { Save, Globe, Bell, Shield, CheckCircle2, Cloud, Bot, Headphones, Trash2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 
@@ -234,6 +234,33 @@ export default function AdminSettings() {
               <span className="text-xs font-medium">Active</span>
             </div>
           </div>
+      </CardContent>
+      </Card>
+
+      {/* Clear Cache */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Trash2 className="h-4 w-4 text-primary" />
+            Cache
+          </CardTitle>
+          <CardDescription>Clear browser cache and stored data</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            If you're experiencing loading issues, stale data, or a stuck spinner, clearing the cache can help resolve them.
+          </p>
+          <Button
+            variant="destructive"
+            onClick={() => {
+              localStorage.clear();
+              sessionStorage.clear();
+              toast({ title: "Cache cleared", description: "Local storage and session data have been wiped. Reloading…" });
+              setTimeout(() => window.location.reload(), 1500);
+            }}
+          >
+            <Trash2 className="h-4 w-4 mr-2" /> Clear Cache & Reload
+          </Button>
         </CardContent>
       </Card>
 
