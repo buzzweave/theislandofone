@@ -184,10 +184,21 @@ export default function AdminBookEditor() {
     try {
       const { chapters, ...bookData } = local;
       await updateBookMut.mutateAsync({ id: local.id, ...bookData });
+      toast({ title: "✓ Book metadata saved" });
       await upsertChaptersMut.mutateAsync({ bookId: local.id, chapters });
-      toast({ title: "Book saved!" });
+      toast({ title: "✓ Book & chapters saved successfully!" });
     } catch (err: any) {
-      toast({ title: "Save failed", description: err.message, variant: "destructive" });
+      console.error("Save error:", err);
+      const msg = err.message || "Unknown error";
+      if (msg.includes("session") || msg.includes("log in") || msg.includes("RLS")) {
+        toast({
+          title: "Session expired",
+          description: "Please log out and log back in, then try saving again.",
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Save failed", description: msg, variant: "destructive" });
+      }
     } finally {
       setSaving(false);
     }
