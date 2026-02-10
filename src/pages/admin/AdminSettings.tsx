@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { useAdminAuth } from "@/contexts/AdminAuthContext";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,57 +6,64 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { Save, Globe, Bell, Shield, CreditCard, Database, MessageSquare, Eye, EyeOff, CheckCircle2 } from "lucide-react";
+import { Save, Globe, Bell, Shield, CheckCircle2, Cloud, Bot, Headphones } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 export default function AdminSettings() {
   const { toast } = useToast();
-  const [siteName, setSiteName] = useState("The Island of One Ministries");
-  const [siteDescription, setSiteDescription] = useState("Faith, Purpose, and Leadership resources by Bryant Clark");
-  const [contactEmail, setContactEmail] = useState("support@buzzweave.com");
-  const [notifyNewMembers, setNotifyNewMembers] = useState(true);
-  const [notifySpeakingRequests, setNotifySpeakingRequests] = useState(true);
-  const [notifyBookPurchases, setNotifyBookPurchases] = useState(false);
-  const [maintenanceMode, setMaintenanceMode] = useState(false);
-  const [allowRegistration, setAllowRegistration] = useState(true);
 
-  // API Keys state
-  const [stripeKey, setStripeKey] = useState("");
-  const [stripeKeySaved, setStripeKeySaved] = useState(false);
-  const [showStripeKey, setShowStripeKey] = useState(false);
+  // Persist all settings via site_settings table
+  const siteName = useSiteSettings("site_name", "The Island of One Ministries");
+  const siteDescription = useSiteSettings("site_description", "Faith, Purpose, and Leadership resources by Bryant Clark");
+  const contactEmail = useSiteSettings("contact_email", "support@buzzweave.com");
+  const notifyNewMembers = useSiteSettings("notify_new_members", "true");
+  const notifySpeakingRequests = useSiteSettings("notify_speaking_requests", "true");
+  const notifyBookPurchases = useSiteSettings("notify_book_purchases", "false");
+  const maintenanceMode = useSiteSettings("maintenance_mode", "false");
+  const allowRegistration = useSiteSettings("allow_registration", "true");
 
-  const [storageKey, setStorageKey] = useState("");
-  const [storageKeySaved, setStorageKeySaved] = useState(false);
-  const [showStorageKey, setShowStorageKey] = useState(false);
+  // Local state for text inputs (synced from DB, saved on button click)
+  const [localName, setLocalName] = useState("");
+  const [localDesc, setLocalDesc] = useState("");
+  const [localEmail, setLocalEmail] = useState("");
 
-  const [chatgptKey, setChatgptKey] = useState("");
-  const [chatgptKeySaved, setChatgptKeySaved] = useState(false);
-  const [showChatgptKey, setShowChatgptKey] = useState(false);
+  useEffect(() => { if (!siteName.isLoading) setLocalName(siteName.value); }, [siteName.value, siteName.isLoading]);
+  useEffect(() => { if (!siteDescription.isLoading) setLocalDesc(siteDescription.value); }, [siteDescription.value, siteDescription.isLoading]);
+  useEffect(() => { if (!contactEmail.isLoading) setLocalEmail(contactEmail.value); }, [contactEmail.value, contactEmail.isLoading]);
 
-  const handleSave = () => {
-    toast({ title: "Settings saved", description: "Your changes have been applied." });
-  };
-
-  const handleSaveApiKey = (type: "stripe" | "storage" | "chatgpt") => {
-    if (type === "stripe" && stripeKey.trim()) {
-      setStripeKeySaved(true);
-      toast({ title: "Stripe API key saved", description: "Stripe payments are now enabled." });
-    } else if (type === "storage" && storageKey.trim()) {
-      setStorageKeySaved(true);
-      toast({ title: "Storage API key saved", description: "External storage is now connected." });
-    } else if (type === "chatgpt" && chatgptKey.trim()) {
-      setChatgptKeySaved(true);
-      toast({ title: "ChatGPT API key saved", description: "AI features are now enabled." });
-    } else {
-      toast({ title: "Error", description: "Please enter a valid API key.", variant: "destructive" });
+  const handleSave = async () => {
+    try {
+      await Promise.all([
+        siteName.updateValue(localName),
+        siteDescription.updateValue(localDesc),
+        contactEmail.updateValue(localEmail),
+      ]);
+      toast({ title: "Settings saved", description: "Your changes have been applied." });
+    } catch {
+      toast({ title: "Error", description: "Failed to save settings.", variant: "destructive" });
     }
   };
+
+  const toggleSetting = async (
+    setting: ReturnType<typeof useSiteSettings>,
+    checked: boolean
+  ) => {
+    try {
+      await setting.updateValue(checked ? "true" : "false");
+    } catch {
+      toast({ title: "Error", description: "Failed to update setting.", variant: "destructive" });
+    }
+  };
+
+  const isLoading =
+    siteName.isLoading || siteDescription.isLoading || contactEmail.isLoading;
 
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
         <h2 className="font-display text-2xl font-bold">Settings</h2>
-        <p className="text-sm text-muted-foreground">Manage site configuration & API integrations</p>
+        <p className="text-sm text-muted-foreground">Manage site configuration & integrations</p>
       </div>
 
       {/* General */}
@@ -72,15 +78,28 @@ export default function AdminSettings() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>Site Name</Label>
-            <Input value={siteName} onChange={(e) => setSiteName(e.target.value)} />
+            <Input
+              value={localName}
+              onChange={(e) => setLocalName(e.target.value)}
+              disabled={isLoading}
+            />
           </div>
           <div className="space-y-2">
             <Label>Site Description</Label>
-            <Textarea value={siteDescription} onChange={(e) => setSiteDescription(e.target.value)} rows={2} />
+            <Textarea
+              value={localDesc}
+              onChange={(e) => setLocalDesc(e.target.value)}
+              rows={2}
+              disabled={isLoading}
+            />
           </div>
           <div className="space-y-2">
             <Label>Contact Email</Label>
-            <Input value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} />
+            <Input
+              value={localEmail}
+              onChange={(e) => setLocalEmail(e.target.value)}
+              disabled={isLoading}
+            />
           </div>
         </CardContent>
       </Card>
@@ -92,7 +111,7 @@ export default function AdminSettings() {
             <Bell className="h-4 w-4 text-primary" />
             Notifications
           </CardTitle>
-          <CardDescription>Choose what triggers email alerts</CardDescription>
+          <CardDescription>Choose what triggers dashboard alerts</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
@@ -100,7 +119,10 @@ export default function AdminSettings() {
               <p className="text-sm font-medium">New member signups</p>
               <p className="text-xs text-muted-foreground">Get notified when someone subscribes</p>
             </div>
-            <Switch checked={notifyNewMembers} onCheckedChange={setNotifyNewMembers} />
+            <Switch
+              checked={notifyNewMembers.value === "true"}
+              onCheckedChange={(checked) => toggleSetting(notifyNewMembers, checked)}
+            />
           </div>
           <Separator />
           <div className="flex items-center justify-between">
@@ -108,7 +130,10 @@ export default function AdminSettings() {
               <p className="text-sm font-medium">Speaking requests</p>
               <p className="text-xs text-muted-foreground">Alert on new speaking inquiries</p>
             </div>
-            <Switch checked={notifySpeakingRequests} onCheckedChange={setNotifySpeakingRequests} />
+            <Switch
+              checked={notifySpeakingRequests.value === "true"}
+              onCheckedChange={(checked) => toggleSetting(notifySpeakingRequests, checked)}
+            />
           </div>
           <Separator />
           <div className="flex items-center justify-between">
@@ -116,7 +141,10 @@ export default function AdminSettings() {
               <p className="text-sm font-medium">Book purchases</p>
               <p className="text-xs text-muted-foreground">Notification for each book sale</p>
             </div>
-            <Switch checked={notifyBookPurchases} onCheckedChange={setNotifyBookPurchases} />
+            <Switch
+              checked={notifyBookPurchases.value === "true"}
+              onCheckedChange={(checked) => toggleSetting(notifyBookPurchases, checked)}
+            />
           </div>
         </CardContent>
       </Card>
@@ -136,7 +164,10 @@ export default function AdminSettings() {
               <p className="text-sm font-medium">Maintenance mode</p>
               <p className="text-xs text-muted-foreground">Show a maintenance page to visitors</p>
             </div>
-            <Switch checked={maintenanceMode} onCheckedChange={setMaintenanceMode} />
+            <Switch
+              checked={maintenanceMode.value === "true"}
+              onCheckedChange={(checked) => toggleSetting(maintenanceMode, checked)}
+            />
           </div>
           <Separator />
           <div className="flex items-center justify-between">
@@ -144,132 +175,69 @@ export default function AdminSettings() {
               <p className="text-sm font-medium">Allow new registrations</p>
               <p className="text-xs text-muted-foreground">Let new members sign up</p>
             </div>
-            <Switch checked={allowRegistration} onCheckedChange={setAllowRegistration} />
+            <Switch
+              checked={allowRegistration.value === "true"}
+              onCheckedChange={(checked) => toggleSetting(allowRegistration, checked)}
+            />
           </div>
         </CardContent>
       </Card>
 
-      {/* Stripe API */}
+      {/* Integration Status */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <CreditCard className="h-4 w-4 text-primary" />
-            Stripe API
-            {stripeKeySaved && <CheckCircle2 className="h-4 w-4 text-green-500 ml-auto" />}
+            <Cloud className="h-4 w-4 text-primary" />
+            Integrations
           </CardTitle>
-          <CardDescription>Connect Stripe for book purchases and membership payments</CardDescription>
+          <CardDescription>Connected services and their status</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Stripe Secret Key</Label>
-            <div className="relative">
-              <Input
-                type={showStripeKey ? "text" : "password"}
-                placeholder="sk_live_..."
-                value={stripeKey}
-                onChange={(e) => { setStripeKey(e.target.value); setStripeKeySaved(false); }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowStripeKey(!showStripeKey)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                {showStripeKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Cloud className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium">Cloud Storage</p>
+                <p className="text-xs text-muted-foreground">File storage for images, audio, and media</p>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Find your key at{" "}
-              <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                dashboard.stripe.com/apikeys
-              </a>
-            </p>
+            <div className="flex items-center gap-1.5 text-primary">
+              <CheckCircle2 className="h-4 w-4" />
+              <span className="text-xs font-medium">Active</span>
+            </div>
           </div>
-          <Button size="sm" onClick={() => handleSaveApiKey("stripe")} disabled={!stripeKey.trim()}>
-            {stripeKeySaved ? <><CheckCircle2 className="h-4 w-4 mr-2" /> Connected</> : <><Save className="h-4 w-4 mr-2" /> Save Key</>}
-          </Button>
+          <Separator />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Bot className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium">AI Writing Assistant</p>
+                <p className="text-xs text-muted-foreground">AI-powered content generation</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 text-primary">
+              <CheckCircle2 className="h-4 w-4" />
+              <span className="text-xs font-medium">Active</span>
+            </div>
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Headphones className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium">Text-to-Speech</p>
+                <p className="text-xs text-muted-foreground">Audio generation via ElevenLabs</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 text-primary">
+              <CheckCircle2 className="h-4 w-4" />
+              <span className="text-xs font-medium">Active</span>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Storage API */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Database className="h-4 w-4 text-primary" />
-            Storage API
-            {storageKeySaved && <CheckCircle2 className="h-4 w-4 text-green-500 ml-auto" />}
-          </CardTitle>
-          <CardDescription>Connect external cloud storage for files and media</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Storage API Key</Label>
-            <div className="relative">
-              <Input
-                type={showStorageKey ? "text" : "password"}
-                placeholder="Enter your storage API key..."
-                value={storageKey}
-                onChange={(e) => { setStorageKey(e.target.value); setStorageKeySaved(false); }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowStorageKey(!showStorageKey)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                {showStorageKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              API key for your cloud storage provider (AWS S3, Google Cloud, etc.)
-            </p>
-          </div>
-          <Button size="sm" onClick={() => handleSaveApiKey("storage")} disabled={!storageKey.trim()}>
-            {storageKeySaved ? <><CheckCircle2 className="h-4 w-4 mr-2" /> Connected</> : <><Save className="h-4 w-4 mr-2" /> Save Key</>}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* ChatGPT API */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <MessageSquare className="h-4 w-4 text-primary" />
-            ChatGPT / OpenAI API
-            {chatgptKeySaved && <CheckCircle2 className="h-4 w-4 text-green-500 ml-auto" />}
-          </CardTitle>
-          <CardDescription>Enable AI-powered writing assistance and content generation</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>OpenAI API Key</Label>
-            <div className="relative">
-              <Input
-                type={showChatgptKey ? "text" : "password"}
-                placeholder="sk-..."
-                value={chatgptKey}
-                onChange={(e) => { setChatgptKey(e.target.value); setChatgptKeySaved(false); }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowChatgptKey(!showChatgptKey)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                {showChatgptKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Get your key at{" "}
-              <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                platform.openai.com/api-keys
-              </a>
-            </p>
-          </div>
-          <Button size="sm" onClick={() => handleSaveApiKey("chatgpt")} disabled={!chatgptKey.trim()}>
-            {chatgptKeySaved ? <><CheckCircle2 className="h-4 w-4 mr-2" /> Connected</> : <><Save className="h-4 w-4 mr-2" /> Save Key</>}
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Button onClick={handleSave} className="w-full sm:w-auto">
+      <Button onClick={handleSave} className="w-full sm:w-auto" disabled={isLoading}>
         <Save className="h-4 w-4 mr-2" /> Save Settings
       </Button>
     </div>
