@@ -93,15 +93,15 @@ export function useAddBook() {
 }
 
 async function ensureAdminSession() {
+  // Always try to refresh first to keep token fresh
+  const { data: refreshData } = await supabase.auth.refreshSession();
+  if (refreshData.session?.user) return refreshData.session;
+
+  // Fallback: check existing session
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.user) {
-    // Try refreshing the token
-    const { data: refreshData } = await supabase.auth.refreshSession();
-    if (!refreshData.session?.user) {
-      throw new Error("Your session has expired. Please log in again from the admin login page.");
-    }
-  }
-  return session || (await supabase.auth.getSession()).data.session;
+  if (session?.user) return session;
+
+  throw new Error("Your session has expired. Please log in again from the admin login page.");
 }
 
 export function useUpdateBook() {
