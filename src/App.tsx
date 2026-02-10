@@ -30,6 +30,7 @@ import AdminChatGPT from "./pages/admin/AdminChatGPT";
 import AdminHeroBanners from "./pages/admin/AdminHeroBanners";
 import AdminMembershipPlans from "./pages/admin/AdminMembershipPlans";
 import AdminGraphics from "./pages/admin/AdminGraphics";
+import AdminBlogManager from "./pages/admin/AdminBlogManager";
 import SermonDetail from "./pages/SermonDetail";
 import Blog from "./pages/Blog";
 import NotFound from "./pages/NotFound";
@@ -79,7 +80,7 @@ const App = () => (
               <Route path="chatgpt" element={<AdminChatGPT />} />
               <Route path="plans" element={<AdminMembershipPlans />} />
               <Route path="graphics" element={<AdminGraphics />} />
-              <Route path="blog" element={<AdminPlaceholder title="Blog Manager" />} />
+              <Route path="blog" element={<AdminBlogManager />} />
               <Route path="settings" element={<AdminSettings />} />
             </Route>
 
