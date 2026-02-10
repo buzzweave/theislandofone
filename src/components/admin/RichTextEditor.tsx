@@ -21,11 +21,91 @@ const PasteAsParas = Extension.create({
         key: new PluginKey("pasteAsParas"),
         props: {
           handlePaste(view, event) {
-            // Only intercept plain-text pastes (no HTML on the clipboard)
             const html = event.clipboardData?.getData("text/html");
-            if (html) return false; // let TipTap handle rich HTML pastes
-
             const text = event.clipboardData?.getData("text/plain");
+
+            // If HTML is present (e.g. from ChatGPT), normalize it to preserve paragraphs
+            if (html) {
+              // Create a temp element to parse the HTML
+              const div = document.createElement("div");
+              div.innerHTML = html;
+
+              // Remove any wrapper divs/spans that ChatGPT adds, keep paragraph structure
+              // Convert <br><br> sequences into paragraph breaks
+              let cleaned = div.innerHTML;
+              // Replace double <br> with paragraph split marker
+              cleaned = cleaned.replace(/(<br\s*\/?>\s*){2,}/gi, "</p><p>");
+              // Wrap content in <p> if it's not already wrapped
+              if (!cleaned.trim().startsWith("<p") && !cleaned.trim().startsWith("<h")) {
+                cleaned = `<p>${cleaned}</p>`;
+              }
+
+              // Parse the cleaned HTML into ProseMirror nodes
+              const tempDiv = document.createElement("div");
+              tempDiv.innerHTML = cleaned;
+              const { schema } = view.state;
+              const nodes: any[] = [];
+
+              tempDiv.childNodes.forEach((node) => {
+                if (node.nodeType === Node.TEXT_NODE) {
+                  const t = node.textContent?.trim();
+                  if (t) nodes.push(schema.nodes.paragraph.create(null, schema.text(t)));
+                } else if (node.nodeType === Node.ELEMENT_NODE) {
+                  const el = node as HTMLElement;
+                  const tag = el.tagName.toLowerCase();
+
+                  if (tag === "p" || tag === "div") {
+                    const inner = el.innerHTML.trim();
+                    if (!inner) return;
+                    // Parse inline content (bold, italic, etc.) by using the editor's parser
+                    const wrapper = document.createElement("div");
+                    wrapper.innerHTML = `<p>${inner}</p>`;
+                    const parsed = view.state.schema.nodeFromJSON(
+                      // Use DOMParser to properly parse inline marks
+                      view.someProp("domParser" as any, () => null)
+                        ? null
+                        : null
+                    );
+                    // Fallback: just use plain text from the element
+                    const textContent = el.textContent?.trim();
+                    if (textContent) {
+                      nodes.push(schema.nodes.paragraph.create(null, schema.text(textContent)));
+                    }
+                  } else if (tag === "h1" || tag === "h2" || tag === "h3") {
+                    const level = parseInt(tag.charAt(1));
+                    const textContent = el.textContent?.trim();
+                    if (textContent && schema.nodes.heading) {
+                      nodes.push(schema.nodes.heading.create({ level }, schema.text(textContent)));
+                    }
+                  } else if (tag === "strong" || tag === "b" || tag === "em" || tag === "i") {
+                    const textContent = el.textContent?.trim();
+                    if (textContent) {
+                      const marks: any[] = [];
+                      if (tag === "strong" || tag === "b") marks.push(schema.marks.bold.create());
+                      if (tag === "em" || tag === "i") marks.push(schema.marks.italic.create());
+                      nodes.push(schema.nodes.paragraph.create(null, schema.text(textContent, marks)));
+                    }
+                  } else {
+                    // Generic fallback: extract text as paragraph
+                    const textContent = el.textContent?.trim();
+                    if (textContent) {
+                      nodes.push(schema.nodes.paragraph.create(null, schema.text(textContent)));
+                    }
+                  }
+                }
+              });
+
+              if (nodes.length > 0) {
+                event.preventDefault();
+                const slice = new Slice(Fragment.from(nodes), 0, 0);
+                const tr = view.state.tr.replaceSelection(slice);
+                view.dispatch(tr);
+                return true;
+              }
+              // If our parsing produced nothing, fall through to plain text
+            }
+
+            // Plain-text paste: split on double newlines for paragraphs
             if (!text) return false;
 
             const { schema } = view.state;
@@ -45,6 +125,7 @@ const PasteAsParas = Extension.create({
 
             if (nodes.length === 0) return false;
 
+            event.preventDefault();
             const slice = new Slice(Fragment.from(nodes), 0, 0);
             const tr = view.state.tr.replaceSelection(slice);
             view.dispatch(tr);
@@ -274,7 +355,7 @@ export default function RichTextEditor({
       attributes: {
         class: cn(
           "prose prose-sm dark:prose-invert max-w-none focus:outline-none px-3 py-2",
-          "prose-headings:font-display prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5 prose-blockquote:my-1.5"
+          "prose-headings:font-display prose-p:my-3 prose-ul:my-1.5 prose-ol:my-1.5 prose-blockquote:my-1.5"
         ),
         style: `min-height: ${minHeight}`,
       },
