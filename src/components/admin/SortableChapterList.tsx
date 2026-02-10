@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
+import RichTextEditor from "@/components/admin/RichTextEditor";
 import { CSS } from "@dnd-kit/utilities";
 import {
   DndContext,
@@ -107,12 +108,11 @@ function SortableChapter({
           </div>
           <div>
             <Label className="text-xs">Content</Label>
-            <Textarea
-              value={chapter.content}
-              onChange={(e) => onUpdate({ content: e.target.value })}
-              rows={8}
-              className="font-body text-sm leading-relaxed"
+            <RichTextEditor
+              content={chapter.content}
+              onChange={(html) => onUpdate({ content: html })}
               placeholder="Write chapter content here..."
+              minHeight="180px"
             />
           </div>
         </div>
