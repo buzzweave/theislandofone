@@ -7,6 +7,23 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// In-memory rate limiter: 20 requests per hour per user
+const rateLimits = new Map<string, { count: number; resetAt: number }>();
+const MAX_REQUESTS = 20;
+const WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
+function checkRateLimit(userId: string): boolean {
+  const now = Date.now();
+  const entry = rateLimits.get(userId);
+  if (!entry || now > entry.resetAt) {
+    rateLimits.set(userId, { count: 1, resetAt: now + WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= MAX_REQUESTS) return false;
+  entry.count++;
+  return true;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -37,7 +54,7 @@ serve(async (req) => {
       );
     }
 
-    const userId = claimsData.claims.sub;
+    const userId = claimsData.claims.sub as string;
 
     // Check admin role using service role client
     const serviceClient = createClient(
@@ -59,7 +76,24 @@ serve(async (req) => {
       );
     }
 
+    // Rate limit check
+    if (!checkRateLimit(userId)) {
+      return new Response(
+        JSON.stringify({ error: "Rate limit exceeded. Please try again later (max 20 requests/hour)." }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { action, context, contentType, customPrompt } = await req.json();
+
+    // Input validation
+    const input = context || customPrompt || "";
+    if (input.length > 50000) {
+      return new Response(
+        JSON.stringify({ error: "Input text too long (max 50,000 characters)." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -125,7 +159,7 @@ Do not include meta-commentary like "Here's the rewritten version." Just provide
   } catch (e) {
     console.error("ai-writing error:", e);
     return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
+      JSON.stringify({ error: "An internal error occurred" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
