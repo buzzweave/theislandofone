@@ -79,6 +79,7 @@ const App = () => (
               <Route path="chatgpt" element={<AdminChatGPT />} />
               <Route path="plans" element={<AdminMembershipPlans />} />
               <Route path="graphics" element={<AdminGraphics />} />
+              <Route path="blog" element={<AdminPlaceholder title="Blog Manager" />} />
               <Route path="settings" element={<AdminSettings />} />
             </Route>
 
