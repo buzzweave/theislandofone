@@ -93,13 +93,22 @@ export function useAddBook() {
 }
 
 async function ensureAdminSession() {
-  // Always try to refresh first to keep token fresh
-  const { data: refreshData } = await supabase.auth.refreshSession();
-  if (refreshData.session?.user) return refreshData.session;
+  const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
+    Promise.race([p, new Promise<never>((_, rej) => setTimeout(() => rej(new Error("Session check timed out")), ms))]);
 
-  // Fallback: check existing session
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session?.user) return session;
+  try {
+    const { data: refreshData } = await withTimeout(supabase.auth.refreshSession(), 5000);
+    if (refreshData.session?.user) return refreshData.session;
+  } catch {
+    // refresh failed or timed out, try getSession
+  }
+
+  try {
+    const { data: { session } } = await withTimeout(supabase.auth.getSession(), 5000);
+    if (session?.user) return session;
+  } catch {
+    // also failed
+  }
 
   throw new Error("Your session has expired. Please log in again from the admin login page.");
 }
