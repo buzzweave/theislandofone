@@ -179,27 +179,40 @@ export default function AdminBookEditor() {
   };
 
   const handleSave = async () => {
-    if (!local) return;
+    if (!local || saving) return;
     setSaving(true);
+
+    const SAVE_TIMEOUT = 15000; // 15 second max
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error("Save timed out. Please try again.")), SAVE_TIMEOUT);
+    });
+
     try {
       const { chapters, ...bookData } = local;
-      await updateBookMut.mutateAsync({ id: local.id, ...bookData });
-      toast({ title: "✓ Book metadata saved" });
-      await upsertChaptersMut.mutateAsync({ bookId: local.id, chapters });
+
+      await Promise.race([
+        (async () => {
+          await updateBookMut.mutateAsync({ id: local.id, ...bookData });
+          await upsertChaptersMut.mutateAsync({ bookId: local.id, chapters });
+        })(),
+        timeoutPromise,
+      ]);
+
       toast({ title: "✓ Book & chapters saved successfully!" });
     } catch (err: any) {
       console.error("Save error:", err);
       const msg = err.message || "Unknown error";
-      if (msg.includes("session") || msg.includes("log in") || msg.includes("RLS")) {
-        toast({
-          title: "Session expired",
-          description: "Please log out and log back in, then try saving again.",
-          variant: "destructive",
-        });
+      if (msg.includes("timed out")) {
+        toast({ title: "Save timed out", description: "The server took too long. Please try again.", variant: "destructive" });
+      } else if (msg.includes("session") || msg.includes("log in") || msg.includes("RLS")) {
+        toast({ title: "Session expired", description: "Please log out and log back in, then try saving again.", variant: "destructive" });
       } else {
         toast({ title: "Save failed", description: msg, variant: "destructive" });
       }
     } finally {
+      if (timer) clearTimeout(timer);
       setSaving(false);
     }
   };
