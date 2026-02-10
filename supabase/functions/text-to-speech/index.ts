@@ -17,6 +17,24 @@ const VOICE_MAP: Record<string, string> = {
   "gentle-female": "pFZP5JQG7iQjIQuC4Bku",
 };
 
+// In-memory rate limiter: 10 requests per hour per user (TTS is expensive)
+const rateLimits = new Map<string, { count: number; resetAt: number }>();
+const MAX_REQUESTS = 10;
+const WINDOW_MS = 60 * 60 * 1000;
+const MAX_TEXT_LENGTH = 100000;
+
+function checkRateLimit(userId: string): boolean {
+  const now = Date.now();
+  const entry = rateLimits.get(userId);
+  if (!entry || now > entry.resetAt) {
+    rateLimits.set(userId, { count: 1, resetAt: now + WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= MAX_REQUESTS) return false;
+  entry.count++;
+  return true;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -47,7 +65,7 @@ serve(async (req) => {
       );
     }
 
-    const userId = claimsData.claims.sub;
+    const userId = claimsData.claims.sub as string;
 
     // Check admin role
     const serviceClient = createClient(
@@ -69,6 +87,14 @@ serve(async (req) => {
       );
     }
 
+    // Rate limit check
+    if (!checkRateLimit(userId)) {
+      return new Response(
+        JSON.stringify({ error: "Rate limit exceeded. Please try again later (max 10 requests/hour)." }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { text, voice, title } = await req.json();
     const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
     if (!ELEVENLABS_API_KEY) {
@@ -78,8 +104,15 @@ serve(async (req) => {
       });
     }
 
-    if (!text || text.trim().length === 0) {
+    if (!text || typeof text !== "string" || text.trim().length === 0) {
       return new Response(JSON.stringify({ error: "No text provided" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (text.length > MAX_TEXT_LENGTH) {
+      return new Response(JSON.stringify({ error: `Text too long (max ${MAX_TEXT_LENGTH} characters)` }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -135,7 +168,7 @@ serve(async (req) => {
         const errText = await response.text();
         console.error("ElevenLabs error:", response.status, errText);
         return new Response(
-          JSON.stringify({ error: `ElevenLabs API error: ${response.status}` }),
+          JSON.stringify({ error: "Text-to-speech service error" }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -185,7 +218,7 @@ serve(async (req) => {
   } catch (e) {
     console.error("TTS error:", e);
     return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
+      JSON.stringify({ error: "An internal error occurred" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
