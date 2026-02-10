@@ -1,16 +1,22 @@
 import { BookOpen, FileText, Video, Mic, Users, BarChart3 } from "lucide-react";
 import { Link } from "react-router-dom";
-
-const stats = [
-  { label: "Books", value: "3", icon: BookOpen, to: "/admin/books" },
-  { label: "Sermons", value: "5", icon: FileText, to: "/admin/sermons" },
-  { label: "Videos", value: "5", icon: Video, to: "/admin/videos" },
-  { label: "Speaking Requests", value: "2", icon: Mic, to: "/admin/speaking" },
-  { label: "Members", value: "47", icon: Users, to: "/admin/members" },
-  { label: "Page Views (7d)", value: "1,284", icon: BarChart3, to: "/admin/analytics" },
-];
+import { useBooks } from "@/hooks/useBooks";
+import { useSermons } from "@/hooks/useSermons";
+import { useVideos } from "@/hooks/useVideos";
 
 export default function AdminDashboard() {
+  const { data: books = [] } = useBooks();
+  const { sermons } = useSermons();
+  const { data: videos = [] } = useVideos();
+
+  const stats = [
+    { label: "Books", value: String(books.length), icon: BookOpen, to: "/admin/books" },
+    { label: "Sermons", value: String(sermons.length), icon: FileText, to: "/admin/sermons" },
+    { label: "Videos", value: String(videos.length), icon: Video, to: "/admin/videos" },
+    { label: "Speaking Requests", value: "—", icon: Mic, to: "/admin/speaking" },
+    { label: "Members", value: "—", icon: Users, to: "/admin/members" },
+    { label: "Page Views (7d)", value: "—", icon: BarChart3, to: "/admin/analytics" },
+  ];
   return (
     <div>
       <div className="mb-8">
