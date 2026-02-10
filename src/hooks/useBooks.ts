@@ -31,23 +31,26 @@ export function useBooks() {
   return useQuery({
     queryKey: ["books"],
     queryFn: async () => {
-      const { data: books, error } = await supabase
-        .from("books")
-        .select("*")
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
+      const [booksRes, chaptersRes] = await Promise.all([
+        supabase.from("books").select("*").order("sort_order", { ascending: true }),
+        supabase.from("book_chapters").select("*").order("sort_order", { ascending: true }),
+      ]);
+      if (booksRes.error) throw booksRes.error;
+      if (chaptersRes.error) throw chaptersRes.error;
 
-      const { data: chapters, error: chError } = await supabase
-        .from("book_chapters")
-        .select("*")
-        .order("sort_order", { ascending: true });
-      if (chError) throw chError;
+      const chaptersByBook = new Map<string, BookChapter[]>();
+      for (const ch of chaptersRes.data ?? []) {
+        const arr = chaptersByBook.get(ch.book_id) ?? [];
+        arr.push(ch);
+        chaptersByBook.set(ch.book_id, arr);
+      }
 
-      return (books ?? []).map((b) => ({
+      return (booksRes.data ?? []).map((b) => ({
         ...b,
-        chapters: (chapters ?? []).filter((ch) => ch.book_id === b.id),
+        chapters: chaptersByBook.get(b.id) ?? [],
       })) as Book[];
     },
+    staleTime: 30000,
   });
 }
 
@@ -96,10 +99,10 @@ export function useUpdateBook() {
         .from("books")
         .update(updates)
         .eq("id", id)
-        .select()
-        .single();
+        .select();
       if (error) throw error;
-      return data;
+      if (!data || data.length === 0) throw new Error("Save failed – are you logged in as admin?");
+      return data[0];
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["books"] }),
   });
