@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowLeft, Calendar, User } from "lucide-react";
 import { format } from "date-fns";
+import DOMPurify from "dompurify";
 import SocialShareLinks from "@/components/SocialShareLinks";
 
 export default function BlogPost() {
@@ -78,7 +79,10 @@ export default function BlogPost() {
               prose-p:leading-relaxed prose-p:mb-4
               prose-li:leading-relaxed
               prose-blockquote:border-primary prose-blockquote:italic"
-            dangerouslySetInnerHTML={{ __html: post.content }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(post.content, {
+              ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'a', 'span', 'div'],
+              ALLOWED_ATTR: ['href', 'target', 'rel', 'style', 'class'],
+            }) }}
           />
         ) : (
           <div
