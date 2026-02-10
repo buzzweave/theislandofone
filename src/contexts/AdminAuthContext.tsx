@@ -25,6 +25,19 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
 
   const isLocked = lockoutEnd !== null && Date.now() < lockoutEnd;
 
+  // Keep session alive while admin is logged in
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const interval = setInterval(async () => {
+      try {
+        await supabase.auth.refreshSession();
+      } catch {
+        // ignore
+      }
+    }, 4 * 60 * 1000); // refresh every 4 minutes
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
+
   useEffect(() => {
     let mounted = true;
 
@@ -42,7 +55,6 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    // 1. Set up listener first (but skip events until initial check is done)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!mounted || !initialCheckDone.current) return;
       if (session?.user) {
@@ -53,7 +65,6 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    // 2. Do initial session check
     const init = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -74,7 +85,6 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
 
     init();
 
-    // Safety timeout - 8 seconds max
     const timeout = setTimeout(() => {
       if (mounted) {
         initialCheckDone.current = true;
