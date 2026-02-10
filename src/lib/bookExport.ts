@@ -64,7 +64,7 @@ export function exportBookToPdf(book: Book) {
   doc.setFontSize(8);
   doc.setFont("helvetica", "italic");
   doc.text(
-    `© ${new Date().getFullYear()} @theislandofone. All rights reserved. For personal use only.`,
+    `© ${new Date().getFullYear()} The Island of One. All rights reserved. For personal use only.`,
     pageW / 2,
     pageH * 0.85,
     { align: "center" }
@@ -176,7 +176,7 @@ ${tocItems}
 </body>
 </html>`;
 
-  const copyrightNotice = `© ${new Date().getFullYear()} @theislandofone. All rights reserved. For personal use only.`;
+  const copyrightNotice = `© ${new Date().getFullYear()} The Island of One. All rights reserved. For personal use only.`;
 
   const chapterFiles = book.chapters.map((ch, i) => ({
     name: `OEBPS/ch${i}.xhtml`,
