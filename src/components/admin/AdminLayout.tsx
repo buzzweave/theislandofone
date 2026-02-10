@@ -11,8 +11,6 @@ import {
   Users,
   BarChart3,
   Settings,
-  ChevronLeft,
-  ChevronRight,
   PanelRightClose,
   PanelRightOpen,
   LogOut,
@@ -21,8 +19,12 @@ import {
   Crown,
   Image,
   PenLine,
+  Menu,
 } from "lucide-react";
 import AISidebar from "./AISidebar";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
 
 const navItems = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
@@ -41,124 +43,127 @@ const navItems = [
 ];
 
 export default function AdminLayout() {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [aiSidebarOpen, setAiSidebarOpen] = useState(true);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { logout } = useAdminAuth();
+  const isMobile = useIsMobile();
 
   const isActive = (path: string, end?: boolean) => {
     if (end) return location.pathname === path;
     return location.pathname.startsWith(path);
   };
 
-  // Determine content type for AI sidebar based on route
   const getContentType = (): "book" | "sermon" | "chapter" | "notes" => {
     if (location.pathname.includes("/sermons")) return "sermon";
     if (location.pathname.includes("/books")) return "book";
-    return "sermon"; // default
+    return "sermon";
   };
+
+  const NavContent = () => (
+    <>
+      <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
+        {navItems.map((item) => (
+          <Link
+            key={item.to}
+            to={item.to}
+            onClick={() => setMobileNavOpen(false)}
+            className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+              isActive(item.to, item.end)
+                ? "bg-primary/10 text-primary font-medium"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            }`}
+          >
+            <item.icon className="h-4 w-4 shrink-0" />
+            <span>{item.label}</span>
+          </Link>
+        ))}
+      </nav>
+      <div className="border-t border-border p-2">
+        <button
+          onClick={() => { logout(); navigate("/admin/login"); setMobileNavOpen(false); }}
+          className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors w-full"
+        >
+          <LogOut className="h-4 w-4 shrink-0" />
+          <span>Sign Out</span>
+        </button>
+      </div>
+    </>
+  );
 
   return (
     <AIContentProvider>
-    <div className="min-h-screen flex bg-background">
-      {/* ─── Left Navigation Sidebar ─── */}
-      <aside
-        className={`shrink-0 flex flex-col border-r border-border bg-card transition-all duration-200 ${
-          sidebarCollapsed ? "w-16" : "w-56"
-        }`}
-      >
-        {/* Brand */}
-        <div className="h-14 flex items-center px-4 border-b border-border gap-2">
-          <BookOpen className="h-5 w-5 text-primary shrink-0" />
-          {!sidebarCollapsed && (
-            <span className="font-display text-sm font-semibold truncate">Admin</span>
-          )}
-        </div>
-
-        {/* Nav */}
-        <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
-          {navItems.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
-                isActive(item.to, item.end)
-                  ? "bg-primary/10 text-primary font-medium"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
-              }`}
-              title={sidebarCollapsed ? item.label : undefined}
-            >
-              <item.icon className="h-4 w-4 shrink-0" />
-              {!sidebarCollapsed && <span>{item.label}</span>}
-            </Link>
-          ))}
-        </nav>
-
-        {/* Bottom controls */}
-        <div className="border-t border-border p-2 space-y-1">
-          <button
-            onClick={() => { logout(); navigate("/admin/login"); }}
-            className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors w-full"
-            title={sidebarCollapsed ? "Sign out" : undefined}
-          >
-            <LogOut className="h-4 w-4 shrink-0" />
-            {!sidebarCollapsed && <span>Sign Out</span>}
-          </button>
-          <button
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors w-full"
-          >
-            {sidebarCollapsed ? (
-              <ChevronRight className="h-4 w-4 shrink-0" />
-            ) : (
-              <>
-                <ChevronLeft className="h-4 w-4 shrink-0" />
-                <span>Collapse</span>
-              </>
-            )}
-          </button>
-        </div>
-      </aside>
-
-      {/* ─── Main Content ─── */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top bar */}
-        <header className="h-14 border-b border-border flex items-center justify-between px-6 shrink-0 bg-card">
-          <h1 className="font-display text-base font-semibold truncate">
-            {navItems.find((n) => isActive(n.to, n.end))?.label || "Admin"}
-          </h1>
-          <button
-            onClick={() => setAiSidebarOpen(!aiSidebarOpen)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-border"
-          >
-            {aiSidebarOpen ? (
-              <>
-                <PanelRightClose className="h-3.5 w-3.5" /> Hide AI
-              </>
-            ) : (
-              <>
-                <PanelRightOpen className="h-3.5 w-3.5" /> Show AI
-              </>
-            )}
-          </button>
-        </header>
-
-        {/* Content + AI sidebar */}
-        <div className="flex-1 flex overflow-hidden">
-          <div className="flex-1 overflow-y-auto p-6">
-            <Outlet />
-          </div>
-
-          {/* AI Sidebar */}
-          {aiSidebarOpen && (
-            <div className="w-80 shrink-0 overflow-hidden">
-              <AISidebar contentType={getContentType()} />
+      <div className="min-h-screen flex bg-background">
+        {/* Desktop sidebar */}
+        {!isMobile && (
+          <aside className="shrink-0 flex flex-col border-r border-border bg-card w-56">
+            <div className="h-14 flex items-center px-4 border-b border-border gap-2">
+              <BookOpen className="h-5 w-5 text-primary shrink-0" />
+              <span className="font-display text-sm font-semibold truncate">Admin</span>
             </div>
-          )}
+            <NavContent />
+          </aside>
+        )}
+
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Top bar */}
+          <header className="h-14 border-b border-border flex items-center justify-between px-4 md:px-6 shrink-0 bg-card gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              {isMobile && (
+                <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+                  <SheetTrigger asChild>
+                    <Button variant="ghost" size="icon" className="shrink-0">
+                      <Menu className="h-5 w-5" />
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="left" className="p-0 w-64 flex flex-col">
+                    <div className="h-14 flex items-center px-4 border-b border-border gap-2">
+                      <BookOpen className="h-5 w-5 text-primary shrink-0" />
+                      <span className="font-display text-sm font-semibold">Admin</span>
+                    </div>
+                    <NavContent />
+                  </SheetContent>
+                </Sheet>
+              )}
+              <h1 className="font-display text-base font-semibold truncate">
+                {navItems.find((n) => isActive(n.to, n.end))?.label || "Admin"}
+              </h1>
+            </div>
+            {!isMobile && (
+              <button
+                onClick={() => setAiSidebarOpen(!aiSidebarOpen)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-border"
+              >
+                {aiSidebarOpen ? (
+                  <>
+                    <PanelRightClose className="h-3.5 w-3.5" /> Hide AI
+                  </>
+                ) : (
+                  <>
+                    <PanelRightOpen className="h-3.5 w-3.5" /> Show AI
+                  </>
+                )}
+              </button>
+            )}
+          </header>
+
+          {/* Content + AI sidebar */}
+          <div className="flex-1 flex overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-4 md:p-6">
+              <Outlet />
+            </div>
+
+            {/* AI Sidebar - desktop only */}
+            {!isMobile && aiSidebarOpen && (
+              <div className="w-80 shrink-0 overflow-hidden">
+                <AISidebar contentType={getContentType()} />
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
     </AIContentProvider>
   );
 }
