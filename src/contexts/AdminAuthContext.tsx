@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface AdminAuthContextType {
@@ -21,17 +21,12 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutEnd, setLockoutEnd] = useState<number | null>(null);
+  const initialCheckDone = useRef(false);
 
   const isLocked = lockoutEnd !== null && Date.now() < lockoutEnd;
 
-  // Listen for auth state changes
   useEffect(() => {
     let mounted = true;
-
-    // Safety timeout - never leave the user stuck on a spinner
-    const timeout = setTimeout(() => {
-      if (mounted) setIsLoading(false);
-    }, 3000);
 
     const checkAdminRole = async (userId: string): Promise<boolean> => {
       try {
@@ -47,33 +42,45 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    // Check existing session first
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!mounted) return;
-      if (session?.user) {
-        const isAdmin = await checkAdminRole(session.user.id);
-        if (mounted) setIsAuthenticated(isAdmin);
-      }
-      if (mounted) {
-        setIsLoading(false);
-        clearTimeout(timeout);
-      }
-    });
-
-    // Then listen for future changes
+    // 1. Set up listener first (but skip events until initial check is done)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!mounted) return;
+      if (!mounted || !initialCheckDone.current) return;
       if (session?.user) {
         const isAdmin = await checkAdminRole(session.user.id);
         if (mounted) setIsAuthenticated(isAdmin);
       } else {
         if (mounted) setIsAuthenticated(false);
       }
-      if (mounted) {
-        setIsLoading(false);
-        clearTimeout(timeout);
-      }
     });
+
+    // 2. Do initial session check
+    const init = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!mounted) return;
+        if (session?.user) {
+          const isAdmin = await checkAdminRole(session.user.id);
+          if (mounted) setIsAuthenticated(isAdmin);
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (mounted) {
+          initialCheckDone.current = true;
+          setIsLoading(false);
+        }
+      }
+    };
+
+    init();
+
+    // Safety timeout - 8 seconds max
+    const timeout = setTimeout(() => {
+      if (mounted) {
+        initialCheckDone.current = true;
+        setIsLoading(false);
+      }
+    }, 8000);
 
     return () => {
       mounted = false;
@@ -109,7 +116,6 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
 
       if (!roleData) {
-        // Not an admin — sign them out
         await supabase.auth.signOut();
         const next = failedAttempts + 1;
         setFailedAttempts(next);
