@@ -1,9 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { books, sermons, videos, membershipPlans } from "@/data/content";
+import { sermons, videos, membershipPlans } from "@/data/content";
 import { BarChart3, BookOpen, FileText, Video, Users, TrendingUp, Eye, DollarSign } from "lucide-react";
+import { useBooks } from "@/hooks/useBooks";
 
-const stats = [
-  { label: "Total Books", value: books.length, icon: BookOpen, change: "+2 this month" },
+const staticStats = [
   { label: "Total Sermons", value: sermons.length, icon: FileText, change: "+3 this month" },
   { label: "Total Videos", value: videos.length, icon: Video, change: "+1 this month" },
   { label: "Active Members", value: 127, icon: Users, change: "+12 this month" },
@@ -27,7 +27,13 @@ const revenueData = [
 ];
 
 export default function AdminAnalytics() {
+  const { data: books = [] } = useBooks();
   const maxRevenue = Math.max(...revenueData.map((d) => d.amount));
+
+  const stats = [
+    { label: "Total Books", value: books.length, icon: BookOpen, change: "+2 this month" },
+    ...staticStats,
+  ];
 
   return (
     <div className="space-y-6">

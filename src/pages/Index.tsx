@@ -1,20 +1,12 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { ArrowRight, BookOpen, Mic, Play, Users, PenLine, X } from "lucide-react";
-import bookCover1 from "@/assets/book-cover-1.jpg";
-import bookCover2 from "@/assets/book-cover-2.jpg";
-import bookCover3 from "@/assets/book-cover-3.jpg";
 import { membershipPlans } from "@/data/content";
 import { useBooks } from "@/hooks/useBooks";
 import { useSermons } from "@/hooks/useSermons";
 import { useVideos } from "@/hooks/useVideos";
 import HeroCarousel from "@/components/HeroCarousel";
 
-const bookCovers: Record<string, string> = {
-  "book-cover-1": bookCover1,
-  "book-cover-2": bookCover2,
-  "book-cover-3": bookCover3,
-};
 
 function getYouTubeId(url: string) {
   const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|live\/|embed\/))([^?&/]+)/);
@@ -22,7 +14,7 @@ function getYouTubeId(url: string) {
 }
 
 export default function Index() {
-  const { books } = useBooks();
+  const { data: books = [] } = useBooks();
   const { sermons } = useSermons();
   const { data: videos = [] } = useVideos();
   const featuredVideos = videos.filter((v) => v.featured);
@@ -48,18 +40,24 @@ export default function Index() {
                 className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300 hover:shadow-gold"
               >
                 <div className="aspect-[2/3] overflow-hidden">
-                  <img
-                    src={book.coverImage.startsWith("http") ? book.coverImage : bookCovers[book.coverImage]}
-                    alt={book.title}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    loading="lazy"
-                  />
+                  {book.cover_image ? (
+                    <img
+                      src={book.cover_image}
+                      alt={book.title}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-muted flex items-center justify-center">
+                      <BookOpen className="h-12 w-12 text-muted-foreground" />
+                    </div>
+                  )}
                 </div>
                 <div className="p-4 sm:p-5">
                   <h3 className="font-display text-lg font-semibold mb-1">{book.title}</h3>
                   <p className="text-muted-foreground text-sm mb-3 line-clamp-2">{book.subtitle}</p>
                   <span className="text-primary text-sm font-semibold">
-                    {book.isFree ? "Free Download" : `$${book.price}`}
+                    {book.is_free ? "Free Download" : `$${book.price}`}
                   </span>
                 </div>
               </Link>

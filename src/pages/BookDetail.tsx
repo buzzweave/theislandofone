@@ -2,28 +2,14 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, Download, FileText, Lock, ShoppingCart } from "lucide-react";
 import { exportBookToPdf, exportBookToEpub } from "@/lib/bookExport";
-import { useBooks } from "@/hooks/useBooks";
+import { useBook } from "@/hooks/useBooks";
 import SocialShareLinks from "@/components/SocialShareLinks";
 import AudioPlayer from "@/components/AudioPlayer";
-import bookCover1 from "@/assets/book-cover-1.jpg";
-import bookCover2 from "@/assets/book-cover-2.jpg";
-import bookCover3 from "@/assets/book-cover-3.jpg";
-
-const bookCovers: Record<string, string> = {
-  "book-cover-1": bookCover1,
-  "book-cover-2": bookCover2,
-  "book-cover-3": bookCover3,
-};
-
-function getCoverSrc(coverImage: string) {
-  if (coverImage.startsWith("http")) return coverImage;
-  return bookCovers[coverImage] ?? "";
-}
+import DOMPurify from "dompurify";
 
 export default function BookDetail() {
   const { id } = useParams<{ id: string }>();
-  const { books } = useBooks();
-  const book = books.find((b) => b.id === id);
+  const { data: book, isLoading } = useBook(id);
   const [openChapter, setOpenChapter] = useState<string | null>(null);
 
   useEffect(() => {
@@ -32,6 +18,14 @@ export default function BookDetail() {
     }
   }, [book]);
   const [purchased, setPurchased] = useState(false);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
 
   if (!book) {
     return (
@@ -44,12 +38,26 @@ export default function BookDetail() {
     );
   }
 
-  const canRead = book.isFree || purchased;
-  // For paid books, allow preview of first chapter only
+  const canRead = book.is_free || purchased;
   const previewChapterCount = 1;
 
   const toggleChapter = (chapterId: string) => {
     setOpenChapter(openChapter === chapterId ? null : chapterId);
+  };
+
+  const renderContent = (content: string) => {
+    const isHtml = content?.includes("<") && content?.includes(">");
+    if (isHtml) {
+      return (
+        <div
+          className="prose prose-invert prose-sm max-w-none"
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }}
+        />
+      );
+    }
+    return (
+      <p className="text-secondary-foreground leading-relaxed whitespace-pre-wrap">{content}</p>
+    );
   };
 
   return (
@@ -68,9 +76,9 @@ export default function BookDetail() {
             {/* Cover */}
             <div className="md:w-1/3 mb-8 md:mb-0">
               <div className="aspect-[2/3] rounded-xl overflow-hidden border border-border shadow-gold">
-                {getCoverSrc(book.coverImage) ? (
+                {book.cover_image ? (
                   <img
-                    src={getCoverSrc(book.coverImage)}
+                    src={book.cover_image}
                     alt={book.title}
                     className="w-full h-full object-cover"
                   />
@@ -92,12 +100,12 @@ export default function BookDetail() {
                 <p className="text-muted-foreground text-lg mb-1">{book.subtitle}</p>
               )}
               <p className="text-muted-foreground text-sm mb-6">by {book.author}</p>
-              <p className="text-secondary-foreground leading-relaxed text-base mb-8 max-w-xl">
-                {book.description}
-              </p>
+              <div className="text-secondary-foreground leading-relaxed text-base mb-8 max-w-xl">
+                {renderContent(book.description)}
+              </div>
 
               <div className="flex flex-wrap items-center gap-3 mb-4">
-                {book.isFree ? (
+                {book.is_free ? (
                   <>
                     <button
                       onClick={() => exportBookToPdf(book)}
@@ -142,14 +150,14 @@ export default function BookDetail() {
 
               <p className="text-xs text-muted-foreground mb-4">
                 {book.chapters.length} chapter{book.chapters.length !== 1 ? "s" : ""}
-                {!book.isFree && !purchased && ` · Preview first chapter free`}
+                {!book.is_free && !purchased && ` · Preview first chapter free`}
               </p>
 
               <SocialShareLinks title={book.title} />
 
-              {canRead && book.audioUrl && (
+              {canRead && book.audio_url && (
                 <div className="mt-6">
-                  <AudioPlayer audioUrl={book.audioUrl} title={book.title} />
+                  <AudioPlayer audioUrl={book.audio_url} title={book.title} />
                 </div>
               )}
             </div>
@@ -204,12 +212,9 @@ export default function BookDetail() {
                     <div className="px-5 pb-5 animate-fade-up">
                       <div className="border-t border-border pt-4 ml-12">
                         <div className="prose prose-invert prose-sm max-w-none">
-                          <p className="text-secondary-foreground leading-relaxed whitespace-pre-wrap">
-                            {chapter.content}
-                          </p>
+                          {renderContent(chapter.content)}
                         </div>
 
-                        {/* Show paywall teaser after preview chapter */}
                         {!canRead && isPreview && (
                           <div className="mt-6 p-5 rounded-lg border border-primary/20 bg-primary/5 text-center">
                             <Lock className="h-5 w-5 text-primary mx-auto mb-2" />
@@ -235,7 +240,6 @@ export default function BookDetail() {
             })}
           </div>
 
-          {/* Bottom paywall for paid books */}
           {!canRead && (
             <div className="mt-12 p-8 rounded-2xl border border-primary/20 bg-card text-center">
               <Lock className="h-8 w-8 text-primary mx-auto mb-3" />
