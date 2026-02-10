@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import RichTextEditor from "@/components/admin/RichTextEditor";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, PenLine, Upload, Eye, EyeOff } from "lucide-react";
@@ -185,7 +186,12 @@ export default function AdminBlogManager() {
 
           <div className="space-y-2">
             <Label>Content</Label>
-            <Textarea value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} placeholder="Full blog post content…" rows={10} />
+            <RichTextEditor
+              content={form.content}
+              onChange={(html) => setForm({ ...form, content: html })}
+              placeholder="Full blog post content…"
+              minHeight="300px"
+            />
           </div>
 
           <div className="flex items-center gap-3">

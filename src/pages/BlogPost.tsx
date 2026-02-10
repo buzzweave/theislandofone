@@ -41,19 +41,25 @@ export default function BlogPost() {
     );
   }
 
+  const isHtml = post.content?.includes("<") && post.content?.includes(">");
+
   return (
     <div className="min-h-screen">
       {post.image_url && (
-        <div className="w-full max-h-[400px] overflow-hidden">
-          <img src={post.image_url} alt={post.title} className="w-full h-full object-cover" />
+        <div className="w-full aspect-[21/9] sm:aspect-[3/1] max-h-[420px] overflow-hidden">
+          <img
+            src={post.image_url}
+            alt={post.title}
+            className="w-full h-full object-cover object-center"
+          />
         </div>
       )}
-      <article className="container mx-auto px-4 py-12 max-w-3xl">
-        <Link to="/blog" className="text-primary hover:underline flex items-center gap-1 text-sm mb-8">
+      <article className="container mx-auto px-4 sm:px-6 py-8 sm:py-12 max-w-3xl">
+        <Link to="/blog" className="text-primary hover:underline flex items-center gap-1 text-sm mb-6 sm:mb-8">
           <ArrowLeft className="h-4 w-4" /> Back to Blog
         </Link>
-        <h1 className="font-display text-3xl sm:text-4xl font-bold mb-4">{post.title}</h1>
-        <div className="flex items-center gap-4 text-sm text-muted-foreground mb-8">
+        <h1 className="font-display text-2xl sm:text-3xl md:text-4xl font-bold mb-4">{post.title}</h1>
+        <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-sm text-muted-foreground mb-6 sm:mb-8">
           {post.author && (
             <span className="flex items-center gap-1">
               <User className="h-4 w-4" /> {post.author}
@@ -64,9 +70,26 @@ export default function BlogPost() {
             {format(new Date(post.published_at || post.created_at), "MMMM d, yyyy")}
           </span>
         </div>
-        <div className="prose prose-neutral dark:prose-invert max-w-none whitespace-pre-wrap">
-          {post.content}
-        </div>
+        {isHtml ? (
+          <div
+            className="prose prose-sm sm:prose-base prose-neutral dark:prose-invert max-w-none
+              prose-headings:font-display prose-headings:font-bold
+              prose-p:leading-relaxed prose-p:mb-4
+              prose-li:leading-relaxed
+              prose-blockquote:border-primary prose-blockquote:italic"
+            dangerouslySetInnerHTML={{ __html: post.content }}
+          />
+        ) : (
+          <div
+            className="prose prose-sm sm:prose-base prose-neutral dark:prose-invert max-w-none
+              prose-headings:font-display prose-headings:font-bold
+              prose-p:leading-relaxed prose-p:mb-4"
+          >
+            {post.content.split(/\n\n+/).map((paragraph, i) => (
+              <p key={i}>{paragraph.trim()}</p>
+            ))}
+          </div>
+        )}
       </article>
     </div>
   );
