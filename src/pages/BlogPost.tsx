@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowLeft, Calendar, User } from "lucide-react";
 import { format } from "date-fns";
+import SocialShareLinks from "@/components/SocialShareLinks";
 
 export default function BlogPost() {
   const { slug } = useParams<{ slug: string }>();
@@ -90,6 +91,9 @@ export default function BlogPost() {
             ))}
           </div>
         )}
+        <div className="mt-10 pt-6 border-t border-border">
+          <SocialShareLinks title={post.title} />
+        </div>
       </article>
     </div>
   );
