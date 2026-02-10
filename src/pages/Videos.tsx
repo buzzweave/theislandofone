@@ -1,20 +1,30 @@
 import { useState } from "react";
 import { Play, Facebook, Twitter, Link2 } from "lucide-react";
-import { videos } from "@/data/content";
+import { useVideos } from "@/hooks/useVideos";
 import { useToast } from "@/hooks/use-toast";
-
-const categories = ["All", ...Array.from(new Set(videos.map((v) => v.category)))];
 
 export default function Videos() {
   const [activeCategory, setActiveCategory] = useState("All");
   const { toast } = useToast();
+  const { data: videos = [], isLoading } = useVideos();
+
+  const categories = ["All", ...Array.from(new Set(videos.map((v) => v.category)))];
   const filtered = activeCategory === "All" ? videos : videos.filter((v) => v.category === activeCategory);
+
+  const getYouTubeThumbnail = (url: string) => {
+    const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|live\/|embed\/))([^?&/]+)/);
+    return match ? `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg` : "";
+  };
 
   const shareVideo = (title: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const url = window.location.href;
     navigator.clipboard.writeText(url);
     toast({ title: "Link copied", description: `Share link for "${title}" copied.` });
+  };
+
+  const openVideo = (youtubeUrl: string) => {
+    if (youtubeUrl) window.open(youtubeUrl, "_blank");
   };
 
   return (
@@ -30,73 +40,91 @@ export default function Videos() {
       </section>
 
       <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-wrap gap-2 justify-center mb-12">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                activeCategory === cat ? "bg-primary text-primary-foreground" : "bg-card border border-border text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto pb-24">
-          {filtered.map((video) => (
-            <div
-              key={video.id}
-              className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300 cursor-pointer"
-            >
-              <div className="relative aspect-video overflow-hidden">
-                <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                <div className="absolute inset-0 bg-background/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="w-14 h-14 rounded-full bg-primary/90 flex items-center justify-center">
-                    <Play className="h-6 w-6 text-primary-foreground ml-0.5" />
-                  </div>
-                </div>
-                <span className="absolute bottom-2 right-2 text-xs bg-background/80 px-2 py-0.5 rounded text-foreground">{video.duration}</span>
-                {video.featured && (
-                  <span className="absolute top-2 left-2 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary text-primary-foreground font-semibold">
-                    Featured
-                  </span>
-                )}
-              </div>
-              <div className="p-4">
-                <p className="text-xs text-primary uppercase tracking-wider mb-1">{video.category}</p>
-                <h3 className="font-display text-sm font-semibold group-hover:text-primary transition-colors mb-2">{video.title}</h3>
-                <div className="flex items-center gap-1.5">
-                  <a
-                    href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="p-1.5 rounded border border-border text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors"
-                  >
-                    <Facebook className="h-3 w-3" />
-                  </a>
-                  <a
-                    href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(video.title)}&url=${encodeURIComponent(window.location.href)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="p-1.5 rounded border border-border text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors"
-                  >
-                    <Twitter className="h-3 w-3" />
-                  </a>
-                  <button
-                    onClick={(e) => shareVideo(video.title, e)}
-                    className="p-1.5 rounded border border-border text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors"
-                  >
-                    <Link2 className="h-3 w-3" />
-                  </button>
-                </div>
-              </div>
+        {isLoading ? (
+          <p className="text-center text-muted-foreground py-12">Loading videos...</p>
+        ) : videos.length === 0 ? (
+          <p className="text-center text-muted-foreground py-12">No videos yet.</p>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-2 justify-center mb-12">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                    activeCategory === cat ? "bg-primary text-primary-foreground" : "bg-card border border-border text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
             </div>
-          ))}
-        </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto pb-24">
+              {filtered.map((video) => {
+                const thumb = video.thumbnail || (video.youtube_url ? getYouTubeThumbnail(video.youtube_url) : "");
+                return (
+                  <div
+                    key={video.id}
+                    onClick={() => openVideo(video.youtube_url)}
+                    className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300 cursor-pointer"
+                  >
+                    <div className="relative aspect-video overflow-hidden">
+                      {thumb ? (
+                        <img src={thumb} alt={video.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                      ) : (
+                        <div className="w-full h-full bg-muted flex items-center justify-center">
+                          <Play className="h-10 w-10 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-background/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="w-14 h-14 rounded-full bg-primary/90 flex items-center justify-center">
+                          <Play className="h-6 w-6 text-primary-foreground ml-0.5" />
+                        </div>
+                      </div>
+                      <span className="absolute bottom-2 right-2 text-xs bg-background/80 px-2 py-0.5 rounded text-foreground">{video.duration}</span>
+                      {video.featured && (
+                        <span className="absolute top-2 left-2 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary text-primary-foreground font-semibold">
+                          Featured
+                        </span>
+                      )}
+                    </div>
+                    <div className="p-4">
+                      <p className="text-xs text-primary uppercase tracking-wider mb-1">{video.category}</p>
+                      <h3 className="font-display text-sm font-semibold group-hover:text-primary transition-colors mb-2">{video.title}</h3>
+                      <div className="flex items-center gap-1.5">
+                        <a
+                          href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(video.youtube_url || window.location.href)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="p-1.5 rounded border border-border text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors"
+                        >
+                          <Facebook className="h-3 w-3" />
+                        </a>
+                        <a
+                          href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(video.title)}&url=${encodeURIComponent(video.youtube_url || window.location.href)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="p-1.5 rounded border border-border text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors"
+                        >
+                          <Twitter className="h-3 w-3" />
+                        </a>
+                        <button
+                          onClick={(e) => shareVideo(video.title, e)}
+                          className="p-1.5 rounded border border-border text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors"
+                        >
+                          <Link2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
