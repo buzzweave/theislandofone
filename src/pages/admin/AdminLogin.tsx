@@ -6,18 +6,19 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { ShieldAlert, Lock, Eye, EyeOff } from "lucide-react";
+import { ShieldAlert, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 
 export default function AdminLogin() {
-  const { login, isAuthenticated, failedAttempts, isLocked, lockoutEnd } = useAdminAuth();
+  const { login, isAuthenticated, isLoading, failedAttempts, isLocked, lockoutEnd } = useAdminAuth();
   const navigate = useNavigate();
 
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [captchaVerified, setCaptchaVerified] = useState(false);
   const [error, setError] = useState("");
   const [lockCountdown, setLockCountdown] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   // Redirect if already authed
   useEffect(() => {
@@ -42,11 +43,11 @@ export default function AdminLogin() {
     return () => clearInterval(interval);
   }, [isLocked, lockoutEnd]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    if (!username.trim() || !password.trim()) {
+    if (!email.trim() || !password.trim()) {
       setError("All fields are required.");
       return;
     }
@@ -56,13 +57,24 @@ export default function AdminLogin() {
       return;
     }
 
-    const success = login(username.trim(), password);
+    setSubmitting(true);
+    const success = await login(email.trim(), password);
+    setSubmitting(false);
+
     if (success) {
       navigate("/admin", { replace: true });
     } else {
-      setError("Invalid credentials.");
+      setError("Invalid credentials or insufficient permissions.");
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
@@ -92,13 +104,14 @@ export default function AdminLogin() {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="username">Username</Label>
+                <Label htmlFor="email">Email</Label>
                 <Input
-                  id="username"
-                  autoComplete="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter admin username"
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter admin email"
                 />
               </div>
 
@@ -140,7 +153,8 @@ export default function AdminLogin() {
                 </p>
               )}
 
-              <Button type="submit" className="w-full" size="lg">
+              <Button type="submit" className="w-full" size="lg" disabled={submitting}>
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                 Sign In
               </Button>
             </form>

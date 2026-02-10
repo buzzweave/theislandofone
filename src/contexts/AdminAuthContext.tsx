@@ -1,8 +1,10 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AdminAuthContextType {
   isAuthenticated: boolean;
-  login: (username: string, password: string) => boolean;
+  isLoading: boolean;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   failedAttempts: number;
   isLocked: boolean;
@@ -11,50 +13,107 @@ interface AdminAuthContextType {
 
 const AdminAuthContext = createContext<AdminAuthContextType | null>(null);
 
-const ADMIN_USERNAME = "support@buzzweave.com";
-const ADMIN_PASSWORD = "Blairbo361!";
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_DURATION = 5 * 60 * 1000; // 5 minutes
 
 export function AdminAuthProvider({ children }: { children: ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return sessionStorage.getItem("admin_auth") === "true";
-  });
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutEnd, setLockoutEnd] = useState<number | null>(null);
 
   const isLocked = lockoutEnd !== null && Date.now() < lockoutEnd;
 
+  // Listen for auth state changes
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        // Check if user has admin role
+        const { data } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", session.user.id)
+          .eq("role", "admin")
+          .maybeSingle();
+
+        setIsAuthenticated(!!data);
+      } else {
+        setIsAuthenticated(false);
+      }
+      setIsLoading(false);
+    });
+
+    // Check existing session
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        const { data } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", session.user.id)
+          .eq("role", "admin")
+          .maybeSingle();
+
+        setIsAuthenticated(!!data);
+      }
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   const login = useCallback(
-    (username: string, password: string): boolean => {
+    async (email: string, password: string): Promise<boolean> => {
       if (isLocked) return false;
 
-      if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-        setIsAuthenticated(true);
-        setFailedAttempts(0);
-        setLockoutEnd(null);
-        sessionStorage.setItem("admin_auth", "true");
-        return true;
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error || !data.user) {
+        const next = failedAttempts + 1;
+        setFailedAttempts(next);
+        if (next >= MAX_ATTEMPTS) {
+          setLockoutEnd(Date.now() + LOCKOUT_DURATION);
+        }
+        return false;
       }
 
-      const next = failedAttempts + 1;
-      setFailedAttempts(next);
-      if (next >= MAX_ATTEMPTS) {
-        setLockoutEnd(Date.now() + LOCKOUT_DURATION);
+      // Check admin role
+      const { data: roleData } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", data.user.id)
+        .eq("role", "admin")
+        .maybeSingle();
+
+      if (!roleData) {
+        // Not an admin — sign them out
+        await supabase.auth.signOut();
+        const next = failedAttempts + 1;
+        setFailedAttempts(next);
+        if (next >= MAX_ATTEMPTS) {
+          setLockoutEnd(Date.now() + LOCKOUT_DURATION);
+        }
+        return false;
       }
-      return false;
+
+      setIsAuthenticated(true);
+      setFailedAttempts(0);
+      setLockoutEnd(null);
+      return true;
     },
     [failedAttempts, isLocked],
   );
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
     setIsAuthenticated(false);
-    sessionStorage.removeItem("admin_auth");
   }, []);
 
   return (
     <AdminAuthContext.Provider
-      value={{ isAuthenticated, login, logout, failedAttempts, isLocked, lockoutEnd }}
+      value={{ isAuthenticated, isLoading, login, logout, failedAttempts, isLocked, lockoutEnd }}
     >
       {children}
     </AdminAuthContext.Provider>

@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,13 +8,13 @@ const corsHeaders = {
 };
 
 const VOICE_MAP: Record<string, string> = {
-  "deep-smooth": "JBFqnCBsd6RMkjVDRZzb",     // George - deep, authoritative
-  "warm-narrator": "onwK4e9ZLuTAKqWW03F9",    // Daniel - warm narration
-  "calm-male": "N2lVS1w4EtoT3dr4eOWO",        // Callum - calm, collected
-  "rich-female": "EXAVITQu4vr4xnSDxMaL",      // Sarah - rich female
-  "smooth-male": "TX3LPaxmHKxFdv7VOQHJ",      // Liam - smooth
-  "classic-narrator": "nPczCjzI2devNBz1zQrb",  // Brian - classic narrator
-  "gentle-female": "pFZP5JQG7iQjIQuC4Bku",    // Lily - gentle
+  "deep-smooth": "JBFqnCBsd6RMkjVDRZzb",
+  "warm-narrator": "onwK4e9ZLuTAKqWW03F9",
+  "calm-male": "N2lVS1w4EtoT3dr4eOWO",
+  "rich-female": "EXAVITQu4vr4xnSDxMaL",
+  "smooth-male": "TX3LPaxmHKxFdv7VOQHJ",
+  "classic-narrator": "nPczCjzI2devNBz1zQrb",
+  "gentle-female": "pFZP5JQG7iQjIQuC4Bku",
 };
 
 serve(async (req) => {
@@ -22,6 +23,52 @@ serve(async (req) => {
   }
 
   try {
+    // Authenticate request
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Authentication required" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(
+        JSON.stringify({ error: "Invalid authentication token" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const userId = claimsData.claims.sub;
+
+    // Check admin role
+    const serviceClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    const { data: roleData } = await serviceClient
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .eq("role", "admin")
+      .maybeSingle();
+
+    if (!roleData) {
+      return new Response(
+        JSON.stringify({ error: "Admin access required" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { text, voice, title } = await req.json();
     const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
     if (!ELEVENLABS_API_KEY) {
@@ -38,13 +85,10 @@ serve(async (req) => {
       });
     }
 
-    // Truncate to ElevenLabs limit (5000 chars per request)
-    // For longer texts, we chunk and stitch
     const voiceId = VOICE_MAP[voice] || VOICE_MAP["deep-smooth"];
     const chunks: string[] = [];
     const maxChunkSize = 4500;
 
-    // Split text into chunks at sentence boundaries
     const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
     let currentChunk = "";
     for (const sentence of sentences) {
@@ -57,7 +101,6 @@ serve(async (req) => {
     }
     if (currentChunk.trim()) chunks.push(currentChunk.trim());
 
-    // Generate audio for each chunk
     const audioBuffers: ArrayBuffer[] = [];
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
@@ -73,7 +116,6 @@ serve(async (req) => {
         },
       };
 
-      // Request stitching for continuity
       if (i > 0) body.previous_text = chunks[i - 1].slice(-200);
       if (i < chunks.length - 1) body.next_text = chunks[i + 1].slice(0, 200);
 
@@ -101,7 +143,6 @@ serve(async (req) => {
       audioBuffers.push(await response.arrayBuffer());
     }
 
-    // Concatenate audio buffers
     const totalLength = audioBuffers.reduce((sum, buf) => sum + buf.byteLength, 0);
     const combined = new Uint8Array(totalLength);
     let offset = 0;
@@ -110,7 +151,6 @@ serve(async (req) => {
       offset += buf.byteLength;
     }
 
-    // Upload to Supabase storage
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const fileName = `${Date.now()}-${(title || "audio").replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()}.mp3`;
