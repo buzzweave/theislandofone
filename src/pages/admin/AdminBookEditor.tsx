@@ -33,6 +33,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 
+const PDF_BUCKET = "site-assets";
+
 const CATEGORIES = ["Devotional", "Faith", "Leadership", "Ministry", "Prayer", "Family"];
 
 type LocalBook = Omit<Book, "created_at" | "updated_at"> & { chapters: BookChapter[] };
@@ -46,11 +48,13 @@ export default function AdminBookEditor() {
   const isMobile = useIsMobile();
   const aiContent = useAIContent();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [local, setLocal] = useState<LocalBook | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
   const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
 
   // Set initial active when books load
@@ -128,6 +132,7 @@ export default function AdminBookEditor() {
         cover_image: "",
         featured: false,
         audio_url: null,
+        pdf_url: "",
         sort_order: 0,
       });
       setActiveId(result.id);
@@ -393,6 +398,76 @@ export default function AdminBookEditor() {
                 onDeleteChapter={deleteChapter}
                 onExpandedChange={(id) => setActiveChapterId(id)}
               />
+            </CardContent>
+          </Card>
+
+          {/* PDF Attachment */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <BookOpen className="h-4 w-4" /> PDF Attachment
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">Upload a PDF file readers can download from the book page.</p>
+              <div className="flex flex-col sm:flex-row gap-3 items-start">
+                <div className="flex-1">
+                  <Input
+                    value={local.pdf_url}
+                    onChange={(e) => updateLocal({ pdf_url: e.target.value })}
+                    placeholder="Upload a PDF or paste a URL"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={pdfInputRef}
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setUploadingPdf(true);
+                      try {
+                        const path = `book-pdfs/${local.id}.pdf`;
+                        const { error: uploadError } = await supabase.storage
+                          .from(PDF_BUCKET)
+                          .upload(path, file, { upsert: true });
+                        if (uploadError) throw uploadError;
+                        const { data: { publicUrl } } = supabase.storage
+                          .from(PDF_BUCKET)
+                          .getPublicUrl(path);
+                        updateLocal({ pdf_url: publicUrl });
+                        toast({ title: "PDF uploaded" });
+                      } catch (err: any) {
+                        toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+                      } finally {
+                        setUploadingPdf(false);
+                        if (pdfInputRef.current) pdfInputRef.current.value = "";
+                      }
+                    }}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => pdfInputRef.current?.click()}
+                    disabled={uploadingPdf}
+                  >
+                    {uploadingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
+                    {uploadingPdf ? "Uploading…" : "Upload PDF"}
+                  </Button>
+                  {local.pdf_url && (
+                    <Button variant="ghost" size="sm" onClick={() => updateLocal({ pdf_url: "" })}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+              {local.pdf_url && (
+                <a href={local.pdf_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline truncate block">
+                  {local.pdf_url}
+                </a>
+              )}
             </CardContent>
           </Card>
 

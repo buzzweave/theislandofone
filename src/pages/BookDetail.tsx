@@ -107,12 +107,23 @@ export default function BookDetail() {
               <div className="flex flex-wrap items-center gap-3 mb-4">
                 {book.is_free ? (
                   <>
-                    <button
-                      onClick={() => exportBookToPdf(book)}
-                      className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-gold"
-                    >
-                      <Download className="h-4 w-4" /> Download PDF
-                    </button>
+                    {(book as any).pdf_url ? (
+                      <a
+                        href={(book as any).pdf_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-gold"
+                      >
+                        <Download className="h-4 w-4" /> Download PDF
+                      </a>
+                    ) : (
+                      <button
+                        onClick={() => exportBookToPdf(book)}
+                        className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-gold"
+                      >
+                        <Download className="h-4 w-4" /> Download PDF
+                      </button>
+                    )}
                     <button
                       onClick={() => exportBookToEpub(book)}
                       className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-primary/30 text-primary text-sm font-semibold hover:bg-primary/10 transition-colors"

@@ -105,6 +105,7 @@ export type Database = {
           featured: boolean
           id: string
           is_free: boolean
+          pdf_url: string
           price: number
           sort_order: number
           subtitle: string
@@ -121,6 +122,7 @@ export type Database = {
           featured?: boolean
           id?: string
           is_free?: boolean
+          pdf_url?: string
           price?: number
           sort_order?: number
           subtitle?: string
@@ -137,6 +139,7 @@ export type Database = {
           featured?: boolean
           id?: string
           is_free?: boolean
+          pdf_url?: string
           price?: number
           sort_order?: number
           subtitle?: string
