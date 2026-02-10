@@ -84,7 +84,7 @@ export default function Index() {
             {featuredSermons.slice(0, 3).map((sermon) => (
               <Link
                 key={sermon.id}
-                to="/sermons"
+                to={`/sermons/${sermon.id}`}
                 className="group p-5 sm:p-6 rounded-xl bg-card border border-border hover:border-primary/30 transition-all duration-300"
               >
                 <div className="flex items-center gap-2 mb-3">
