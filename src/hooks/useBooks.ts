@@ -95,7 +95,13 @@ export function useAddBook() {
 export function useUpdateBook() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, chapters, ...updates }: Partial<Book> & { id: string }) => {
+    mutationFn: async ({ id, chapters, created_at, updated_at, ...rest }: Partial<Book> & { id: string }) => {
+      // Only send columns that exist on the books table
+      const updates: Record<string, unknown> = {};
+      const validCols = ["title","subtitle","author","description","price","is_free","category","cover_image","featured","audio_url","pdf_url","sort_order"];
+      for (const key of validCols) {
+        if (key in rest) updates[key] = (rest as Record<string, unknown>)[key];
+      }
       const { data, error } = await supabase
         .from("books")
         .update(updates)
