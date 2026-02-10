@@ -23,8 +23,7 @@ import {
   Loader2,
   ArrowLeft,
 } from "lucide-react";
-import { type Book, type BookChapter } from "@/data/content";
-import { useBooks } from "@/hooks/useBooks";
+import { useBooks, useAddBook, useUpdateBook, useDeleteBook, useUpsertChapters, type Book, type BookChapter } from "@/hooks/useBooks";
 import SortableChapterList from "@/components/admin/SortableChapterList";
 import { useAIContent } from "@/contexts/AIContentContext";
 import AudioGenerator from "@/components/admin/AudioGenerator";
@@ -35,138 +34,174 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 const CATEGORIES = ["Devotional", "Faith", "Leadership", "Ministry", "Prayer", "Family"];
 
+type LocalBook = Omit<Book, "created_at" | "updated_at"> & { chapters: BookChapter[] };
+
 export default function AdminBookEditor() {
-  const { books: bookList, setBooks: setBookList } = useBooks();
-  const [activeId, setActiveId] = useState<string | null>(bookList[0]?.id ?? null);
-  const [saved, setSaved] = useState(false);
-  const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const aiContent = useAIContent();
+  const { data: bookList = [], isLoading } = useBooks();
+  const addBookMut = useAddBook();
+  const updateBookMut = useUpdateBook();
+  const deleteBookMut = useDeleteBook();
+  const upsertChaptersMut = useUpsertChapters();
   const isMobile = useIsMobile();
+  const aiContent = useAIContent();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const active = bookList.find((b) => b.id === activeId) ?? null;
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [local, setLocal] = useState<LocalBook | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
 
+  // Set initial active when books load
   useEffect(() => {
-    if (!active) {
+    if (!activeId && bookList.length > 0) {
+      setActiveId(bookList[0].id);
+    }
+  }, [bookList]);
+
+  // Sync local state when active book changes
+  useEffect(() => {
+    if (activeId) {
+      const book = bookList.find((b) => b.id === activeId);
+      if (book) {
+        setLocal({ ...book });
+      }
+    } else {
+      setLocal(null);
+    }
+  }, [activeId, bookList]);
+
+  // AI content integration
+  useEffect(() => {
+    if (!local) {
       aiContent.unregister();
       return;
     }
     aiContent.register({
       onInsert: (text) => {
-        setBookList((prev) =>
-          prev.map((b) => {
-            if (b.id !== activeId) return b;
-            if (activeChapterId) {
-              return {
-                ...b,
-                chapters: b.chapters.map((ch) =>
-                  ch.id === activeChapterId
-                    ? { ...ch, content: ch.content + "\n\n" + text }
-                    : ch
-                ),
-              };
-            }
-            return { ...b, description: b.description + "\n\n" + text };
-          })
-        );
-        setSaved(false);
+        setLocal((prev) => {
+          if (!prev) return prev;
+          if (activeChapterId) {
+            return {
+              ...prev,
+              chapters: prev.chapters.map((ch) =>
+                ch.id === activeChapterId ? { ...ch, content: ch.content + "\n\n" + text } : ch
+              ),
+            };
+          }
+          return { ...prev, description: prev.description + "\n\n" + text };
+        });
       },
       onReplace: (text) => {
-        setBookList((prev) =>
-          prev.map((b) => {
-            if (b.id !== activeId) return b;
-            if (activeChapterId) {
-              return {
-                ...b,
-                chapters: b.chapters.map((ch) =>
-                  ch.id === activeChapterId
-                    ? { ...ch, content: text }
-                    : ch
-                ),
-              };
-            }
-            return { ...b, description: text };
-          })
-        );
-        setSaved(false);
+        setLocal((prev) => {
+          if (!prev) return prev;
+          if (activeChapterId) {
+            return {
+              ...prev,
+              chapters: prev.chapters.map((ch) =>
+                ch.id === activeChapterId ? { ...ch, content: text } : ch
+              ),
+            };
+          }
+          return { ...prev, description: text };
+        });
       },
     });
     return () => aiContent.unregister();
-  }, [activeId, activeChapterId, active, aiContent, setBookList]);
+  }, [local?.id, activeChapterId, aiContent]);
 
-  const update = (fields: Partial<Book>) => {
-    if (!activeId) return;
-    setBookList((prev) =>
-      prev.map((b) => (b.id === activeId ? { ...b, ...fields } : b)),
-    );
-    setSaved(false);
+  const updateLocal = (fields: Partial<LocalBook>) => {
+    setLocal((prev) => (prev ? { ...prev, ...fields } : prev));
   };
 
-  const addNew = () => {
-    const newBook: Book = {
-      id: crypto.randomUUID(),
-      title: "Untitled Book",
-      subtitle: "",
-      author: "Bryant Clark",
-      description: "",
-      price: 0,
-      isFree: true,
-      category: "Faith",
-      coverImage: "",
-      chapters: [],
-      featured: false,
-    };
-    setBookList((prev) => [newBook, ...prev]);
-    setActiveId(newBook.id);
-    setSaved(false);
+  const addNew = async () => {
+    try {
+      const result = await addBookMut.mutateAsync({
+        title: "Untitled Book",
+        subtitle: "",
+        author: "Bryant Clark",
+        description: "",
+        price: 0,
+        is_free: true,
+        category: "Faith",
+        cover_image: "",
+        featured: false,
+        audio_url: null,
+        sort_order: 0,
+      });
+      setActiveId(result.id);
+    } catch (err: any) {
+      toast({ title: "Error creating book", description: err.message, variant: "destructive" });
+    }
   };
 
-  const deleteBook = (id: string) => {
-    setBookList((prev) => prev.filter((b) => b.id !== id));
-    if (activeId === id) setActiveId(bookList.find((b) => b.id !== id)?.id ?? null);
+  const deleteBook = async (id: string) => {
+    if (!confirm("Delete this book?")) return;
+    try {
+      await deleteBookMut.mutateAsync(id);
+      if (activeId === id) setActiveId(bookList.find((b) => b.id !== id)?.id ?? null);
+      toast({ title: "Book deleted" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
   };
 
   const addChapter = () => {
-    if (!active) return;
+    if (!local) return;
     const newChapter: BookChapter = {
       id: crypto.randomUUID(),
-      title: `Chapter ${active.chapters.length + 1}`,
+      book_id: local.id,
+      title: `Chapter ${local.chapters.length + 1}`,
       content: "",
+      sort_order: local.chapters.length,
     };
-    update({ chapters: [...active.chapters, newChapter] });
+    updateLocal({ chapters: [...local.chapters, newChapter] });
   };
 
   const updateChapter = (chapterId: string, fields: Partial<BookChapter>) => {
-    if (!active) return;
-    update({
-      chapters: active.chapters.map((ch) =>
-        ch.id === chapterId ? { ...ch, ...fields } : ch,
+    if (!local) return;
+    updateLocal({
+      chapters: local.chapters.map((ch) =>
+        ch.id === chapterId ? { ...ch, ...fields } : ch
       ),
     });
   };
 
   const deleteChapter = (chapterId: string) => {
-    if (!active) return;
-    update({ chapters: active.chapters.filter((ch) => ch.id !== chapterId) });
+    if (!local) return;
+    updateLocal({ chapters: local.chapters.filter((ch) => ch.id !== chapterId) });
   };
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const handleSave = async () => {
+    if (!local) return;
+    setSaving(true);
+    try {
+      const { chapters, ...bookData } = local;
+      await updateBookMut.mutateAsync({ id: local.id, ...bookData });
+      await upsertChaptersMut.mutateAsync({ bookId: local.id, chapters });
+      toast({ title: "Book saved!" });
+    } catch (err: any) {
+      toast({ title: "Save failed", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const showList = isMobile ? !activeId : true;
   const showEditor = isMobile ? !!activeId : true;
 
+  if (isLoading) {
+    return <p className="text-sm text-muted-foreground animate-pulse">Loading books…</p>;
+  }
+
   return (
     <div className={`flex ${isMobile ? "flex-col" : ""} gap-4 md:gap-6 h-[calc(100vh-8rem)]`}>
-      {/* Book List - inlined */}
+      {/* Book List */}
       {showList && (
         <div className={`${isMobile ? "w-full" : "w-64 shrink-0"} flex flex-col border border-border rounded-lg bg-card overflow-hidden ${isMobile ? "h-[calc(100vh-8rem)]" : ""}`}>
           <div className="p-3 border-b border-border flex items-center justify-between">
             <span className="text-sm font-semibold">Books</span>
-            <Button size="icon" variant="ghost" onClick={addNew} title="New book">
+            <Button size="icon" variant="ghost" onClick={addNew} title="New book" disabled={addBookMut.isPending}>
               <Plus className="h-4 w-4" />
             </Button>
           </div>
@@ -195,8 +230,8 @@ export default function AdminBookEditor() {
         </div>
       )}
 
-      {/* Editor - inlined */}
-      {showEditor && active ? (
+      {/* Editor */}
+      {showEditor && local ? (
         <div className="flex-1 overflow-y-auto space-y-6 pr-0 md:pr-2">
           {isMobile && (
             <Button variant="ghost" size="sm" onClick={() => setActiveId(null)} className="mb-2">
@@ -209,28 +244,28 @@ export default function AdminBookEditor() {
             <div className="md:col-span-2">
               <Label>Title</Label>
               <Input
-                value={active.title}
-                onChange={(e) => update({ title: e.target.value })}
+                value={local.title}
+                onChange={(e) => updateLocal({ title: e.target.value })}
                 className="text-lg font-display"
               />
             </div>
             <div className="md:col-span-2">
               <Label>Subtitle</Label>
               <Input
-                value={active.subtitle}
-                onChange={(e) => update({ subtitle: e.target.value })}
+                value={local.subtitle}
+                onChange={(e) => updateLocal({ subtitle: e.target.value })}
               />
             </div>
             <div>
               <Label>Author</Label>
               <Input
-                value={active.author}
-                onChange={(e) => update({ author: e.target.value })}
+                value={local.author}
+                onChange={(e) => updateLocal({ author: e.target.value })}
               />
             </div>
             <div>
               <Label>Category</Label>
-              <Select value={active.category} onValueChange={(v) => update({ category: v })}>
+              <Select value={local.category} onValueChange={(v) => updateLocal({ category: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {CATEGORIES.map((c) => (
@@ -253,8 +288,8 @@ export default function AdminBookEditor() {
                 <div className="flex-1">
                   <Label>Cover Image URL</Label>
                   <Input
-                    value={active.coverImage}
-                    onChange={(e) => update({ coverImage: e.target.value })}
+                    value={local.cover_image}
+                    onChange={(e) => updateLocal({ cover_image: e.target.value })}
                     placeholder="Upload an image or paste a URL"
                   />
                 </div>
@@ -270,7 +305,7 @@ export default function AdminBookEditor() {
                       setUploading(true);
                       try {
                         const ext = file.name.split(".").pop();
-                        const path = `book-covers/${active.id}.${ext}`;
+                        const path = `book-covers/${local.id}.${ext}`;
                         const { error: uploadError } = await supabase.storage
                           .from("site-assets")
                           .upload(path, file, { upsert: true });
@@ -278,8 +313,8 @@ export default function AdminBookEditor() {
                         const { data: { publicUrl } } = supabase.storage
                           .from("site-assets")
                           .getPublicUrl(path);
-                        update({ coverImage: publicUrl });
-                        toast({ title: "Cover uploaded", description: "Book cover image saved." });
+                        updateLocal({ cover_image: publicUrl });
+                        toast({ title: "Cover uploaded" });
                       } catch (err: any) {
                         toast({ title: "Upload failed", description: err.message, variant: "destructive" });
                       } finally {
@@ -299,9 +334,9 @@ export default function AdminBookEditor() {
                   </Button>
                 </div>
               </div>
-              {active.coverImage && (
+              {local.cover_image && (
                 <div className="w-32 aspect-[2/3] rounded-lg border border-border overflow-hidden bg-muted">
-                  <img src={active.coverImage} alt="Cover preview" className="w-full h-full object-cover" />
+                  <img src={local.cover_image} alt="Cover preview" className="w-full h-full object-cover" />
                 </div>
               )}
             </CardContent>
@@ -311,8 +346,8 @@ export default function AdminBookEditor() {
           <div>
             <Label className="mb-1.5 block">Description</Label>
             <RichTextEditor
-              content={active.description}
-              onChange={(html) => update({ description: html })}
+              content={local.description}
+              onChange={(html) => updateLocal({ description: html })}
               placeholder="Write book description..."
               minHeight="120px"
             />
@@ -323,7 +358,7 @@ export default function AdminBookEditor() {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center justify-between">
                 <span className="flex items-center gap-2">
-                  <BookOpen className="h-4 w-4" /> Chapters ({active.chapters.length})
+                  <BookOpen className="h-4 w-4" /> Chapters ({local.chapters.length})
                 </span>
                 <Button size="sm" variant="outline" onClick={addChapter}>
                   <Plus className="h-3 w-3 mr-1" /> Add
@@ -332,8 +367,8 @@ export default function AdminBookEditor() {
             </CardHeader>
             <CardContent>
               <SortableChapterList
-                chapters={active.chapters}
-                onReorder={(reordered) => update({ chapters: reordered })}
+                chapters={local.chapters}
+                onReorder={(reordered) => updateLocal({ chapters: reordered })}
                 onUpdateChapter={updateChapter}
                 onDeleteChapter={deleteChapter}
                 onExpandedChange={(id) => setActiveChapterId(id)}
@@ -348,10 +383,10 @@ export default function AdminBookEditor() {
             </CardHeader>
             <CardContent>
               <AudioGenerator
-                getText={() => active.chapters.map(ch => `${ch.title}\n\n${ch.content}`).join("\n\n")}
-                getTitle={() => active.title}
-                audioUrl={active.audioUrl}
-                onAudioGenerated={(url) => update({ audioUrl: url })}
+                getText={() => local.chapters.map(ch => `${ch.title}\n\n${ch.content}`).join("\n\n")}
+                getTitle={() => local.title}
+                audioUrl={local.audio_url ?? undefined}
+                onAudioGenerated={(url) => updateLocal({ audio_url: url })}
               />
             </CardContent>
           </Card>
@@ -370,8 +405,8 @@ export default function AdminBookEditor() {
                   <p className="text-xs text-muted-foreground">Show this book in the featured section.</p>
                 </div>
                 <Switch
-                  checked={active.featured}
-                  onCheckedChange={(v) => update({ featured: v })}
+                  checked={local.featured}
+                  onCheckedChange={(v) => updateLocal({ featured: v })}
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -382,21 +417,21 @@ export default function AdminBookEditor() {
                   <p className="text-xs text-muted-foreground">Toggle to set a price or make it free.</p>
                 </div>
                 <Switch
-                  checked={!active.isFree}
+                  checked={!local.is_free}
                   onCheckedChange={(v) =>
-                    update({ isFree: !v, price: v ? active.price || 14.99 : 0 })
+                    updateLocal({ is_free: !v, price: v ? local.price || 14.99 : 0 })
                   }
                 />
               </div>
-              {!active.isFree && (
+              {!local.is_free && (
                 <div className="pl-4 border-l-2 border-primary/20">
                   <Label>Price ($)</Label>
                   <Input
                     type="number"
                     min={0.99}
                     step={0.01}
-                    value={active.price}
-                    onChange={(e) => update({ price: parseFloat(e.target.value) || 0 })}
+                    value={local.price}
+                    onChange={(e) => updateLocal({ price: parseFloat(e.target.value) || 0 })}
                     className="w-32"
                   />
                 </div>
@@ -406,14 +441,14 @@ export default function AdminBookEditor() {
 
           {/* Actions */}
           <div className="flex flex-wrap items-center gap-3 pb-8">
-            <Button onClick={handleSave}>
+            <Button onClick={handleSave} disabled={saving}>
               <Save className="h-4 w-4 mr-2" />
-              {saved ? "Saved!" : "Save Book"}
+              {saving ? "Saving…" : "Save Book"}
             </Button>
             <Button
               variant="destructive"
               size="icon"
-              onClick={() => deleteBook(active.id)}
+              onClick={() => deleteBook(local.id)}
               title="Delete book"
             >
               <Trash2 className="h-4 w-4" />
@@ -421,7 +456,7 @@ export default function AdminBookEditor() {
           </div>
         </div>
       ) : (
-        !isMobile && !active && (
+        !isMobile && !local && (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
             <p>Select a book or create a new one.</p>
           </div>

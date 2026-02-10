@@ -56,6 +56,95 @@ export type Database = {
         }
         Relationships: []
       }
+      book_chapters: {
+        Row: {
+          book_id: string
+          content: string
+          created_at: string
+          id: string
+          sort_order: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          book_id: string
+          content?: string
+          created_at?: string
+          id?: string
+          sort_order?: number
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          book_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          sort_order?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "book_chapters_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      books: {
+        Row: {
+          audio_url: string | null
+          author: string
+          category: string
+          cover_image: string
+          created_at: string
+          description: string
+          featured: boolean
+          id: string
+          is_free: boolean
+          price: number
+          sort_order: number
+          subtitle: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          audio_url?: string | null
+          author?: string
+          category?: string
+          cover_image?: string
+          created_at?: string
+          description?: string
+          featured?: boolean
+          id?: string
+          is_free?: boolean
+          price?: number
+          sort_order?: number
+          subtitle?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          audio_url?: string | null
+          author?: string
+          category?: string
+          cover_image?: string
+          created_at?: string
+          description?: string
+          featured?: boolean
+          id?: string
+          is_free?: boolean
+          price?: number
+          sort_order?: number
+          subtitle?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       graphics: {
         Row: {
           category: string

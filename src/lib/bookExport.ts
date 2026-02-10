@@ -1,5 +1,5 @@
 import { jsPDF } from "jspdf";
-import type { Book } from "@/data/content";
+import type { Book } from "@/hooks/useBooks";
 
 /**
  * Normalize pasted text into clean paragraphs.
