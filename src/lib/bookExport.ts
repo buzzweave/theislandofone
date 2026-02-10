@@ -60,6 +60,16 @@ export function exportBookToPdf(book: Book) {
   doc.setFontSize(11);
   doc.text(`by ${book.author}`, pageW / 2, pageH * 0.65, { align: "center" });
 
+  // Copyright notice on title page
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "italic");
+  doc.text(
+    `© ${new Date().getFullYear()} @theislandofone. All rights reserved. For personal use only.`,
+    pageW / 2,
+    pageH * 0.85,
+    { align: "center" }
+  );
+
   // --- Chapters ---
   book.chapters.forEach((chapter, i) => {
     doc.addPage();
@@ -166,6 +176,8 @@ ${tocItems}
 </body>
 </html>`;
 
+  const copyrightNotice = `© ${new Date().getFullYear()} @theislandofone. All rights reserved. For personal use only.`;
+
   const chapterFiles = book.chapters.map((ch, i) => ({
     name: `OEBPS/ch${i}.xhtml`,
     content: `<?xml version="1.0" encoding="UTF-8"?>
@@ -179,6 +191,8 @@ ${tocItems}
     .filter((p) => p.trim())
     .map((p) => `<p>${sanitize(p)}</p>`)
     .join("\n  ")}
+  <hr/>
+  <p style="font-size:small;font-style:italic;">${sanitize(copyrightNotice)}</p>
 </body>
 </html>`,
   }));
