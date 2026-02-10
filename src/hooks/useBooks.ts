@@ -92,11 +92,23 @@ export function useAddBook() {
   });
 }
 
+async function ensureAdminSession() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) {
+    // Try refreshing the token
+    const { data: refreshData } = await supabase.auth.refreshSession();
+    if (!refreshData.session?.user) {
+      throw new Error("Your session has expired. Please log in again from the admin login page.");
+    }
+  }
+  return session || (await supabase.auth.getSession()).data.session;
+}
+
 export function useUpdateBook() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, chapters, created_at, updated_at, ...rest }: Partial<Book> & { id: string }) => {
-      // Only send columns that exist on the books table
+      await ensureAdminSession();
       const updates: Record<string, unknown> = {};
       const validCols = ["title","subtitle","author","description","price","is_free","category","cover_image","featured","audio_url","pdf_url","sort_order"];
       for (const key of validCols) {
@@ -107,8 +119,11 @@ export function useUpdateBook() {
         .update(updates)
         .eq("id", id)
         .select();
-      if (error) throw error;
-      if (!data || data.length === 0) throw new Error("Save failed – are you logged in as admin?");
+      if (error) {
+        console.error("Book update error:", error);
+        throw new Error(`Save failed: ${error.message}`);
+      }
+      if (!data || data.length === 0) throw new Error("Save failed – RLS blocked the update. Please log in again as admin.");
       return data[0];
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["books"] }),
@@ -130,10 +145,10 @@ export function useUpsertChapters() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ bookId, chapters }: { bookId: string; chapters: Omit<BookChapter, "book_id">[] }) => {
-      // Delete existing chapters
-      await supabase.from("book_chapters").delete().eq("book_id", bookId);
-      // Insert new ones
+      await ensureAdminSession();
+
       if (chapters.length > 0) {
+        // Use upsert instead of delete+insert to avoid data loss
         const rows = chapters.map((ch, i) => ({
           id: ch.id,
           book_id: bookId,
@@ -141,8 +156,25 @@ export function useUpsertChapters() {
           content: ch.content,
           sort_order: i,
         }));
-        const { error } = await supabase.from("book_chapters").insert(rows);
-        if (error) throw error;
+        const { error } = await supabase.from("book_chapters").upsert(rows, { onConflict: "id" });
+        if (error) {
+          console.error("Chapter upsert error:", error);
+          throw new Error(`Failed to save chapters: ${error.message}`);
+        }
+      }
+
+      // Remove chapters that were deleted by the user
+      const keepIds = chapters.map((ch) => ch.id);
+      const { data: existing } = await supabase
+        .from("book_chapters")
+        .select("id")
+        .eq("book_id", bookId);
+      const toDelete = (existing ?? []).filter((ch) => !keepIds.includes(ch.id)).map((ch) => ch.id);
+      if (toDelete.length > 0) {
+        const { error: delError } = await supabase.from("book_chapters").delete().in("id", toDelete);
+        if (delError) {
+          console.error("Chapter delete error:", delError);
+        }
       }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["books"] }),
