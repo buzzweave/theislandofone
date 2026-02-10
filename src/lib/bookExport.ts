@@ -6,9 +6,30 @@ import type { Book } from "@/hooks/useBooks";
  * - Joins lines that were broken mid-sentence (orphaned words like "I" on their own line)
  * - Preserves intentional paragraph breaks (double newlines or lines ending with sentence-ending punctuation)
  */
+/**
+ * Strip HTML tags and decode common entities, then normalize into clean paragraphs.
+ */
+function stripHtml(html: string): string {
+  // Replace block-level closing tags with newlines to preserve paragraph breaks
+  let text = html.replace(/<\/p>/gi, "\n").replace(/<\/div>/gi, "\n").replace(/<br\s*\/?>/gi, "\n");
+  // Remove all remaining HTML tags
+  text = text.replace(/<[^>]+>/g, "");
+  // Decode common HTML entities
+  text = text
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ");
+  return text;
+}
+
 function normalizeParagraphs(text: string): string {
+  // First strip any HTML
+  const cleaned = stripHtml(text);
   // Split into lines and trim each
-  const lines = text.split("\n").map((l) => l.trim());
+  const lines = cleaned.split("\n").map((l) => l.trim());
   const paragraphs: string[] = [];
   let current = "";
 
