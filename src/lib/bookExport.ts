@@ -40,27 +40,35 @@ export function exportBookToPdf(book: Book) {
   const doc = new jsPDF({ unit: "mm", format: "a5" });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
-  const margin = 15;
-  const contentW = pageW - margin * 2;
+  const marginTop = 20;
+  const marginBottom = 18;
+  const marginSide = 18;
+  const contentW = pageW - marginSide * 2;
+  const lineHeight = 5.5; // generous line spacing
+  const paraGap = 4; // space between paragraphs
+  const firstLineIndent = 8; // paragraph indent
 
   // --- Title page ---
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(24);
-  const titleLines = doc.splitTextToSize(book.title, contentW);
-  doc.text(titleLines, pageW / 2, pageH * 0.35, { align: "center" });
+  doc.setFontSize(26);
+  const titleLines = doc.splitTextToSize(book.title, contentW - 10);
+  const titleY = pageH * 0.32;
+  doc.text(titleLines, pageW / 2, titleY, { align: "center" });
 
   if (book.subtitle) {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(13);
-    doc.text(book.subtitle, pageW / 2, pageH * 0.35 + titleLines.length * 10 + 6, {
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(14);
+    const subY = titleY + titleLines.length * 11 + 8;
+    doc.text(doc.splitTextToSize(book.subtitle, contentW - 10), pageW / 2, subY, {
       align: "center",
     });
   }
 
-  doc.setFontSize(11);
-  doc.text(`by ${book.author}`, pageW / 2, pageH * 0.65, { align: "center" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(12);
+  doc.text(`by ${book.author}`, pageW / 2, pageH * 0.62, { align: "center" });
 
-  // Copyright notice on title page
+  // Copyright notice
   doc.setFontSize(8);
   doc.setFont("helvetica", "italic");
   doc.text(
@@ -74,36 +82,46 @@ export function exportBookToPdf(book: Book) {
   book.chapters.forEach((chapter, i) => {
     doc.addPage();
 
-    // Chapter heading
+    // Chapter heading with breathing room
+    let y = marginTop + 12;
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.text(`Chapter ${i + 1}`, margin, margin + 5);
-    doc.setFontSize(14);
-    doc.text(chapter.title, margin, margin + 13);
+    doc.setFontSize(11);
+    doc.setTextColor(120, 120, 120);
+    doc.text(`CHAPTER ${i + 1}`, pageW / 2, y, { align: "center" });
 
-    // Content – normalize pasted text into clean paragraphs
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
+    y += 10;
+    doc.setFontSize(18);
+    doc.setTextColor(0, 0, 0);
+    const chTitleLines = doc.splitTextToSize(chapter.title, contentW);
+    doc.text(chTitleLines, pageW / 2, y, { align: "center" });
+    y += chTitleLines.length * 8 + 14; // extra space before body
+
+    // Body text
+    doc.setFont("times", "normal");
+    doc.setFontSize(11);
     const normalized = normalizeParagraphs(chapter.content);
     const paras = normalized.split("\n\n").filter((p) => p.trim());
-    let y = margin + 22;
 
-    paras.forEach((para) => {
-      const wrapped = doc.splitTextToSize(para, contentW);
-      // Check if whole paragraph fits, otherwise start new page first
-      if (y + wrapped.length * 4.5 > pageH - margin && y > margin + 22) {
+    paras.forEach((para, pIdx) => {
+      const wrapped: string[] = doc.splitTextToSize(para, contentW - firstLineIndent);
+
+      // If paragraph won't fit at all, start new page
+      if (y + wrapped.length * lineHeight > pageH - marginBottom && y > marginTop + 30) {
         doc.addPage();
-        y = margin;
+        y = marginTop;
       }
-      wrapped.forEach((line: string) => {
-        if (y > pageH - margin) {
+
+      wrapped.forEach((line: string, lIdx: number) => {
+        if (y > pageH - marginBottom) {
           doc.addPage();
-          y = margin;
+          y = marginTop;
         }
-        doc.text(line, margin, y);
-        y += 4.5;
+        // Indent first line of each paragraph (except the very first)
+        const x = lIdx === 0 && pIdx > 0 ? marginSide + firstLineIndent : marginSide;
+        doc.text(line, x, y);
+        y += lineHeight;
       });
-      y += 3; // paragraph spacing
+      y += paraGap;
     });
   });
 
@@ -178,24 +196,36 @@ ${tocItems}
 
   const copyrightNotice = `© ${new Date().getFullYear()} The Island of One. All rights reserved. For personal use only.`;
 
-  const chapterFiles = book.chapters.map((ch, i) => ({
-    name: `OEBPS/ch${i}.xhtml`,
-    content: `<?xml version="1.0" encoding="UTF-8"?>
+  const epubCss = `body { font-family: Georgia, "Times New Roman", serif; line-height: 1.8; margin: 1.5em; color: #222; }
+h1 { text-align: center; font-size: 1.6em; margin-top: 2em; margin-bottom: 0.3em; }
+.chapter-num { text-align: center; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.15em; color: #888; margin-bottom: 0.5em; }
+p { text-indent: 1.5em; margin: 0.6em 0; text-align: justify; }
+p.first { text-indent: 0; }
+.copyright { font-size: 0.75em; font-style: italic; color: #999; text-align: center; margin-top: 3em; border-top: 1px solid #ddd; padding-top: 1em; }`;
+
+  const chapterFiles = book.chapters.map((ch, i) => {
+    const paras = normalizeParagraphs(ch.content)
+      .split("\n\n")
+      .filter((p) => p.trim());
+    const bodyHtml = paras
+      .map((p, pIdx) => `  <p${pIdx === 0 ? ' class="first"' : ''}>${sanitize(p)}</p>`)
+      .join("\n");
+
+    return {
+      name: `OEBPS/ch${i}.xhtml`,
+      content: `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml">
-<head><title>${sanitize(ch.title)}</title></head>
+<head><title>${sanitize(ch.title)}</title><style>${epubCss}</style></head>
 <body>
-  <h1>Chapter ${i + 1}: ${sanitize(ch.title)}</h1>
-  ${normalizeParagraphs(ch.content)
-    .split("\n\n")
-    .filter((p) => p.trim())
-    .map((p) => `<p>${sanitize(p)}</p>`)
-    .join("\n  ")}
-  <hr/>
-  <p style="font-size:small;font-style:italic;">${sanitize(copyrightNotice)}</p>
+  <div class="chapter-num">Chapter ${i + 1}</div>
+  <h1>${sanitize(ch.title)}</h1>
+${bodyHtml}
+  <p class="copyright">${sanitize(copyrightNotice)}</p>
 </body>
 </html>`,
-  }));
+    };
+  });
 
   // Build ZIP manually (minimal implementation for EPUB)
   const files: { name: string; content: string; noCompression?: boolean }[] = [
