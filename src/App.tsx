@@ -33,6 +33,7 @@ import AdminGraphics from "./pages/admin/AdminGraphics";
 import AdminBlogManager from "./pages/admin/AdminBlogManager";
 import SermonDetail from "./pages/SermonDetail";
 import Blog from "./pages/Blog";
+import BlogPost from "./pages/BlogPost";
 import NotFound from "./pages/NotFound";
 import Copyright from "./pages/Copyright";
 import TermsOfService from "./pages/TermsOfService";
@@ -57,6 +58,7 @@ const App = () => (
             <Route path="/videos" element={<Layout><Videos /></Layout>} />
             <Route path="/graphics" element={<Layout><Graphics /></Layout>} />
             <Route path="/blog" element={<Layout><Blog /></Layout>} />
+            <Route path="/blog/:slug" element={<Layout><BlogPost /></Layout>} />
             <Route path="/about" element={<Layout><About /></Layout>} />
             <Route path="/speaking" element={<Layout><Speaking /></Layout>} />
             <Route path="/membership" element={<Layout><Membership /></Layout>} />
