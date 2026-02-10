@@ -15,8 +15,10 @@ function getYouTubeId(url: string) {
 
 export default function Index() {
   const { data: books = [] } = useBooks();
-  const { sermons } = useSermons();
+  const { data: sermons = [] } = useSermons();
   const { data: videos = [] } = useVideos();
+  const featuredBooks = books.filter((b) => b.featured);
+  const featuredSermons = sermons.filter((s) => s.featured);
   const featuredVideos = videos.filter((v) => v.featured);
   const [playingId, setPlayingId] = useState<string | null>(null);
 
@@ -33,7 +35,7 @@ export default function Index() {
             <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold">Featured Books</h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 max-w-5xl mx-auto">
-            {books.map((book) => (
+            {featuredBooks.map((book) => (
               <Link
                 key={book.id}
                 to={`/books`}
@@ -79,7 +81,7 @@ export default function Index() {
             <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold">Latest Sermons</h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-w-5xl mx-auto">
-            {sermons.slice(0, 3).map((sermon) => (
+            {featuredSermons.slice(0, 3).map((sermon) => (
               <Link
                 key={sermon.id}
                 to="/sermons"
@@ -87,9 +89,9 @@ export default function Index() {
               >
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-xs font-semibold uppercase tracking-wider text-primary">{sermon.category}</span>
-                  {sermon.accessLevel !== "free" && (
+                  {sermon.access_level !== "free" && (
                     <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                      {sermon.accessLevel}
+                      {sermon.access_level}
                     </span>
                   )}
                 </div>

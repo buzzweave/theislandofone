@@ -6,7 +6,7 @@ import { useVideos } from "@/hooks/useVideos";
 
 export default function AdminDashboard() {
   const { data: books = [] } = useBooks();
-  const { sermons } = useSermons();
+  const { data: sermons = [] } = useSermons();
   const { data: videos = [] } = useVideos();
 
   const stats = [
