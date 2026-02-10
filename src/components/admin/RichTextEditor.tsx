@@ -227,6 +227,10 @@ export default function RichTextEditor({
         ),
         style: `min-height: ${minHeight}`,
       },
+      // Preserve pasted formatting (bold, italic, lists, etc.)
+      transformPastedHTML(html) {
+        return html;
+      },
     },
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
