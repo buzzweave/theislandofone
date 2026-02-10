@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, BookOpen, Mic, Play, Users, PenLine } from "lucide-react";
+import { useState } from "react";
+import { ArrowRight, BookOpen, Mic, Play, Users, PenLine, X } from "lucide-react";
 import bookCover1 from "@/assets/book-cover-1.jpg";
 import bookCover2 from "@/assets/book-cover-2.jpg";
 import bookCover3 from "@/assets/book-cover-3.jpg";
@@ -15,9 +16,9 @@ const bookCovers: Record<string, string> = {
   "book-cover-3": bookCover3,
 };
 
-function getYouTubeThumbnail(url: string) {
+function getYouTubeId(url: string) {
   const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|live\/|embed\/))([^?&/]+)/);
-  return match ? `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg` : "";
+  return match ? match[1] : "";
 }
 
 export default function Index() {
@@ -25,6 +26,7 @@ export default function Index() {
   const { sermons } = useSermons();
   const { data: videos = [] } = useVideos();
   const featuredVideos = videos.filter((v) => v.featured);
+  const [playingId, setPlayingId] = useState<string | null>(null);
 
   return (
     <div>
@@ -123,27 +125,48 @@ export default function Index() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-w-5xl mx-auto">
               {featuredVideos.map((video) => {
-                const thumb = video.thumbnail || (video.youtube_url ? getYouTubeThumbnail(video.youtube_url) : "");
+                const ytId = getYouTubeId(video.youtube_url);
+                const thumb = video.thumbnail || (ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : "");
+                const isPlaying = playingId === video.id;
                 return (
                   <div
                     key={video.id}
-                    onClick={() => video.youtube_url && window.open(video.youtube_url, "_blank")}
-                    className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300 cursor-pointer"
+                    className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300"
                   >
                     <div className="relative aspect-video overflow-hidden">
-                      {thumb ? (
-                        <img src={thumb} alt={video.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+                      {isPlaying && ytId ? (
+                        <>
+                          <iframe
+                            src={`https://www.youtube.com/embed/${ytId}?autoplay=1&rel=0`}
+                            title={video.title}
+                            className="w-full h-full"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                          />
+                          <button
+                            onClick={() => setPlayingId(null)}
+                            className="absolute top-2 right-2 z-10 p-1 rounded-full bg-background/80 text-foreground hover:bg-background transition-colors"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </>
                       ) : (
-                        <div className="w-full h-full bg-muted flex items-center justify-center">
-                          <Play className="h-10 w-10 text-muted-foreground" />
+                        <div className="cursor-pointer" onClick={() => ytId && setPlayingId(video.id)}>
+                          {thumb ? (
+                            <img src={thumb} alt={video.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+                          ) : (
+                            <div className="w-full h-full bg-muted flex items-center justify-center">
+                              <Play className="h-10 w-10 text-muted-foreground" />
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-background/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="w-12 sm:w-14 h-12 sm:h-14 rounded-full bg-primary/90 flex items-center justify-center">
+                              <Play className="h-5 sm:h-6 w-5 sm:w-6 text-primary-foreground ml-0.5" />
+                            </div>
+                          </div>
+                          <span className="absolute bottom-2 right-2 text-xs bg-background/80 px-2 py-0.5 rounded text-foreground">{video.duration}</span>
                         </div>
                       )}
-                      <div className="absolute inset-0 bg-background/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="w-12 sm:w-14 h-12 sm:h-14 rounded-full bg-primary/90 flex items-center justify-center">
-                          <Play className="h-5 sm:h-6 w-5 sm:w-6 text-primary-foreground ml-0.5" />
-                        </div>
-                      </div>
-                      <span className="absolute bottom-2 right-2 text-xs bg-background/80 px-2 py-0.5 rounded text-foreground">{video.duration}</span>
                     </div>
                     <div className="p-3 sm:p-4">
                       <p className="text-xs text-primary uppercase tracking-wider mb-1">{video.category}</p>
