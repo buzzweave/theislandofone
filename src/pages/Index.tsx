@@ -1,11 +1,12 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, BookOpen, Mic, Play, Users } from "lucide-react";
+import { ArrowRight, BookOpen, Mic, Play, Users, PenLine } from "lucide-react";
 import bookCover1 from "@/assets/book-cover-1.jpg";
 import bookCover2 from "@/assets/book-cover-2.jpg";
 import bookCover3 from "@/assets/book-cover-3.jpg";
-import { videos, membershipPlans } from "@/data/content";
+import { membershipPlans } from "@/data/content";
 import { useBooks } from "@/hooks/useBooks";
 import { useSermons } from "@/hooks/useSermons";
+import { useVideos } from "@/hooks/useVideos";
 import HeroCarousel from "@/components/HeroCarousel";
 
 const bookCovers: Record<string, string> = {
@@ -14,9 +15,17 @@ const bookCovers: Record<string, string> = {
   "book-cover-3": bookCover3,
 };
 
+function getYouTubeThumbnail(url: string) {
+  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|live\/|embed\/))([^?&/]+)/);
+  return match ? `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg` : "";
+}
+
 export default function Index() {
   const { books } = useBooks();
   const { sermons } = useSermons();
+  const { data: videos = [] } = useVideos();
+  const featuredVideos = videos.filter((v) => v.featured);
+
   return (
     <div>
       {/* HERO */}
@@ -90,50 +99,68 @@ export default function Index() {
               </Link>
             ))}
           </div>
-          <div className="text-center mt-10 sm:mt-12">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 mt-10 sm:mt-12">
             <Link to="/sermons" className="text-primary text-sm font-semibold hover:underline inline-flex items-center gap-1">
               Browse Sermon Library <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link
+              to="/blog"
+              className="inline-flex items-center gap-2 px-5 py-2 rounded-full border border-primary/30 text-sm font-semibold text-foreground hover:bg-primary/10 transition-colors"
+            >
+              <PenLine className="h-4 w-4 text-primary" /> Visit the Blog
             </Link>
           </div>
         </div>
       </section>
 
       {/* FEATURED VIDEOS */}
-      <section className="bg-gradient-section py-16 sm:py-24">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-10 sm:mb-16">
-            <p className="text-primary text-sm tracking-[0.2em] uppercase mb-3">Watch</p>
-            <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold">Featured Videos</h2>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-w-5xl mx-auto">
-            {videos.filter(v => v.featured).map((video) => (
-              <div
-                key={video.id}
-                className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300 cursor-pointer"
-              >
-                <div className="relative aspect-video overflow-hidden">
-                  <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
-                  <div className="absolute inset-0 bg-background/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="w-12 sm:w-14 h-12 sm:h-14 rounded-full bg-primary/90 flex items-center justify-center">
-                      <Play className="h-5 sm:h-6 w-5 sm:w-6 text-primary-foreground ml-0.5" />
+      {featuredVideos.length > 0 && (
+        <section className="bg-gradient-section py-16 sm:py-24">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-10 sm:mb-16">
+              <p className="text-primary text-sm tracking-[0.2em] uppercase mb-3">Watch</p>
+              <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold">Featured Videos</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-w-5xl mx-auto">
+              {featuredVideos.map((video) => {
+                const thumb = video.thumbnail || (video.youtube_url ? getYouTubeThumbnail(video.youtube_url) : "");
+                return (
+                  <div
+                    key={video.id}
+                    onClick={() => video.youtube_url && window.open(video.youtube_url, "_blank")}
+                    className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300 cursor-pointer"
+                  >
+                    <div className="relative aspect-video overflow-hidden">
+                      {thumb ? (
+                        <img src={thumb} alt={video.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+                      ) : (
+                        <div className="w-full h-full bg-muted flex items-center justify-center">
+                          <Play className="h-10 w-10 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-background/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="w-12 sm:w-14 h-12 sm:h-14 rounded-full bg-primary/90 flex items-center justify-center">
+                          <Play className="h-5 sm:h-6 w-5 sm:w-6 text-primary-foreground ml-0.5" />
+                        </div>
+                      </div>
+                      <span className="absolute bottom-2 right-2 text-xs bg-background/80 px-2 py-0.5 rounded text-foreground">{video.duration}</span>
+                    </div>
+                    <div className="p-3 sm:p-4">
+                      <p className="text-xs text-primary uppercase tracking-wider mb-1">{video.category}</p>
+                      <h3 className="font-display text-sm font-semibold">{video.title}</h3>
                     </div>
                   </div>
-                  <span className="absolute bottom-2 right-2 text-xs bg-background/80 px-2 py-0.5 rounded text-foreground">{video.duration}</span>
-                </div>
-                <div className="p-3 sm:p-4">
-                  <p className="text-xs text-primary uppercase tracking-wider mb-1">{video.category}</p>
-                  <h3 className="font-display text-sm font-semibold">{video.title}</h3>
-                </div>
-              </div>
-            ))}
+                );
+              })}
+            </div>
+            <div className="text-center mt-10 sm:mt-12">
+              <Link to="/videos" className="text-primary text-sm font-semibold hover:underline inline-flex items-center gap-1">
+                View All Videos <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
           </div>
-          <div className="text-center mt-10 sm:mt-12">
-            <Link to="/videos" className="text-primary text-sm font-semibold hover:underline inline-flex items-center gap-1">
-              View All Videos <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* MEMBERSHIP CTA */}
       <section className="py-16 sm:py-24">
