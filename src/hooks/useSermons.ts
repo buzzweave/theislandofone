@@ -1,52 +1,91 @@
-import { useCallback, useSyncExternalStore } from "react";
-import { sermons as seedSermons, type Sermon } from "@/data/content";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
-const STORAGE_KEY = "sermons_data";
-
-function getSnapshot(): Sermon[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {
-    // ignore parse errors
-  }
-  return seedSermons;
-}
-
-let cachedSermons = getSnapshot();
-
-const listeners = new Set<() => void>();
-
-function subscribe(cb: () => void) {
-  listeners.add(cb);
-  return () => listeners.delete(cb);
-}
-
-function notify() {
-  cachedSermons = getSnapshot();
-  listeners.forEach((cb) => cb());
-}
-
-function persist(sermons: Sermon[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(sermons));
-  notify();
-}
-
-// Listen for storage events from other tabs
-if (typeof window !== "undefined") {
-  window.addEventListener("storage", (e) => {
-    if (e.key === STORAGE_KEY) notify();
-  });
+export interface Sermon {
+  id: string;
+  title: string;
+  scripture: string;
+  excerpt: string;
+  manuscript: string;
+  access_level: string;
+  date: string;
+  category: string;
+  price: number;
+  is_free: boolean;
+  preview_cutoff: number;
+  featured: boolean;
+  audio_url: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export function useSermons() {
-  const sermons = useSyncExternalStore(subscribe, () => cachedSermons);
+  return useQuery({
+    queryKey: ["sermons"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sermons")
+        .select("*")
+        .order("sort_order", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as Sermon[];
+    },
+  });
+}
 
-  const setSermons = useCallback((updater: Sermon[] | ((prev: Sermon[]) => Sermon[])) => {
-    const current = getSnapshot();
-    const next = typeof updater === "function" ? updater(current) : updater;
-    persist(next);
-  }, []);
+export function useSermon(id: string | undefined) {
+  return useQuery({
+    queryKey: ["sermons", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sermons")
+        .select("*")
+        .eq("id", id!)
+        .maybeSingle();
+      if (error) throw error;
+      return data as Sermon | null;
+    },
+    enabled: !!id,
+  });
+}
 
-  return { sermons, setSermons };
+export function useAddSermon() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (sermon: Omit<Sermon, "id" | "created_at" | "updated_at">) => {
+      const { data, error } = await supabase.from("sermons").insert(sermon).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sermons"] }),
+  });
+}
+
+export function useUpdateSermon() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<Sermon> & { id: string }) => {
+      const { data, error } = await supabase
+        .from("sermons")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sermons"] }),
+  });
+}
+
+export function useDeleteSermon() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("sermons").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sermons"] }),
+  });
 }

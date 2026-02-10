@@ -262,6 +262,63 @@ export type Database = {
         }
         Relationships: []
       }
+      sermons: {
+        Row: {
+          access_level: string
+          audio_url: string | null
+          category: string
+          created_at: string
+          date: string
+          excerpt: string
+          featured: boolean
+          id: string
+          is_free: boolean
+          manuscript: string
+          preview_cutoff: number
+          price: number
+          scripture: string
+          sort_order: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          access_level?: string
+          audio_url?: string | null
+          category?: string
+          created_at?: string
+          date?: string
+          excerpt?: string
+          featured?: boolean
+          id?: string
+          is_free?: boolean
+          manuscript?: string
+          preview_cutoff?: number
+          price?: number
+          scripture?: string
+          sort_order?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          access_level?: string
+          audio_url?: string | null
+          category?: string
+          created_at?: string
+          date?: string
+          excerpt?: string
+          featured?: boolean
+          id?: string
+          is_free?: boolean
+          manuscript?: string
+          preview_cutoff?: number
+          price?: number
+          scripture?: string
+          sort_order?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       site_settings: {
         Row: {
           key: string

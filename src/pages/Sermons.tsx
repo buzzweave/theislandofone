@@ -6,14 +6,14 @@ import { useSermons } from "@/hooks/useSermons";
 const accessFilters = ["All", "free", "member", "pastor"];
 
 export default function Sermons() {
-  const { sermons } = useSermons();
+  const { data: sermons = [], isLoading } = useSermons();
   const categories = ["All", ...Array.from(new Set(sermons.map((s) => s.category)))];
   const [activeCategory, setActiveCategory] = useState("All");
   const [accessFilter, setAccessFilter] = useState("All");
 
   const filtered = sermons.filter((s) => {
     if (activeCategory !== "All" && s.category !== activeCategory) return false;
-    if (accessFilter !== "All" && s.accessLevel !== accessFilter) return false;
+    if (accessFilter !== "All" && s.access_level !== accessFilter) return false;
     return true;
   });
 
@@ -66,6 +66,10 @@ export default function Sermons() {
           These sermons are provided as a resource for pastors. Please adapt them for your congregation and give appropriate credit.
         </div>
 
+        {isLoading && (
+          <p className="text-center text-muted-foreground animate-pulse">Loading sermons…</p>
+        )}
+
         {/* Sermons List */}
         <div className="max-w-3xl mx-auto space-y-4 pb-24">
           {filtered.map((sermon) => (
@@ -78,7 +82,7 @@ export default function Sermons() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-xs font-semibold uppercase tracking-wider text-primary">{sermon.category}</span>
-                    {sermon.isFree ? (
+                    {sermon.is_free ? (
                       <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/5 text-primary/70 border border-primary/10">
                         Free
                       </span>
@@ -87,9 +91,9 @@ export default function Sermons() {
                         <Lock className="h-2.5 w-2.5" /> ${sermon.price?.toFixed(2)}
                       </span>
                     )}
-                    {sermon.accessLevel !== "free" && (
+                    {sermon.access_level !== "free" && (
                       <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
-                        {sermon.accessLevel}
+                        {sermon.access_level}
                       </span>
                     )}
                   </div>
@@ -100,7 +104,7 @@ export default function Sermons() {
                 <div className="flex flex-col items-end gap-2 shrink-0">
                   <span className="text-xs text-muted-foreground whitespace-nowrap">{sermon.date}</span>
                   <div className="flex items-center gap-1 text-xs text-muted-foreground group-hover:text-primary transition-colors">
-                    {sermon.isFree ? (
+                    {sermon.is_free ? (
                       <><Eye className="h-3 w-3" /> Read</>
                     ) : (
                       <><ShoppingCart className="h-3 w-3" /> Preview</>
@@ -110,7 +114,7 @@ export default function Sermons() {
               </div>
             </Link>
           ))}
-          {filtered.length === 0 && (
+          {filtered.length === 0 && !isLoading && (
             <p className="text-center text-muted-foreground py-12">No sermons match your filters.</p>
           )}
         </div>

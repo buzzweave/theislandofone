@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { membershipPlans } from "@/data/content";
-import { useSermons } from "@/hooks/useSermons";
+import { useSermon } from "@/hooks/useSermons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import SocialShareLinks from "@/components/SocialShareLinks";
@@ -22,10 +22,17 @@ import {
 export default function SermonDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { sermons } = useSermons();
-  const sermon = sermons.find((s) => s.id === id);
+  const { data: sermon, isLoading } = useSermon(id);
   const [purchased, setPurchased] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-muted-foreground animate-pulse">Loading sermon…</p>
+      </div>
+    );
+  }
 
   if (!sermon) {
     return (
@@ -41,8 +48,8 @@ export default function SermonDetail() {
   }
 
   const paragraphs = sermon.manuscript.split("\n\n");
-  const previewParagraphs = paragraphs.slice(0, sermon.previewCutoff + 1);
-  const isFullAccess = sermon.isFree || purchased;
+  const previewParagraphs = paragraphs.slice(0, sermon.preview_cutoff + 1);
+  const isFullAccess = sermon.is_free || purchased;
 
   const handleMockPurchase = () => {
     setPurchased(true);
@@ -77,12 +84,12 @@ export default function SermonDetail() {
               <span className="text-xs font-semibold uppercase tracking-wider text-primary">
                 {sermon.category}
               </span>
-              {!sermon.isFree && !purchased && (
+              {!sermon.is_free && !purchased && (
                 <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                  <Lock className="h-2.5 w-2.5" /> {sermon.accessLevel}
+                  <Lock className="h-2.5 w-2.5" /> {sermon.access_level}
                 </span>
               )}
-              {sermon.isFree && (
+              {sermon.is_free && (
                 <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/5 text-primary/70 border border-primary/10">
                   Free
                 </span>
@@ -99,9 +106,9 @@ export default function SermonDetail() {
             </p>
             <SocialShareLinks title={sermon.title} />
 
-            {isFullAccess && sermon.audioUrl && (
+            {isFullAccess && sermon.audio_url && (
               <div className="mt-6">
-                <AudioPlayer audioUrl={sermon.audioUrl} title={sermon.title} />
+                <AudioPlayer audioUrl={sermon.audio_url} title={sermon.title} />
               </div>
             )}
           </div>
@@ -112,7 +119,6 @@ export default function SermonDetail() {
         <div className="max-w-3xl mx-auto grid lg:grid-cols-[1fr_300px] gap-8">
           {/* Manuscript */}
           <div>
-            {/* Preview section */}
             <div className="mb-2">
               <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4">
                 <Eye className="h-3.5 w-3.5" />
@@ -128,7 +134,6 @@ export default function SermonDetail() {
               ))}
             </article>
 
-            {/* Paywall fade */}
             {!isFullAccess && (
               <div className="relative mt-0">
                 <div className="absolute inset-x-0 -top-32 h-32 bg-gradient-to-b from-transparent to-background pointer-events-none" />
@@ -156,7 +161,6 @@ export default function SermonDetail() {
               </div>
             )}
 
-            {/* Download section for purchased / free */}
             {isFullAccess && (
               <div className="mt-12 pt-8 border-t border-border">
                 <h3 className="font-display text-lg font-semibold mb-4 flex items-center gap-2">
@@ -188,7 +192,6 @@ export default function SermonDetail() {
 
           {/* Sidebar */}
           <div className="space-y-4">
-            {/* Purchase card (if not free and not purchased) */}
             {!isFullAccess && !showCheckout && (
               <Card className="border-primary/20">
                 <CardHeader className="pb-3">
@@ -216,7 +219,6 @@ export default function SermonDetail() {
               </Card>
             )}
 
-            {/* Mock checkout card */}
             {showCheckout && !purchased && (
               <Card className="border-primary/30 shadow-gold">
                 <CardHeader className="pb-3">
@@ -251,7 +253,6 @@ export default function SermonDetail() {
               </Card>
             )}
 
-            {/* Post-purchase confirmation */}
             {purchased && (
               <Card className="border-primary/30">
                 <CardContent className="pt-6 text-center space-y-3">
@@ -264,7 +265,6 @@ export default function SermonDetail() {
               </Card>
             )}
 
-            {/* Subscribe CTA always visible */}
             <Card>
               <CardContent className="pt-6 space-y-3">
                 <Crown className="h-6 w-6 text-primary" />
