@@ -50,7 +50,7 @@ export default function SermonDetail() {
   };
 
   const handleDownload = (format: string) => {
-    const copyright = `\n\n---\n© ${new Date().getFullYear()} @theislandofone. All rights reserved. For personal use only.\n`;
+    const copyright = `\n\n---\n© ${new Date().getFullYear()} The Island of One. All rights reserved. For personal use only.\n`;
     const blob = new Blob([sermon.manuscript + copyright], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
