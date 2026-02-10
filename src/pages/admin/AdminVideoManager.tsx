@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useVideos, useAddVideo, useUpdateVideo, useDeleteVideo, type Video } from "@/hooks/useVideos";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,11 +8,50 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, Video as VideoIcon, ExternalLink } from "lucide-react";
+import { Plus, Pencil, Trash2, Video as VideoIcon, ExternalLink, Upload, ImageIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+
+function ThumbnailUploader({ currentUrl, onUploaded }: { currentUrl: string; onUploaded: (url: string) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const { toast } = useToast();
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    const ext = file.name.split(".").pop();
+    const path = `thumb-${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from("video-thumbnails").upload(path, file, { upsert: true });
+    if (error) {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    } else {
+      const url = `${SUPABASE_URL}/storage/v1/object/public/video-thumbnails/${path}`;
+      onUploaded(url);
+    }
+    setUploading(false);
+    if (inputRef.current) inputRef.current.value = "";
+  };
+
+  return (
+    <div className="space-y-2">
+      {currentUrl && (
+        <img src={currentUrl} alt="Thumbnail preview" className="w-full aspect-video object-cover rounded-md border border-border" />
+      )}
+      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+      <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => inputRef.current?.click()} disabled={uploading}>
+        <Upload className="h-4 w-4 mr-2" />
+        {uploading ? "Uploading..." : currentUrl ? "Replace Thumbnail" : "Upload Thumbnail"}
+      </Button>
+      <p className="text-xs text-muted-foreground">Leave empty to auto-generate from YouTube URL</p>
+    </div>
+  );
+}
 
 const categories = ["Ministry", "Sermons", "Speaking", "Books", "Devotional"];
-
 type VideoForm = {
   title: string;
   thumbnail: string;
@@ -106,8 +145,11 @@ export default function AdminVideoManager() {
                 <Input value={form.youtube_url} onChange={(e) => setForm({ ...form, youtube_url: e.target.value })} placeholder="https://youtube.com/..." />
               </div>
               <div className="space-y-2">
-                <Label>Thumbnail URL (optional – auto-generated from YouTube)</Label>
-                <Input value={form.thumbnail} onChange={(e) => setForm({ ...form, thumbnail: e.target.value })} placeholder="https://..." />
+                <Label>Thumbnail</Label>
+                <ThumbnailUploader
+                  currentUrl={form.thumbnail}
+                  onUploaded={(url) => setForm({ ...form, thumbnail: url })}
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
