@@ -26,53 +26,57 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
 
   // Listen for auth state changes
   useEffect(() => {
+    let mounted = true;
+
     // Safety timeout - never leave the user stuck on a spinner
     const timeout = setTimeout(() => {
-      setIsLoading(false);
-    }, 5000);
+      if (mounted) setIsLoading(false);
+    }, 3000);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const checkAdminRole = async (userId: string): Promise<boolean> => {
       try {
-        if (session?.user) {
-          const { data } = await supabase
-            .from("user_roles")
-            .select("role")
-            .eq("user_id", session.user.id)
-            .eq("role", "admin")
-            .maybeSingle();
-
-          setIsAuthenticated(!!data);
-        } else {
-          setIsAuthenticated(false);
-        }
+        const { data } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", userId)
+          .eq("role", "admin")
+          .maybeSingle();
+        return !!data;
       } catch {
-        setIsAuthenticated(false);
+        return false;
       }
-      setIsLoading(false);
-      clearTimeout(timeout);
+    };
+
+    // Check existing session first
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!mounted) return;
+      if (session?.user) {
+        const isAdmin = await checkAdminRole(session.user.id);
+        if (mounted) setIsAuthenticated(isAdmin);
+      }
+      if (mounted) {
+        setIsLoading(false);
+        clearTimeout(timeout);
+      }
     });
 
-    // Check existing session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      try {
-        if (session?.user) {
-          const { data } = await supabase
-            .from("user_roles")
-            .select("role")
-            .eq("user_id", session.user.id)
-            .eq("role", "admin")
-            .maybeSingle();
-
-          setIsAuthenticated(!!data);
-        }
-      } catch {
-        setIsAuthenticated(false);
+    // Then listen for future changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!mounted) return;
+      if (session?.user) {
+        const isAdmin = await checkAdminRole(session.user.id);
+        if (mounted) setIsAuthenticated(isAdmin);
+      } else {
+        if (mounted) setIsAuthenticated(false);
       }
-      setIsLoading(false);
-      clearTimeout(timeout);
+      if (mounted) {
+        setIsLoading(false);
+        clearTimeout(timeout);
+      }
     });
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
       clearTimeout(timeout);
     };
