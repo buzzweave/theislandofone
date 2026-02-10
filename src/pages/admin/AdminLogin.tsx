@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
-import MathCaptcha from "@/components/admin/MathCaptcha";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -15,7 +14,6 @@ export default function AdminLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [captchaVerified, setCaptchaVerified] = useState(false);
   const [error, setError] = useState("");
   const [lockCountdown, setLockCountdown] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -49,11 +47,6 @@ export default function AdminLogin() {
 
     if (!email.trim() || !password.trim()) {
       setError("All fields are required.");
-      return;
-    }
-
-    if (!captchaVerified) {
-      setError("Please complete the security check.");
       return;
     }
 
@@ -137,9 +130,6 @@ export default function AdminLogin() {
                   </button>
                 </div>
               </div>
-
-              {/* CAPTCHA */}
-              <MathCaptcha onVerified={setCaptchaVerified} />
 
               {error && (
                 <p className="text-sm text-destructive flex items-center gap-1.5">
