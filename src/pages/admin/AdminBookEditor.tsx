@@ -27,6 +27,7 @@ import { useBooks, useAddBook, useUpdateBook, useDeleteBook, useUpsertChapters, 
 import SortableChapterList from "@/components/admin/SortableChapterList";
 import { useAIContent } from "@/contexts/AIContentContext";
 import AudioGenerator from "@/components/admin/AudioGenerator";
+import PdfUploadButton from "@/components/admin/PdfUploadButton";
 import RichTextEditor from "@/components/admin/RichTextEditor";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -360,9 +361,28 @@ export default function AdminBookEditor() {
                 <span className="flex items-center gap-2">
                   <BookOpen className="h-4 w-4" /> Chapters ({local.chapters.length})
                 </span>
-                <Button size="sm" variant="outline" onClick={addChapter}>
-                  <Plus className="h-3 w-3 mr-1" /> Add
-                </Button>
+                <div className="flex items-center gap-2">
+                  <PdfUploadButton
+                    mode="book"
+                    onBookParsed={(data) => {
+                      const newChapters = data.chapters.map((ch, i) => ({
+                        id: crypto.randomUUID(),
+                        book_id: local.id,
+                        title: ch.title,
+                        content: ch.content,
+                        sort_order: local.chapters.length + i,
+                      }));
+                      updateLocal({
+                        title: data.title || local.title,
+                        subtitle: data.subtitle || local.subtitle,
+                        chapters: [...local.chapters, ...newChapters],
+                      });
+                    }}
+                  />
+                  <Button size="sm" variant="outline" onClick={addChapter}>
+                    <Plus className="h-3 w-3 mr-1" /> Add
+                  </Button>
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent>
