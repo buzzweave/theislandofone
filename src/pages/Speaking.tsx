@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Mic, Send, CheckCircle, Loader2 } from "lucide-react";
+import { Mic, Send, CheckCircle, Loader2, Phone } from "lucide-react";
 import { speakingTopics } from "@/data/content";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -62,7 +62,14 @@ export default function Speaking() {
           {/* Form */}
           <div className="rounded-2xl border border-border bg-card p-8">
             <h2 className="font-display text-2xl font-bold mb-2">Request a Speaker</h2>
-            <p className="text-muted-foreground text-sm mb-8">No fees or commitments — just fill out the form and we'll be in touch.</p>
+            <p className="text-muted-foreground text-sm mb-4">No fees or commitments — just fill out the form and we'll be in touch.</p>
+            <a
+              href="tel:9362380102"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-gold mb-8"
+            >
+              <Phone className="h-4 w-4" />
+              Call Us: (936) 238-0102
+            </a>
 
             {submitted ? (
               <div className="text-center py-12 animate-fade-up">
