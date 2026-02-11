@@ -56,6 +56,9 @@ export default function AdminBookEditor() {
   const [uploading, setUploading] = useState(false);
   const [uploadingPdf, setUploadingPdf] = useState(false);
   const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [dirty, setDirty] = useState(false);
+  const savingRef = useRef(false);
 
   // Set initial active when books load
   useEffect(() => {
@@ -117,6 +120,7 @@ export default function AdminBookEditor() {
 
   const updateLocal = (fields: Partial<LocalBook>) => {
     setLocal((prev) => (prev ? { ...prev, ...fields } : prev));
+    setDirty(true);
   };
 
   const addNew = async () => {
@@ -178,11 +182,12 @@ export default function AdminBookEditor() {
     updateLocal({ chapters: local.chapters.filter((ch) => ch.id !== chapterId) });
   };
 
-  const handleSave = async () => {
-    if (!local || saving) return;
+  const handleSave = async (isAuto = false) => {
+    if (!local || saving || savingRef.current) return;
     setSaving(true);
+    savingRef.current = true;
 
-    const SAVE_TIMEOUT = 15000; // 15 second max
+    const SAVE_TIMEOUT = 60000; // 60 seconds for large books
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     const timeoutPromise = new Promise<never>((_, reject) => {
@@ -200,7 +205,11 @@ export default function AdminBookEditor() {
         timeoutPromise,
       ]);
 
-      toast({ title: "✓ Book & chapters saved successfully!" });
+      setDirty(false);
+      setLastSavedAt(new Date());
+      if (!isAuto) {
+        toast({ title: "✓ Book & chapters saved successfully!" });
+      }
     } catch (err: any) {
       console.error("Save error:", err);
       const msg = err.message || "Unknown error";
@@ -209,13 +218,24 @@ export default function AdminBookEditor() {
       } else if (msg.includes("session") || msg.includes("log in") || msg.includes("RLS")) {
         toast({ title: "Session expired", description: "Please log out and log back in, then try saving again.", variant: "destructive" });
       } else {
-        toast({ title: "Save failed", description: msg, variant: "destructive" });
+        toast({ title: isAuto ? "Auto-save failed" : "Save failed", description: msg, variant: "destructive" });
       }
     } finally {
       if (timer) clearTimeout(timer);
       setSaving(false);
+      savingRef.current = false;
     }
   };
+
+  // Autosave every 60 seconds when there are unsaved changes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (dirty && local && !savingRef.current) {
+        handleSave(true);
+      }
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [dirty, local]);
 
   const showList = isMobile ? !activeId : true;
   const showEditor = isMobile ? !!activeId : true;
@@ -560,7 +580,7 @@ export default function AdminBookEditor() {
 
           {/* Actions */}
           <div className="flex flex-wrap items-center gap-3 pb-8">
-            <Button onClick={handleSave} disabled={saving}>
+            <Button onClick={() => handleSave(false)} disabled={saving}>
               <Save className="h-4 w-4 mr-2" />
               {saving ? "Saving…" : "Save Book"}
             </Button>
