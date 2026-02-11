@@ -187,41 +187,25 @@ export default function AdminBookEditor() {
     setSaving(true);
     savingRef.current = true;
 
-    const SAVE_TIMEOUT = 60000; // 60 seconds for large books
-    let timer: ReturnType<typeof setTimeout> | null = null;
-
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error("Save timed out. Please try again.")), SAVE_TIMEOUT);
-    });
-
     try {
       const { chapters, ...bookData } = local;
-
-      await Promise.race([
-        (async () => {
-          await updateBookMut.mutateAsync({ id: local.id, ...bookData });
-          await upsertChaptersMut.mutateAsync({ bookId: local.id, chapters });
-        })(),
-        timeoutPromise,
-      ]);
+      await updateBookMut.mutateAsync({ id: local.id, ...bookData });
+      await upsertChaptersMut.mutateAsync({ bookId: local.id, chapters });
 
       setDirty(false);
       setLastSavedAt(new Date());
       if (!isAuto) {
-        toast({ title: "✓ Book & chapters saved successfully!" });
+        toast({ title: "Book & chapters saved successfully!" });
       }
     } catch (err: any) {
       console.error("Save error:", err);
       const msg = err.message || "Unknown error";
-      if (msg.includes("timed out")) {
-        toast({ title: "Save timed out", description: "The server took too long. Please try again.", variant: "destructive" });
-      } else if (msg.includes("session") || msg.includes("log in") || msg.includes("RLS")) {
+      if (msg.includes("session") || msg.includes("log in") || msg.includes("RLS")) {
         toast({ title: "Session expired", description: "Please log out and log back in, then try saving again.", variant: "destructive" });
       } else {
         toast({ title: isAuto ? "Auto-save failed" : "Save failed", description: msg, variant: "destructive" });
       }
     } finally {
-      if (timer) clearTimeout(timer);
       setSaving(false);
       savingRef.current = false;
     }
