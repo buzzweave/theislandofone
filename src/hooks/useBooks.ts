@@ -51,7 +51,6 @@ export function useBooks() {
         chapters: chaptersByBook.get(b.id) ?? [],
       })) as Book[];
     },
-    staleTime: 30000,
   });
 }
 
@@ -144,8 +143,8 @@ export function useUpsertChapters() {
       await ensureAdminSession();
 
       if (chapters.length > 0) {
-        // Chunk upserts to avoid server timeouts on large books
-        const CHUNK_SIZE = 5;
+        const CHUNK_SIZE = 2;
+        const MAX_RETRIES = 3;
         const rows = chapters.map((ch, i) => ({
           id: ch.id,
           book_id: bookId,
@@ -155,10 +154,20 @@ export function useUpsertChapters() {
         }));
         for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
           const chunk = rows.slice(i, i + CHUNK_SIZE);
-          const { error } = await supabase.from("book_chapters").upsert(chunk, { onConflict: "id" });
-          if (error) {
-            console.error("Chapter upsert error:", error);
-            throw new Error(`Failed to save chapters: ${error.message}`);
+          let lastError: Error | null = null;
+          for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+            const { error } = await supabase.from("book_chapters").upsert(chunk, { onConflict: "id" });
+            if (!error) { lastError = null; break; }
+            lastError = new Error(error.message);
+            console.warn(`Chapter upsert attempt ${attempt + 1} failed:`, error.message);
+            if (attempt < MAX_RETRIES - 1) {
+              await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+            }
+          }
+          if (lastError) throw new Error(`Failed to save chapters: ${lastError.message}`);
+          // Small delay between chunks
+          if (i + CHUNK_SIZE < rows.length) {
+            await new Promise((r) => setTimeout(r, 300));
           }
         }
       }
