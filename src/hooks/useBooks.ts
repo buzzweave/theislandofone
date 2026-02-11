@@ -144,7 +144,8 @@ export function useUpsertChapters() {
       await ensureAdminSession();
 
       if (chapters.length > 0) {
-        // Use upsert instead of delete+insert to avoid data loss
+        // Chunk upserts to avoid server timeouts on large books
+        const CHUNK_SIZE = 5;
         const rows = chapters.map((ch, i) => ({
           id: ch.id,
           book_id: bookId,
@@ -152,10 +153,13 @@ export function useUpsertChapters() {
           content: ch.content,
           sort_order: i,
         }));
-        const { error } = await supabase.from("book_chapters").upsert(rows, { onConflict: "id" });
-        if (error) {
-          console.error("Chapter upsert error:", error);
-          throw new Error(`Failed to save chapters: ${error.message}`);
+        for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+          const chunk = rows.slice(i, i + CHUNK_SIZE);
+          const { error } = await supabase.from("book_chapters").upsert(chunk, { onConflict: "id" });
+          if (error) {
+            console.error("Chapter upsert error:", error);
+            throw new Error(`Failed to save chapters: ${error.message}`);
+          }
         }
       }
 
