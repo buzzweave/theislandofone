@@ -10,9 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, Video as VideoIcon, ExternalLink, Upload, ImageIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+import { api } from "@/lib/api";
 
 function ThumbnailUploader({ currentUrl, onUploaded }: { currentUrl: string; onUploaded: (url: string) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -23,14 +21,11 @@ function ThumbnailUploader({ currentUrl, onUploaded }: { currentUrl: string; onU
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
-    const ext = file.name.split(".").pop();
-    const path = `thumb-${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("video-thumbnails").upload(path, file, { upsert: true });
-    if (error) {
-      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
-    } else {
-      const url = `${SUPABASE_URL}/storage/v1/object/public/video-thumbnails/${path}`;
-      onUploaded(url);
+    try {
+      const data = await api.upload<{ url: string }>("/api/upload", file);
+      onUploaded(data.url);
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
     }
     setUploading(false);
     if (inputRef.current) inputRef.current.value = "";

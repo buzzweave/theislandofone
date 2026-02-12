@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 
 export function useSiteSettings(key: string, defaultValue = "") {
   const queryClient = useQueryClient();
@@ -7,21 +7,17 @@ export function useSiteSettings(key: string, defaultValue = "") {
   const { data: value, isLoading } = useQuery({
     queryKey: ["site-setting", key],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("site_settings")
-        .select("value")
-        .eq("key", key)
-        .maybeSingle();
-      if (error) throw error;
-      return data?.value || defaultValue;
+      try {
+        const data = await api.get<{ value: string }>(`/api/site-settings/${key}`);
+        return data?.value || defaultValue;
+      } catch {
+        return defaultValue;
+      }
     },
   });
 
   const updateValue = async (newValue: string) => {
-    const { error } = await supabase
-      .from("site_settings")
-      .upsert({ key, value: newValue, updated_at: new Date().toISOString() }, { onConflict: "key" });
-    if (error) throw error;
+    await api.put(`/api/site-settings/${key}`, { value: newValue });
     queryClient.invalidateQueries({ queryKey: ["site-setting", key] });
   };
 

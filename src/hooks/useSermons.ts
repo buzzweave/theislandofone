@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 
 export interface Sermon {
   id: string;
@@ -23,29 +23,14 @@ export interface Sermon {
 export function useSermons() {
   return useQuery({
     queryKey: ["sermons"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("sermons")
-        .select("*")
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return (data ?? []) as Sermon[];
-    },
+    queryFn: () => api.get<Sermon[]>("/api/sermons"),
   });
 }
 
 export function useSermon(id: string | undefined) {
   return useQuery({
     queryKey: ["sermons", id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("sermons")
-        .select("*")
-        .eq("id", id!)
-        .maybeSingle();
-      if (error) throw error;
-      return data as Sermon | null;
-    },
+    queryFn: () => api.get<Sermon | null>(`/api/sermons/${id}`),
     enabled: !!id,
   });
 }
@@ -53,11 +38,8 @@ export function useSermon(id: string | undefined) {
 export function useAddSermon() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (sermon: Omit<Sermon, "id" | "created_at" | "updated_at">) => {
-      const { data, error } = await supabase.from("sermons").insert(sermon).select().single();
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: (sermon: Omit<Sermon, "id" | "created_at" | "updated_at">) =>
+      api.post("/api/sermons", sermon),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["sermons"] }),
   });
 }
@@ -65,16 +47,8 @@ export function useAddSermon() {
 export function useUpdateSermon() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<Sermon> & { id: string }) => {
-      const { data, error } = await supabase
-        .from("sermons")
-        .update(updates)
-        .eq("id", id)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: ({ id, ...updates }: Partial<Sermon> & { id: string }) =>
+      api.put(`/api/sermons/${id}`, updates),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["sermons"] }),
   });
 }
@@ -82,10 +56,7 @@ export function useUpdateSermon() {
 export function useDeleteSermon() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("sermons").delete().eq("id", id);
-      if (error) throw error;
-    },
+    mutationFn: (id: string) => api.delete(`/api/sermons/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["sermons"] }),
   });
 }

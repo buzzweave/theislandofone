@@ -15,7 +15,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { useAIContent } from "@/contexts/AIContentContext";
 import AudioGenerator from "@/components/admin/AudioGenerator";
@@ -107,18 +107,12 @@ export default function AISidebar({
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke("ai-writing", {
-        body: {
-          action,
-          context: selectedContext,
-          contentType,
-          customPrompt: customPromptText || undefined,
-        },
+      const data = await api.post("/api/ai-writing", {
+        action,
+        context: selectedContext,
+        contentType,
+        customPrompt: customPromptText || undefined,
       });
-
-      if (error) {
-        throw new Error(error.message || "Failed to get AI response");
-      }
 
       if (data?.error) {
         throw new Error(data.error);

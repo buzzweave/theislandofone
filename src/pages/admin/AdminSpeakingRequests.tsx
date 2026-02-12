@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,9 +13,22 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Mic, Calendar, Mail, Building2, MessageSquare, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import type { Tables } from "@/integrations/supabase/types";
 
-type SpeakingRequest = Tables<"speaking_requests">;
+interface SpeakingRequest {
+  id: string;
+  name: string;
+  email: string;
+  organization: string | null;
+  event_name: string;
+  event_date: string;
+  event_location: string | null;
+  topic: string | null;
+  message: string | null;
+  status: string;
+  admin_notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 const STATUS_OPTIONS = [
   { value: "new", label: "New", color: "bg-blue-500/10 text-blue-600 border-blue-500/20" },
@@ -38,11 +51,10 @@ export default function AdminSpeakingRequests() {
   const selected = requests.find((r) => r.id === selectedId) ?? null;
 
   const fetchRequests = async () => {
-    const { data } = await supabase
-      .from("speaking_requests")
-      .select("*")
-      .order("created_at", { ascending: false });
-    setRequests(data ?? []);
+    try {
+      const data = await api.get<SpeakingRequest[]>("/api/speaking-requests");
+      setRequests(data ?? []);
+    } catch { /* ignore */ }
     setLoading(false);
   };
 
@@ -51,18 +63,20 @@ export default function AdminSpeakingRequests() {
   }, []);
 
   const updateRequest = async (id: string, fields: Partial<SpeakingRequest>) => {
-    const { error } = await supabase.from("speaking_requests").update(fields).eq("id", id);
-    if (error) {
+    try {
+      await api.put(`/api/speaking-requests/${id}`, fields);
+      setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, ...fields } : r)));
+    } catch {
       toast({ title: "Update failed", variant: "destructive" });
-      return;
     }
-    setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, ...fields } : r)));
   };
 
   const deleteRequest = async (id: string) => {
-    await supabase.from("speaking_requests").delete().eq("id", id);
-    setRequests((prev) => prev.filter((r) => r.id !== id));
-    if (selectedId === id) setSelectedId(null);
+    try {
+      await api.delete(`/api/speaking-requests/${id}`);
+      setRequests((prev) => prev.filter((r) => r.id !== id));
+      if (selectedId === id) setSelectedId(null);
+    } catch { /* ignore */ }
   };
 
   const newCount = requests.filter((r) => r.status === "new").length;

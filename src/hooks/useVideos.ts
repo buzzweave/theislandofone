@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 
 export interface Video {
   id: string;
@@ -18,25 +18,15 @@ export interface Video {
 export function useVideos() {
   return useQuery({
     queryKey: ["videos"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("videos")
-        .select("*")
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return data as Video[];
-    },
+    queryFn: () => api.get<Video[]>("/api/videos"),
   });
 }
 
 export function useAddVideo() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (video: Omit<Video, "id" | "created_at" | "updated_at">) => {
-      const { data, error } = await supabase.from("videos").insert(video).select().single();
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: (video: Omit<Video, "id" | "created_at" | "updated_at">) =>
+      api.post("/api/videos", video),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["videos"] }),
   });
 }
@@ -44,11 +34,8 @@ export function useAddVideo() {
 export function useUpdateVideo() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<Video> & { id: string }) => {
-      const { data, error } = await supabase.from("videos").update(updates).eq("id", id).select().single();
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: ({ id, ...updates }: Partial<Video> & { id: string }) =>
+      api.put(`/api/videos/${id}`, updates),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["videos"] }),
   });
 }
@@ -56,10 +43,7 @@ export function useUpdateVideo() {
 export function useDeleteVideo() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("videos").delete().eq("id", id);
-      if (error) throw error;
-    },
+    mutationFn: (id: string) => api.delete(`/api/videos/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["videos"] }),
   });
 }

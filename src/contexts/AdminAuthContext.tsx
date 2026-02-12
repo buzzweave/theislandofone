@@ -1,11 +1,12 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 
 interface AdminAuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
+  forgotPassword: (email: string) => Promise<boolean>;
   failedAttempts: number;
   isLocked: boolean;
   lockoutEnd: number | null;
@@ -21,7 +22,6 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutEnd, setLockoutEnd] = useState<number | null>(null);
-  const initialCheckDone = useRef(false);
 
   const isLocked = lockoutEnd !== null && Date.now() < lockoutEnd;
 
@@ -30,85 +30,54 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     if (!isAuthenticated) return;
     const interval = setInterval(async () => {
       try {
-        await supabase.auth.refreshSession();
+        const data = await api.post("/api/auth/refresh");
+        if (data?.token) api.setToken(data.token);
       } catch {
-        // ignore
+        setIsAuthenticated(false);
+        api.clearToken();
       }
-    }, 4 * 60 * 1000); // refresh every 4 minutes
+    }, 4 * 60 * 1000);
     return () => clearInterval(interval);
   }, [isAuthenticated]);
 
+  // Check existing token on mount
   useEffect(() => {
     let mounted = true;
-
-    const checkAdminRole = async (userId: string): Promise<boolean> => {
-      try {
-        const { data } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", userId)
-          .eq("role", "admin")
-          .maybeSingle();
-        return !!data;
-      } catch {
-        return false;
-      }
-    };
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!mounted || !initialCheckDone.current) return;
-      if (session?.user) {
-        const isAdmin = await checkAdminRole(session.user.id);
-        if (mounted) setIsAuthenticated(isAdmin);
-      } else {
-        if (mounted) setIsAuthenticated(false);
-      }
-    });
-
     const init = async () => {
+      if (!api.hasToken()) {
+        if (mounted) setIsLoading(false);
+        return;
+      }
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!mounted) return;
-        if (session?.user) {
-          const isAdmin = await checkAdminRole(session.user.id);
-          if (mounted) setIsAuthenticated(isAdmin);
-        }
+        await api.get("/api/auth/me");
+        if (mounted) setIsAuthenticated(true);
       } catch {
-        // ignore
+        api.clearToken();
       } finally {
-        if (mounted) {
-          initialCheckDone.current = true;
-          setIsLoading(false);
-        }
+        if (mounted) setIsLoading(false);
       }
     };
-
     init();
-
     const timeout = setTimeout(() => {
-      if (mounted) {
-        initialCheckDone.current = true;
-        setIsLoading(false);
-      }
+      if (mounted) setIsLoading(false);
     }, 8000);
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-      clearTimeout(timeout);
-    };
+    return () => { mounted = false; clearTimeout(timeout); };
   }, []);
 
   const login = useCallback(
     async (email: string, password: string): Promise<boolean> => {
       if (isLocked) return false;
-
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error || !data.user) {
+      try {
+        const data = await api.post("/api/auth/login", { email, password });
+        if (data?.token) {
+          api.setToken(data.token);
+          setIsAuthenticated(true);
+          setFailedAttempts(0);
+          setLockoutEnd(null);
+          return true;
+        }
+        throw new Error("No token received");
+      } catch {
         const next = failedAttempts + 1;
         setFailedAttempts(next);
         if (next >= MAX_ATTEMPTS) {
@@ -116,41 +85,27 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
         }
         return false;
       }
-
-      // Check admin role
-      const { data: roleData } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", data.user.id)
-        .eq("role", "admin")
-        .maybeSingle();
-
-      if (!roleData) {
-        await supabase.auth.signOut();
-        const next = failedAttempts + 1;
-        setFailedAttempts(next);
-        if (next >= MAX_ATTEMPTS) {
-          setLockoutEnd(Date.now() + LOCKOUT_DURATION);
-        }
-        return false;
-      }
-
-      setIsAuthenticated(true);
-      setFailedAttempts(0);
-      setLockoutEnd(null);
-      return true;
     },
     [failedAttempts, isLocked],
   );
 
-  const logout = useCallback(async () => {
-    await supabase.auth.signOut();
+  const forgotPassword = useCallback(async (email: string): Promise<boolean> => {
+    try {
+      await api.post("/api/auth/forgot-password", { email });
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const logout = useCallback(() => {
+    api.clearToken();
     setIsAuthenticated(false);
   }, []);
 
   return (
     <AdminAuthContext.Provider
-      value={{ isAuthenticated, isLoading, login, logout, failedAttempts, isLocked, lockoutEnd }}
+      value={{ isAuthenticated, isLoading, login, logout, forgotPassword, failedAttempts, isLocked, lockoutEnd }}
     >
       {children}
     </AdminAuthContext.Provider>

@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FileUp, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import * as pdfjsLib from "pdfjs-dist";
 
 // Use the bundled worker
@@ -59,11 +59,7 @@ export default function PdfUploadButton({ mode, onBookParsed, onSermonParsed, di
       }
 
       setStatus("AI is detecting chapters and formatting…");
-      const { data, error } = await supabase.functions.invoke("parse-pdf", {
-        body: { text, mode },
-      });
-
-      if (error) throw error;
+      const data = await api.post("/api/parse-pdf", { text, mode });
 
       if (mode === "book" && onBookParsed) {
         onBookParsed(data);

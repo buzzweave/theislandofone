@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 
 export interface Graphic {
   id: string;
@@ -16,15 +16,7 @@ export interface Graphic {
 export function useGraphics() {
   const { data: graphics = [], isLoading } = useQuery({
     queryKey: ["graphics"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("graphics")
-        .select("id, title, description, category, price, preview_url, is_active, sort_order, created_at")
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return data as Graphic[];
-    },
+    queryFn: () => api.get<Graphic[]>("/api/graphics"),
   });
-
   return { graphics, isLoading };
 }

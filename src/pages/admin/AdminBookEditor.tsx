@@ -29,11 +29,9 @@ import { useAIContent } from "@/contexts/AIContentContext";
 import AudioGenerator from "@/components/admin/AudioGenerator";
 import PdfUploadButton from "@/components/admin/PdfUploadButton";
 import RichTextEditor from "@/components/admin/RichTextEditor";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
-
-const PDF_BUCKET = "site-assets";
 
 const CATEGORIES = ["Devotional", "Faith", "Leadership", "Ministry", "Prayer", "Family"];
 
@@ -60,14 +58,12 @@ export default function AdminBookEditor() {
   const [dirty, setDirty] = useState(false);
   const savingRef = useRef(false);
 
-  // Set initial active when books load
   useEffect(() => {
     if (!activeId && bookList.length > 0) {
       setActiveId(bookList[0].id);
     }
   }, [bookList]);
 
-  // Sync local state when active book changes
   useEffect(() => {
     if (activeId) {
       const book = bookList.find((b) => b.id === activeId);
@@ -79,7 +75,6 @@ export default function AdminBookEditor() {
     }
   }, [activeId, bookList]);
 
-  // AI content integration
   useEffect(() => {
     if (!local) {
       aiContent.unregister();
@@ -200,7 +195,7 @@ export default function AdminBookEditor() {
     } catch (err: any) {
       console.error("Save error:", err);
       const msg = err.message || "Unknown error";
-      if (msg.includes("session") || msg.includes("log in") || msg.includes("RLS")) {
+      if (msg.includes("session") || msg.includes("log in") || msg.includes("expired")) {
         toast({ title: "Session expired", description: "Please log out and log back in, then try saving again.", variant: "destructive" });
       } else {
         toast({ title: isAuto ? "Auto-save failed" : "Save failed", description: msg, variant: "destructive" });
@@ -211,7 +206,6 @@ export default function AdminBookEditor() {
     }
   };
 
-  // Autosave every 60 seconds when there are unsaved changes
   useEffect(() => {
     const interval = setInterval(() => {
       if (dirty && local && !savingRef.current) {
@@ -230,7 +224,6 @@ export default function AdminBookEditor() {
 
   return (
     <div className={`flex ${isMobile ? "flex-col" : ""} gap-4 md:gap-6 h-[calc(100vh-8rem)]`}>
-      {/* Book List */}
       {showList && (
         <div className={`${isMobile ? "w-full" : "w-64 shrink-0"} flex flex-col border border-border rounded-lg bg-card overflow-hidden ${isMobile ? "h-[calc(100vh-8rem)]" : ""}`}>
           <div className="p-3 border-b border-border flex items-center justify-between">
@@ -264,7 +257,6 @@ export default function AdminBookEditor() {
         </div>
       )}
 
-      {/* Editor */}
       {showEditor && local ? (
         <div className="flex-1 overflow-y-auto space-y-6 pr-0 md:pr-2">
           {isMobile && (
@@ -273,7 +265,6 @@ export default function AdminBookEditor() {
             </Button>
           )}
 
-          {/* Title & meta */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
               <Label>Title</Label>
@@ -310,7 +301,6 @@ export default function AdminBookEditor() {
             </div>
           </div>
 
-          {/* Cover Image */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
@@ -338,16 +328,8 @@ export default function AdminBookEditor() {
                       if (!file) return;
                       setUploading(true);
                       try {
-                        const ext = file.name.split(".").pop();
-                        const path = `book-covers/${local.id}.${ext}`;
-                        const { error: uploadError } = await supabase.storage
-                          .from("site-assets")
-                          .upload(path, file, { upsert: true });
-                        if (uploadError) throw uploadError;
-                        const { data: { publicUrl } } = supabase.storage
-                          .from("site-assets")
-                          .getPublicUrl(path);
-                        updateLocal({ cover_image: publicUrl });
+                        const data = await api.upload<{ url: string }>("/api/upload", file);
+                        updateLocal({ cover_image: data.url });
                         toast({ title: "Cover uploaded" });
                       } catch (err: any) {
                         toast({ title: "Upload failed", description: err.message, variant: "destructive" });
@@ -376,7 +358,6 @@ export default function AdminBookEditor() {
             </CardContent>
           </Card>
 
-          {/* Description */}
           <div>
             <Label className="mb-1.5 block">Description</Label>
             <RichTextEditor
@@ -387,7 +368,6 @@ export default function AdminBookEditor() {
             />
           </div>
 
-          {/* Chapters */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center justify-between">
@@ -429,7 +409,6 @@ export default function AdminBookEditor() {
             </CardContent>
           </Card>
 
-          {/* PDF Attachment */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
@@ -457,15 +436,8 @@ export default function AdminBookEditor() {
                       if (!file) return;
                       setUploadingPdf(true);
                       try {
-                        const path = `book-pdfs/${local.id}.pdf`;
-                        const { error: uploadError } = await supabase.storage
-                          .from(PDF_BUCKET)
-                          .upload(path, file, { upsert: true });
-                        if (uploadError) throw uploadError;
-                        const { data: { publicUrl } } = supabase.storage
-                          .from(PDF_BUCKET)
-                          .getPublicUrl(path);
-                        updateLocal({ pdf_url: publicUrl });
+                        const data = await api.upload<{ url: string }>("/api/upload", file);
+                        updateLocal({ pdf_url: data.url });
                         toast({ title: "PDF uploaded" });
                       } catch (err: any) {
                         toast({ title: "Upload failed", description: err.message, variant: "destructive" });
@@ -499,7 +471,6 @@ export default function AdminBookEditor() {
             </CardContent>
           </Card>
 
-          {/* Audio */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm">Audio Version</CardTitle>
@@ -514,7 +485,6 @@ export default function AdminBookEditor() {
             </CardContent>
           </Card>
 
-          {/* Publishing */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
@@ -562,7 +532,6 @@ export default function AdminBookEditor() {
             </CardContent>
           </Card>
 
-          {/* Actions */}
           <div className="flex flex-wrap items-center gap-3 pb-8">
             <Button onClick={() => handleSave(false)} disabled={saving}>
               <Save className="h-4 w-4 mr-2" />
