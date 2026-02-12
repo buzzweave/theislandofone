@@ -262,8 +262,10 @@ ${bodyHtml}
   const a = document.createElement("a");
   a.href = url;
   a.download = `${book.title.replace(/[^a-zA-Z0-9]/g, "_")}.epub`;
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
 // Minimal ZIP builder for EPUB (store-only, no compression needed for small text files)
