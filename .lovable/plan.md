@@ -1,30 +1,39 @@
 
 
-## Make Hero Banners Responsive on Mobile
+## Fix EPUB Download 404 Error
 
-The hero carousel already has some responsive classes, but there are several improvements needed for a polished mobile experience.
+### Root Cause
 
-### Changes to `src/components/HeroCarousel.tsx`
+In `src/lib/bookExport.ts`, the `exportBookToEpub` function creates a temporary blob URL, triggers a download click, and then immediately revokes the URL. The browser download is asynchronous, so by the time it tries to fetch the blob, the URL has already been destroyed -- resulting in a 404.
 
-1. **Reduce minimum height on small screens** -- Change `min-h-[70vh]` to `min-h-[55vh]` for very small phones, keeping the current breakpoints for larger screens.
+### Fix (single file change)
 
-2. **Scale down navigation arrows on mobile** -- Reduce arrow button size and icon size on small screens (smaller padding, smaller icons) so they don't crowd the content.
+**File: `src/lib/bookExport.ts`** (lines 261-266)
 
-3. **Move dot indicators closer to bottom on mobile** -- Change `bottom-8` to `bottom-4 sm:bottom-8` so dots don't overlap with CTA buttons on short screens.
+Delay the `URL.revokeObjectURL` call using `setTimeout` so the browser has time to initiate the download before the blob URL is cleaned up.
 
-4. **Tighten text spacing on mobile** -- Reduce `mb-8` on the subtitle paragraph to `mb-6 sm:mb-8` to prevent overflow on small viewports.
+```typescript
+// Before (broken):
+const url = URL.createObjectURL(blob);
+const a = document.createElement("a");
+a.href = url;
+a.download = `${book.title.replace(/[^a-zA-Z0-9]/g, "_")}.epub`;
+a.click();
+URL.revokeObjectURL(url);
 
-5. **Ensure CTA buttons don't overflow** -- Add `w-full sm:w-auto` to both CTA buttons so they stack full-width on phones and shrink on larger screens.
+// After (fixed):
+const url = URL.createObjectURL(blob);
+const a = document.createElement("a");
+a.href = url;
+a.download = `${book.title.replace(/[^a-zA-Z0-9]/g, "_")}.epub`;
+document.body.appendChild(a);
+a.click();
+document.body.removeChild(a);
+setTimeout(() => URL.revokeObjectURL(url), 10000);
+```
 
-6. **Image object-position** -- Add `object-center` to the background images to ensure the focal point stays centered on narrow screens.
+Key changes:
+- Append the anchor to the DOM before clicking (required by some browsers like Firefox)
+- Remove it from DOM after click
+- Delay blob URL cleanup by 10 seconds so the download has time to start
 
-### Technical Summary
-
-All changes are CSS/Tailwind class adjustments in `HeroCarousel.tsx` only -- no logic or structural changes needed. The key modifications:
-
-- Section: `min-h-[55vh] sm:min-h-[70vh] md:min-h-[80vh] lg:min-h-[90vh]`
-- Nav arrows: `p-1.5 sm:p-2`, icons `h-5 w-5 sm:h-6 sm:w-6`
-- Dots: `bottom-4 sm:bottom-8`
-- Subtitle margin: `mb-6 sm:mb-8`
-- CTA links: add `w-full sm:w-auto`
-- Images: add `object-center`
