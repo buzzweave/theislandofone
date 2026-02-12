@@ -1,33 +1,30 @@
 
 
-## Fix: Add API Key Input Fields and Route All AI Through ChatGPT API
+## Make Hero Banners Responsive on Mobile
 
-### Problem
-The VPS is serving an older version of `AdminSettings.tsx` that shows integration status badges only (no input fields). The Lovable source code already contains the correct implementation with API key inputs, but the VPS build is stale.
+The hero carousel already has some responsive classes, but there are several improvements needed for a polished mobile experience.
 
-### What Will Change
+### Changes to `src/components/HeroCarousel.tsx`
 
-**1. Re-save AdminSettings.tsx** (force fresh build in Lovable preview so you can verify, then copy to VPS)
+1. **Reduce minimum height on small screens** -- Change `min-h-[70vh]` to `min-h-[55vh]` for very small phones, keeping the current breakpoints for larger screens.
 
-The Integrations card will display:
-- **ChatGPT / OpenAI** row with a password input field (placeholder: `sk-...`) and a "Configured" / "Not configured" indicator
-- **ElevenLabs** row with a password input field (placeholder: `xi-...`) and a "Configured" / "Not configured" indicator
-- Both keys are saved when you click **Save Settings**
+2. **Scale down navigation arrows on mobile** -- Reduce arrow button size and icon size on small screens (smaller padding, smaller icons) so they don't crowd the content.
 
-**2. No code changes needed** -- the file already contains the correct implementation. The issue is purely a deployment/cache problem on your VPS.
+3. **Move dot indicators closer to bottom on mobile** -- Change `bottom-8` to `bottom-4 sm:bottom-8` so dots don't overlap with CTA buttons on short screens.
 
-### Steps After Approval
+4. **Tighten text spacing on mobile** -- Reduce `mb-8` on the subtitle paragraph to `mb-6 sm:mb-8` to prevent overflow on small viewports.
 
-1. I will re-save `AdminSettings.tsx` with a small formatting touch to trigger a fresh Lovable build.
-2. You verify in the Lovable preview that the input fields appear at `/admin/settings`.
-3. Copy the file contents to your VPS, run `npm run build`, and hard-refresh the browser.
+5. **Ensure CTA buttons don't overflow** -- Add `w-full sm:w-auto` to both CTA buttons so they stack full-width on phones and shrink on larger screens.
 
-### VPS Deployment Checklist
-- Replace `src/pages/admin/AdminSettings.tsx` on your VPS with the updated file
-- Run `npm run build` (or `vite build`) to regenerate the production bundle
-- Restart your web server if it caches static assets
-- Hard-refresh the browser (Ctrl+Shift+R)
+6. **Image object-position** -- Add `object-center` to the background images to ensure the focal point stays centered on narrow screens.
 
-### Note on "All AI Controlled by ChatGPT API"
-The AI writing feature (`AISidebar.tsx`) already calls your VPS endpoint at `/api/ai-writing`. Your VPS backend should read the `chatgpt_api_key` from the `site_settings` table and use it when calling the OpenAI API. No frontend changes are needed for this -- it is a VPS backend configuration concern.
+### Technical Summary
 
+All changes are CSS/Tailwind class adjustments in `HeroCarousel.tsx` only -- no logic or structural changes needed. The key modifications:
+
+- Section: `min-h-[55vh] sm:min-h-[70vh] md:min-h-[80vh] lg:min-h-[90vh]`
+- Nav arrows: `p-1.5 sm:p-2`, icons `h-5 w-5 sm:h-6 sm:w-6`
+- Dots: `bottom-4 sm:bottom-8`
+- Subtitle margin: `mb-6 sm:mb-8`
+- CTA links: add `w-full sm:w-auto`
+- Images: add `object-center`
