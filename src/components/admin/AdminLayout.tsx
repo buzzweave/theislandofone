@@ -20,6 +20,7 @@ import {
   Image,
   PenLine,
   Menu,
+  BookUp,
 } from "lucide-react";
 import AISidebar from "./AISidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -39,6 +40,7 @@ const navItems = [
   { to: "/admin/plans", label: "Plans", icon: Crown },
   { to: "/admin/graphics", label: "Graphics", icon: Image },
   { to: "/admin/blog", label: "Blog", icon: PenLine },
+  { to: "/admin/publisher", label: "Publisher", icon: BookUp },
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
