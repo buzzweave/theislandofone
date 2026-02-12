@@ -9,9 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, PenLine, Upload, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+import { api } from "@/lib/api";
 
 type PostForm = {
   title: string;
@@ -44,14 +42,11 @@ function ImageUploader({ currentUrl, onUploaded }: { currentUrl: string; onUploa
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
-    const ext = file.name.split(".").pop();
-    const path = `blog-${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("blog-images").upload(path, file, { upsert: true });
-    if (error) {
-      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
-    } else {
-      const url = `${SUPABASE_URL}/storage/v1/object/public/blog-images/${path}`;
-      onUploaded(url);
+    try {
+      const data = await api.upload<{ url: string }>("/api/upload", file);
+      onUploaded(data.url);
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
     }
     setUploading(false);
     if (inputRef.current) inputRef.current.value = "";
@@ -208,7 +203,6 @@ export default function AdminBlogManager() {
         </div>
       )}
 
-      {/* Posts list */}
       <div className="space-y-3">
         {posts?.length === 0 && <p className="text-sm text-muted-foreground">No blog posts yet.</p>}
         {posts?.map((post) => (

@@ -1,6 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { ArrowLeft, Calendar, User } from "lucide-react";
 import { format } from "date-fns";
 import DOMPurify from "dompurify";
@@ -11,16 +11,7 @@ export default function BlogPost() {
 
   const { data: post, isLoading } = useQuery({
     queryKey: ["blog_post", slug],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("blog_posts")
-        .select("*")
-        .eq("slug", slug!)
-        .eq("is_published", true)
-        .single();
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => api.get(`/api/blog-posts/by-slug/${slug}`),
     enabled: !!slug,
   });
 
@@ -90,7 +81,7 @@ export default function BlogPost() {
               prose-headings:font-display prose-headings:font-bold
               prose-p:leading-relaxed prose-p:mb-4"
           >
-            {post.content.split(/\n\n+/).map((paragraph, i) => (
+            {post.content.split(/\n\n+/).map((paragraph: string, i: number) => (
               <p key={i}>{paragraph.trim()}</p>
             ))}
           </div>

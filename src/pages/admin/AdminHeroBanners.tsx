@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { useHeroBanners, HeroBanner } from "@/hooks/useHeroBanners";
 import { useSiteLogo } from "@/hooks/useSiteLogo";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
@@ -51,7 +51,6 @@ function SortableBannerItem({
   return (
     <div ref={setNodeRef} style={style} className="rounded-lg border border-border bg-card overflow-hidden">
       <div className="flex flex-col md:flex-row">
-        {/* Image preview */}
         <div className="relative w-full md:w-72 aspect-video md:aspect-auto md:h-48 shrink-0 bg-muted overflow-hidden group">
           {banner.image_url ? (
             <img src={banner.image_url} alt={banner.title} className="w-full h-full object-cover" />
@@ -68,7 +67,6 @@ function SortableBannerItem({
           </button>
         </div>
 
-        {/* Fields */}
         <div className="flex-1 p-4 space-y-3">
           <div className="flex items-start justify-between gap-2">
             <button
@@ -143,12 +141,8 @@ function LogoUploadSection() {
       if (!file) return;
       setUploading(true);
       try {
-        const ext = file.name.split(".").pop();
-        const path = `logo-${Date.now()}.${ext}`;
-        const { error } = await supabase.storage.from("site-assets").upload(path, file);
-        if (error) throw error;
-        const { data } = supabase.storage.from("site-assets").getPublicUrl(path);
-        await updateLogo(data.publicUrl);
+        const data = await api.upload<{ url: string }>("/api/upload", file);
+        await updateLogo(data.url);
         toast({ title: "Logo updated!" });
       } catch (err: any) {
         toast({ title: "Upload failed", description: err.message, variant: "destructive" });
@@ -238,12 +232,8 @@ function WatermarkSection() {
       if (!file) return;
       setUploading(true);
       try {
-        const ext = file.name.split(".").pop();
-        const path = `watermark-${Date.now()}.${ext}`;
-        const { error } = await supabase.storage.from("site-assets").upload(path, file);
-        if (error) throw error;
-        const { data } = supabase.storage.from("site-assets").getPublicUrl(path);
-        await updateWatermark(data.publicUrl);
+        const data = await api.upload<{ url: string }>("/api/upload", file);
+        await updateWatermark(data.url);
         toast({ title: "Watermark uploaded!" });
       } catch (err: any) {
         toast({ title: "Upload failed", description: err.message, variant: "destructive" });
@@ -314,15 +304,13 @@ export default function AdminHeroBanners() {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["hero-banners"] });
 
   const uploadImage = async (file: File): Promise<string | null> => {
-    const ext = file.name.split(".").pop();
-    const path = `${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("hero-banners").upload(path, file);
-    if (error) {
-      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    try {
+      const data = await api.upload<{ url: string }>("/api/upload", file);
+      return data.url;
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
       return null;
     }
-    const { data } = supabase.storage.from("hero-banners").getPublicUrl(path);
-    return data.publicUrl;
   };
 
   const addBanner = async () => {
@@ -335,17 +323,17 @@ export default function AdminHeroBanners() {
     setUploading(true);
     const url = await uploadImage(file);
     if (url) {
-      const { error } = await supabase.from("hero_banners").insert({
-        title: "New Banner",
-        subtitle: "",
-        image_url: url,
-        sort_order: banners.length,
-      });
-      if (error) {
-        toast({ title: "Error", description: error.message, variant: "destructive" });
-      } else {
+      try {
+        await api.post("/api/hero-banners", {
+          title: "New Banner",
+          subtitle: "",
+          image_url: url,
+          sort_order: banners.length,
+        });
         toast({ title: "Banner added" });
         invalidate();
+      } catch (err: any) {
+        toast({ title: "Error", description: err.message, variant: "destructive" });
       }
     }
     setUploading(false);
@@ -353,21 +341,21 @@ export default function AdminHeroBanners() {
   };
 
   const updateBanner = async (id: string, updates: Partial<HeroBanner>) => {
-    const { error } = await supabase.from("hero_banners").update(updates).eq("id", id);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
+    try {
+      await api.put(`/api/hero-banners/${id}`, updates);
       invalidate();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   };
 
   const deleteBanner = async (id: string) => {
-    const { error } = await supabase.from("hero_banners").delete().eq("id", id);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
+    try {
+      await api.delete(`/api/hero-banners/${id}`);
       toast({ title: "Banner deleted" });
       invalidate();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   };
 
@@ -400,7 +388,7 @@ export default function AdminHeroBanners() {
     queryClient.setQueryData(["hero-banners"], reordered);
 
     const updates = reordered.map((b, i) =>
-      supabase.from("hero_banners").update({ sort_order: i }).eq("id", b.id)
+      api.put(`/api/hero-banners/${b.id}`, { sort_order: i })
     );
     await Promise.all(updates);
     invalidate();
@@ -411,11 +399,9 @@ export default function AdminHeroBanners() {
 
   return (
     <div className="space-y-6">
-      {/* Logo Upload Section */}
       <LogoUploadSection />
       <WatermarkSection />
 
-      {/* Hero Banners Section */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-display text-2xl font-bold">Hero Banners</h2>

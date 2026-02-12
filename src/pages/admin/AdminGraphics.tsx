@@ -1,9 +1,9 @@
-import { useState, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
+import { api } from "@/lib/api";
 import { useGraphics, Graphic } from "@/hooks/useGraphics";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Upload, Eye, EyeOff, Image } from "lucide-react";
+import { Plus, Trash2, Eye, EyeOff, Image } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -16,70 +16,54 @@ export default function AdminGraphics() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["graphics"] });
 
-  const uploadFile = async (file: File, folder: string): Promise<string | null> => {
-    const ext = file.name.split(".").pop();
-    const path = `${folder}/${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("graphics").upload(path, file);
-    if (error) {
-      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
-      return null;
-    }
-    const { data } = supabase.storage.from("graphics").getPublicUrl(path);
-    return data.publicUrl;
-  };
-
   const addGraphic = async (previewFile: File, downloadFile: File) => {
     setUploading(true);
-    const [previewUrl, fileUrl] = await Promise.all([
-      uploadFile(previewFile, "previews"),
-      uploadFile(downloadFile, "files"),
-    ]);
-    if (previewUrl && fileUrl) {
-      const { error } = await supabase.from("graphics").insert({
+    try {
+      const [previewData, fileData] = await Promise.all([
+        api.upload<{ url: string }>("/api/upload", previewFile),
+        api.upload<{ url: string }>("/api/upload", downloadFile),
+      ]);
+      await api.post("/api/graphics", {
         title: previewFile.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "),
-        preview_url: previewUrl,
-        file_url: fileUrl,
+        preview_url: previewData.url,
+        file_url: fileData.url,
         sort_order: graphics.length,
         price: 4.99,
       });
-      if (error) {
-        toast({ title: "Error", description: error.message, variant: "destructive" });
-      } else {
-        toast({ title: "Graphic added" });
-        invalidate();
-      }
+      toast({ title: "Graphic added" });
+      invalidate();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     }
     setUploading(false);
   };
 
   const updateGraphic = async (id: string, updates: Partial<Graphic>) => {
-    const { error } = await supabase.from("graphics").update(updates).eq("id", id);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
+    try {
+      await api.put(`/api/graphics/${id}`, updates);
       invalidate();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   };
 
   const deleteGraphic = async (id: string) => {
-    const { error } = await supabase.from("graphics").delete().eq("id", id);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
+    try {
+      await api.delete(`/api/graphics/${id}`);
       toast({ title: "Graphic deleted" });
       invalidate();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   };
 
   const handleAddClick = () => {
-    // Create a two-step file picker: preview then download file
     const previewInput = document.createElement("input");
     previewInput.type = "file";
     previewInput.accept = "image/*";
     previewInput.onchange = (e) => {
       const previewFile = (e.target as HTMLInputElement).files?.[0];
       if (!previewFile) return;
-      // Now ask for the download file
       const downloadInput = document.createElement("input");
       downloadInput.type = "file";
       downloadInput.accept = "image/*,.zip,.psd,.ai,.svg,.pdf";
@@ -122,12 +106,9 @@ export default function AdminGraphics() {
           {graphics.map((graphic) => (
             <div key={graphic.id} className="rounded-lg border border-border bg-card overflow-hidden">
               <div className="flex flex-col md:flex-row">
-                {/* Preview */}
                 <div className="relative w-full md:w-56 aspect-video md:aspect-auto md:h-40 shrink-0 bg-muted overflow-hidden">
                   <img src={graphic.preview_url} alt={graphic.title} className="w-full h-full object-cover" />
                 </div>
-
-                {/* Fields */}
                 <div className="flex-1 p-4 space-y-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 space-y-2">

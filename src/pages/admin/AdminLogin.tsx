@@ -1,7 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
-import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -16,7 +15,7 @@ function generateCaptcha() {
 }
 
 export default function AdminLogin() {
-  const { login, isAuthenticated, isLoading, failedAttempts, isLocked, lockoutEnd } = useAdminAuth();
+  const { login, forgotPassword, isAuthenticated, isLoading, failedAttempts, isLocked, lockoutEnd } = useAdminAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -98,13 +97,10 @@ export default function AdminLogin() {
     setError("");
     setResetSending(true);
 
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(resetEmail.trim(), {
-      redirectTo: `${window.location.origin}/admin/login`,
-    });
-
+    const success = await forgotPassword(resetEmail.trim());
     setResetSending(false);
 
-    if (resetError) {
+    if (!success) {
       setError("Failed to send reset email. Please try again.");
     } else {
       setResetSent(true);

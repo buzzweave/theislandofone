@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 
 export function useSiteLogo() {
   const queryClient = useQueryClient();
@@ -7,22 +7,17 @@ export function useSiteLogo() {
   const { data: logoUrl, isLoading } = useQuery({
     queryKey: ["site-logo"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("site_settings")
-        .select("value")
-        .eq("key", "logo_url")
-        .maybeSingle();
-      if (error) throw error;
-      return data?.value || "";
+      try {
+        const data = await api.get<{ value: string }>("/api/site-settings/logo_url");
+        return data?.value || "";
+      } catch {
+        return "";
+      }
     },
   });
 
   const updateLogo = async (url: string) => {
-    const { error } = await supabase
-      .from("site_settings")
-      .update({ value: url, updated_at: new Date().toISOString() })
-      .eq("key", "logo_url");
-    if (error) throw error;
+    await api.put("/api/site-settings/logo_url", { value: url });
     queryClient.invalidateQueries({ queryKey: ["site-logo"] });
   };
 

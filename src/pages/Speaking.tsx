@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Mic, Send, CheckCircle, Loader2, Phone } from "lucide-react";
 import { speakingTopics } from "@/data/content";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
 
@@ -35,22 +35,9 @@ export default function Speaking() {
         message: (formData.get("message") as string) || null,
       });
 
-      const { error } = await supabase.from("speaking_requests").insert({
-        name: validated.name,
-        email: validated.email,
-        organization: validated.organization ?? null,
-        event_name: validated.event_name,
-        event_date: validated.event_date,
-        message: validated.message ?? null,
-      });
+      await api.post("/api/speaking-requests", validated);
 
       setLoading(false);
-
-      if (error) {
-        toast({ title: "Something went wrong", description: "Please try again later.", variant: "destructive" });
-        return;
-      }
-
       setSubmitted(true);
     } catch (err) {
       setLoading(false);

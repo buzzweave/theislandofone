@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 
 export interface HeroBanner {
   id: string;
@@ -17,14 +17,7 @@ export interface HeroBanner {
 export function useHeroBanners() {
   const { data: banners = [], ...rest } = useQuery({
     queryKey: ["hero-banners"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("hero_banners")
-        .select("*")
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return data as HeroBanner[];
-    },
+    queryFn: () => api.get<HeroBanner[]>("/api/hero-banners"),
   });
   return { banners, ...rest };
 }
