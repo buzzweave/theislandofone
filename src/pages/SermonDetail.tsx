@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import SocialShareLinks from "@/components/SocialShareLinks";
 import AudioPlayer from "@/components/AudioPlayer";
+import DOMPurify from "dompurify";
+
 import {
   ArrowLeft,
   Lock,
@@ -67,6 +69,19 @@ export default function SermonDetail() {
     URL.revokeObjectURL(url);
   };
 
+  const renderContent = (content: string) => {
+    const isHtml = content?.includes("<") && content?.includes(">");
+    if (isHtml) {
+      return (
+        <div
+          className="prose prose-invert prose-sm max-w-none"
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }}
+        />
+      );
+    }
+    return <p className="text-secondary-foreground leading-relaxed whitespace-pre-wrap">{content}</p>;
+  };
+
   return (
     <div className="min-h-screen">
       {/* Header */}
@@ -81,9 +96,7 @@ export default function SermonDetail() {
 
           <div className="max-w-3xl">
             <div className="flex items-center gap-3 mb-3">
-              <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-                {sermon.category}
-              </span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-primary">{sermon.category}</span>
               {!sermon.is_free && !purchased && (
                 <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
                   <Lock className="h-2.5 w-2.5" /> {sermon.access_level}
@@ -95,13 +108,12 @@ export default function SermonDetail() {
                 </span>
               )}
             </div>
-            <h1 className="font-display text-4xl md:text-5xl font-bold mb-3">
-              {sermon.title}
-            </h1>
+            <h1 className="font-display text-4xl md:text-5xl font-bold mb-3">{sermon.title}</h1>
             <p className="text-lg text-primary/80 mb-2">{sermon.scripture}</p>
             <p className="text-muted-foreground">{sermon.excerpt}</p>
             <p className="text-sm text-muted-foreground mt-3 mb-4">
-              Published {new Date(sermon.date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+              Published{" "}
+              {new Date(sermon.date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
               {" · "}By Bryant Clark
             </p>
             <SocialShareLinks title={sermon.title} />
@@ -129,7 +141,7 @@ export default function SermonDetail() {
             <article className="prose prose-invert prose-lg max-w-none space-y-5">
               {(isFullAccess ? paragraphs : previewParagraphs).map((p, i) => (
                 <p key={i} className="text-foreground/90 leading-relaxed">
-                  {p}
+                  {renderContent(p)}
                 </p>
               ))}
             </article>
@@ -139,9 +151,7 @@ export default function SermonDetail() {
                 <div className="absolute inset-x-0 -top-32 h-32 bg-gradient-to-b from-transparent to-background pointer-events-none" />
                 <div className="pt-8 pb-4 text-center space-y-4">
                   <Lock className="h-8 w-8 text-primary mx-auto" />
-                  <p className="font-display text-xl font-semibold">
-                    Continue Reading
-                  </p>
+                  <p className="font-display text-xl font-semibold">Continue Reading</p>
                   <p className="text-sm text-muted-foreground max-w-md mx-auto">
                     Purchase this sermon to read the full manuscript and download in PDF, EPUB, or Word format.
                   </p>
@@ -198,12 +208,8 @@ export default function SermonDetail() {
                   <CardTitle className="font-display text-lg">Get This Sermon</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="text-3xl font-bold text-primary">
-                    ${sermon.price?.toFixed(2)}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    One-time purchase. Download in PDF, EPUB, and Word.
-                  </p>
+                  <div className="text-3xl font-bold text-primary">${sermon.price?.toFixed(2)}</div>
+                  <p className="text-xs text-muted-foreground">One-time purchase. Download in PDF, EPUB, and Word.</p>
                   <Button className="w-full" onClick={() => setShowCheckout(true)}>
                     <ShoppingCart className="h-4 w-4 mr-2" /> Purchase
                   </Button>
@@ -228,9 +234,7 @@ export default function SermonDetail() {
                   <div className="p-3 rounded-lg bg-secondary/50 space-y-1">
                     <p className="text-sm font-medium">{sermon.title}</p>
                     <p className="text-xs text-muted-foreground">{sermon.scripture}</p>
-                    <p className="text-lg font-bold text-primary mt-2">
-                      ${sermon.price?.toFixed(2)}
-                    </p>
+                    <p className="text-lg font-bold text-primary mt-2">${sermon.price?.toFixed(2)}</p>
                   </div>
                   <div className="space-y-2 text-xs text-muted-foreground">
                     <p>✓ Full manuscript access</p>
@@ -258,9 +262,7 @@ export default function SermonDetail() {
                 <CardContent className="pt-6 text-center space-y-3">
                   <CheckCircle2 className="h-10 w-10 text-primary mx-auto" />
                   <p className="font-display text-lg font-semibold">Purchased!</p>
-                  <p className="text-xs text-muted-foreground">
-                    Full manuscript unlocked. Download below.
-                  </p>
+                  <p className="text-xs text-muted-foreground">Full manuscript unlocked. Download below.</p>
                 </CardContent>
               </Card>
             )}
@@ -268,9 +270,7 @@ export default function SermonDetail() {
             <Card>
               <CardContent className="pt-6 space-y-3">
                 <Crown className="h-6 w-6 text-primary" />
-                <p className="font-display text-sm font-semibold">
-                  Unlock All Sermons
-                </p>
+                <p className="font-display text-sm font-semibold">Unlock All Sermons</p>
                 <p className="text-xs text-muted-foreground">
                   Subscribe to get unlimited access to our entire sermon library plus exclusive resources.
                 </p>
