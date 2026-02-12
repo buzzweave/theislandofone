@@ -23,14 +23,22 @@ export default function AdminSettings() {
   const maintenanceMode = useSiteSettings("maintenance_mode", "false");
   const allowRegistration = useSiteSettings("allow_registration", "true");
 
+  // API Keys
+  const chatgptApiKey = useSiteSettings("chatgpt_api_key", "");
+  const elevenlabsApiKey = useSiteSettings("elevenlabs_api_key", "");
+
   // Local state for text inputs (synced from DB, saved on button click)
   const [localName, setLocalName] = useState("");
   const [localDesc, setLocalDesc] = useState("");
   const [localEmail, setLocalEmail] = useState("");
+  const [localChatgptKey, setLocalChatgptKey] = useState("");
+  const [localElevenlabsKey, setLocalElevenlabsKey] = useState("");
 
   useEffect(() => { if (!siteName.isLoading) setLocalName(siteName.value); }, [siteName.value, siteName.isLoading]);
   useEffect(() => { if (!siteDescription.isLoading) setLocalDesc(siteDescription.value); }, [siteDescription.value, siteDescription.isLoading]);
   useEffect(() => { if (!contactEmail.isLoading) setLocalEmail(contactEmail.value); }, [contactEmail.value, contactEmail.isLoading]);
+  useEffect(() => { if (!chatgptApiKey.isLoading) setLocalChatgptKey(chatgptApiKey.value); }, [chatgptApiKey.value, chatgptApiKey.isLoading]);
+  useEffect(() => { if (!elevenlabsApiKey.isLoading) setLocalElevenlabsKey(elevenlabsApiKey.value); }, [elevenlabsApiKey.value, elevenlabsApiKey.isLoading]);
 
   const handleSave = async () => {
     try {
@@ -38,6 +46,8 @@ export default function AdminSettings() {
         siteName.updateValue(localName),
         siteDescription.updateValue(localDesc),
         contactEmail.updateValue(localEmail),
+        chatgptApiKey.updateValue(localChatgptKey),
+        elevenlabsApiKey.updateValue(localElevenlabsKey),
       ]);
       toast({ title: "Settings saved", description: "Your changes have been applied." });
     } catch {
@@ -207,34 +217,60 @@ export default function AdminSettings() {
             </div>
           </div>
           <Separator />
-          <div className="flex items-center justify-between">
+          <div className="space-y-3">
             <div className="flex items-center gap-3">
               <Bot className="h-5 w-5 text-muted-foreground" />
               <div>
-                <p className="text-sm font-medium">AI Writing Assistant</p>
+                <p className="text-sm font-medium">ChatGPT / OpenAI</p>
                 <p className="text-xs text-muted-foreground">AI-powered content generation</p>
               </div>
             </div>
-            <div className="flex items-center gap-1.5 text-primary">
-              <CheckCircle2 className="h-4 w-4" />
-              <span className="text-xs font-medium">Active</span>
+            <div className="space-y-2 pl-8">
+              <Label>API Key</Label>
+              <Input
+                type="password"
+                value={localChatgptKey}
+                onChange={(e) => setLocalChatgptKey(e.target.value)}
+                placeholder="sk-..."
+                disabled={isLoading}
+              />
+              <div className="flex items-center gap-1.5">
+                {localChatgptKey ? (
+                  <span className="text-xs text-primary flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Configured</span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Not configured</span>
+                )}
+              </div>
             </div>
           </div>
           <Separator />
-          <div className="flex items-center justify-between">
+          <div className="space-y-3">
             <div className="flex items-center gap-3">
               <Headphones className="h-5 w-5 text-muted-foreground" />
               <div>
-                <p className="text-sm font-medium">Text-to-Speech</p>
-                <p className="text-xs text-muted-foreground">Audio generation via ElevenLabs</p>
+                <p className="text-sm font-medium">ElevenLabs</p>
+                <p className="text-xs text-muted-foreground">Text-to-Speech audio generation</p>
               </div>
             </div>
-            <div className="flex items-center gap-1.5 text-primary">
-              <CheckCircle2 className="h-4 w-4" />
-              <span className="text-xs font-medium">Active</span>
+            <div className="space-y-2 pl-8">
+              <Label>API Key</Label>
+              <Input
+                type="password"
+                value={localElevenlabsKey}
+                onChange={(e) => setLocalElevenlabsKey(e.target.value)}
+                placeholder="xi-..."
+                disabled={isLoading}
+              />
+              <div className="flex items-center gap-1.5">
+                {localElevenlabsKey ? (
+                  <span className="text-xs text-primary flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Configured</span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Not configured</span>
+                )}
+              </div>
             </div>
           </div>
-      </CardContent>
+        </CardContent>
       </Card>
 
       {/* Clear Cache */}
