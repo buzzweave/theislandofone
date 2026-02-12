@@ -94,6 +94,53 @@ export type Database = {
           },
         ]
       }
+      book_publish_records: {
+        Row: {
+          book_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          platform: string
+          published_at: string | null
+          status: string
+          store_url: string | null
+          submitted_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          book_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          platform: string
+          published_at?: string | null
+          status?: string
+          store_url?: string | null
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          book_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          platform?: string
+          published_at?: string | null
+          status?: string
+          store_url?: string | null
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "book_publish_records_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       books: {
         Row: {
           audio_url: string | null

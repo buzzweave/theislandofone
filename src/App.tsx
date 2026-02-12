@@ -31,6 +31,7 @@ import AdminHeroBanners from "./pages/admin/AdminHeroBanners";
 import AdminMembershipPlans from "./pages/admin/AdminMembershipPlans";
 import AdminGraphics from "./pages/admin/AdminGraphics";
 import AdminBlogManager from "./pages/admin/AdminBlogManager";
+import AdminPublisher from "./pages/admin/AdminPublisher";
 import SermonDetail from "./pages/SermonDetail";
 import Blog from "./pages/Blog";
 import BlogPost from "./pages/BlogPost";
@@ -92,6 +93,7 @@ const App = () => (
               <Route path="plans" element={<AdminMembershipPlans />} />
               <Route path="graphics" element={<AdminGraphics />} />
               <Route path="blog" element={<AdminBlogManager />} />
+              <Route path="publisher" element={<AdminPublisher />} />
               <Route path="settings" element={<AdminSettings />} />
             </Route>
 
