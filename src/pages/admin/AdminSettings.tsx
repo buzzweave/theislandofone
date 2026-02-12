@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { Save, Globe, Bell, Shield, CheckCircle2, Cloud, Bot, Headphones, Trash2, Loader2 } from "lucide-react";
+import { Save, Globe, Bell, Shield, CheckCircle2, Cloud, Bot, Headphones, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 
