@@ -322,7 +322,7 @@ function buildEpubZip(files: { name: string; content: string; noCompression?: bo
   ev.setUint32(12, cdSize, true);
   ev.setUint32(16, cdOffset, true);
 
-  return new Blob([...parts, ...centralDir, eocd].map(b => new Uint8Array(b.buffer as ArrayBuffer)), { type: "application/epub+zip" });
+  return new Blob([...parts, ...centralDir, eocd].map(b => new Uint8Array(b.buffer as ArrayBuffer, b.byteOffset, b.byteLength)), { type: "application/epub+zip" });
 }
 
 function crc32(data: Uint8Array): number {
