@@ -236,43 +236,64 @@ export default function AdminGraphics() {
         <div className="space-y-4">
           {displayGraphics.map((graphic) => (
             <div key={graphic.id} className="rounded-lg border border-border bg-card overflow-hidden">
+              {/* Status badge */}
+              <div className={`px-4 py-1.5 text-xs font-semibold uppercase tracking-wider flex items-center justify-between ${graphic.is_active ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>
+                <span className="flex items-center gap-1.5">
+                  {graphic.is_active ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                  {graphic.is_active ? "Published — Live on site" : "Draft — Hidden from public"}
+                </span>
+              </div>
               <div className="flex flex-col md:flex-row">
-                <div className="relative w-full md:w-56 aspect-video md:aspect-auto md:h-40 shrink-0 bg-muted overflow-hidden">
+                <div className="relative w-full md:w-56 aspect-video md:aspect-auto md:h-48 shrink-0 bg-muted overflow-hidden">
                   <img src={graphic.preview_url} alt={graphic.title} className="w-full h-full object-cover" />
                 </div>
                 <div className="flex-1 p-4 space-y-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 space-y-2">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Title</Label>
-                        <Input className="h-8 text-sm" defaultValue={graphic.title} onBlur={(e) => updateGraphic(graphic.id, { title: e.target.value })} />
+                  <div className="flex-1 space-y-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Title</Label>
+                      <Input className="h-8 text-sm" defaultValue={graphic.title} onBlur={(e) => updateGraphic(graphic.id, { title: e.target.value })} />
+                    </div>
+                    <div className="flex gap-2">
+                      <div className="space-y-1 flex-1">
+                        <Label className="text-xs">Category</Label>
+                        <Input className="h-8 text-sm" defaultValue={graphic.category} onBlur={(e) => updateGraphic(graphic.id, { category: e.target.value })} />
                       </div>
-                      <div className="flex gap-2">
-                        <div className="space-y-1 flex-1">
-                          <Label className="text-xs">Category</Label>
-                          <Input className="h-8 text-sm" defaultValue={graphic.category} onBlur={(e) => updateGraphic(graphic.id, { category: e.target.value })} />
-                        </div>
-                        <div className="space-y-1 w-28">
-                          <Label className="text-xs">Price ($)</Label>
-                          <Input type="number" step="0.01" className="h-8 text-sm" defaultValue={graphic.price} onBlur={(e) => updateGraphic(graphic.id, { price: parseFloat(e.target.value) || 0 })} />
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Description</Label>
-                        <Input className="h-8 text-sm" defaultValue={graphic.description} onBlur={(e) => updateGraphic(graphic.id, { description: e.target.value })} />
+                      <div className="space-y-1 w-28">
+                        <Label className="text-xs">Price ($)</Label>
+                        <Input type="number" step="0.01" className="h-8 text-sm" defaultValue={graphic.price} onBlur={(e) => updateGraphic(graphic.id, { price: parseFloat(e.target.value) || 0 })} />
                       </div>
                     </div>
-                    <div className="flex flex-col items-center gap-1">
-                      <button onClick={() => setResizeGraphic(graphic)} className="p-1.5 rounded text-muted-foreground hover:text-primary" title="Resize for social media">
-                        <Maximize2 className="h-4 w-4" />
-                      </button>
-                      <button onClick={() => updateGraphic(graphic.id, { is_active: !graphic.is_active })} className={`p-1.5 rounded text-xs ${graphic.is_active ? "text-primary" : "text-muted-foreground"}`} title={graphic.is_active ? "Active (Published)" : "Draft (Hidden)"}>
-                        {graphic.is_active ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                      </button>
-                      <button onClick={() => deleteGraphic(graphic.id)} className="p-1.5 rounded text-destructive hover:bg-destructive/10">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Description</Label>
+                      <Input className="h-8 text-sm" defaultValue={graphic.description} onBlur={(e) => updateGraphic(graphic.id, { description: e.target.value })} />
                     </div>
+                  </div>
+                  {/* Action buttons row */}
+                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border">
+                    <Button
+                      variant={graphic.is_active ? "outline" : "default"}
+                      size="sm"
+                      onClick={() => updateGraphic(graphic.id, { is_active: !graphic.is_active })}
+                      className="text-xs"
+                    >
+                      {graphic.is_active ? <><EyeOff className="h-3.5 w-3.5 mr-1.5" /> Unpublish (Draft)</> : <><Eye className="h-3.5 w-3.5 mr-1.5" /> Publish to Site</>}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setResizeGraphic(graphic)}
+                      className="text-xs"
+                    >
+                      <Maximize2 className="h-3.5 w-3.5 mr-1.5" /> Resize for Social Media
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => deleteGraphic(graphic.id)}
+                      className="text-xs text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30 ml-auto"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete
+                    </Button>
                   </div>
                 </div>
               </div>
