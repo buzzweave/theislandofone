@@ -9,8 +9,6 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-
 const RESIZE_PRESETS = [
   { label: "Instagram Post", w: 1080, h: 1080, platform: "Instagram" },
   { label: "Instagram Story", w: 1080, h: 1920, platform: "Instagram" },
@@ -28,20 +26,16 @@ function getAdminToken(): string {
   return localStorage.getItem("admin_token") || "";
 }
 
-async function adminApi(method: string, body?: Record<string, unknown>) {
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/graphics-admin`, {
-    method,
+async function adminApi(method: "GET" | "POST" | "PUT" | "DELETE", body?: Record<string, unknown>) {
+  const { data, error } = await supabase.functions.invoke("graphics-admin", {
+    method: method as "GET" | "POST" | "PUT" | "DELETE" | "PATCH",
     headers: {
-      "Content-Type": "application/json",
       "x-admin-token": getAdminToken(),
     },
-    body: body ? JSON.stringify(body) : undefined,
+    body: body ?? undefined,
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || "Request failed");
-  }
-  return res.json();
+  if (error) throw error;
+  return data;
 }
 
 async function uploadToStorage(file: File, folder: string): Promise<string> {
