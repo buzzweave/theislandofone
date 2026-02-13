@@ -1,4 +1,4 @@
-import { useEditor, EditorContent, type Editor, Extension } from "@tiptap/react";
+import { useEditor, EditorContent, type Editor, Extension, Mark } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import { TextStyle } from "@tiptap/extension-text-style";
@@ -7,6 +7,44 @@ import TextAlign from "@tiptap/extension-text-align";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Slice, Fragment } from "@tiptap/pm/model";
 import { useEffect, useCallback } from "react";
+
+/**
+ * Custom FontSize extension that works with TextStyle mark
+ */
+const FontSize = Extension.create({
+  name: "fontSize",
+  addGlobalAttributes() {
+    return [
+      {
+        types: ["textStyle"],
+        attributes: {
+          fontSize: {
+            default: null,
+            parseHTML: (element) => element.style.fontSize?.replace(/['"]+/g, "") || null,
+            renderHTML: (attributes) => {
+              if (!attributes.fontSize) return {};
+              return { style: `font-size: ${attributes.fontSize}` };
+            },
+          },
+        },
+      },
+    ];
+  },
+  addCommands() {
+    return {
+      setFontSize:
+        (fontSize: string) =>
+        ({ chain }: any) => {
+          return chain().setMark("textStyle", { fontSize }).run();
+        },
+      unsetFontSize:
+        () =>
+        ({ chain }: any) => {
+          return chain().setMark("textStyle", { fontSize: null }).removeEmptyTextStyle().run();
+        },
+    } as any;
+  },
+});
 
 /**
  * Custom extension that converts pasted plain text into proper paragraph nodes
@@ -72,12 +110,20 @@ import {
   Undo,
   Redo,
   Quote,
+  Type,
 } from "lucide-react";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 const COLORS = [
@@ -85,11 +131,23 @@ const COLORS = [
   "#EAB308", "#22C55E", "#3B82F6", "#8B5CF6", "#EC4899",
 ];
 
+const FONT_SIZES = [
+  { label: "Small", value: "12px" },
+  { label: "Normal", value: "16px" },
+  { label: "Medium", value: "18px" },
+  { label: "Large", value: "20px" },
+  { label: "X-Large", value: "24px" },
+  { label: "XX-Large", value: "32px" },
+  { label: "Huge", value: "40px" },
+];
+
 interface ToolbarProps {
   editor: Editor;
 }
 
 function Toolbar({ editor }: ToolbarProps) {
+  const currentFontSize = editor.getAttributes("textStyle")?.fontSize || null;
+
   return (
     <div className="flex flex-wrap items-center gap-0.5 p-1.5 border-b border-border bg-muted/30">
       <Toggle
@@ -138,30 +196,68 @@ function Toolbar({ editor }: ToolbarProps) {
 
       <div className="w-px h-5 bg-border mx-1" />
 
-      <Toggle
-        size="sm"
-        pressed={editor.isActive("bulletList")}
-        onPressedChange={() => editor.chain().focus().toggleBulletList().run()}
+      {/* Font Size */}
+      <Select
+        value={currentFontSize || ""}
+        onValueChange={(val) => {
+          if (val === "reset") {
+            (editor.chain().focus() as any).unsetFontSize().run();
+          } else {
+            (editor.chain().focus() as any).setFontSize(val).run();
+          }
+        }}
+      >
+        <SelectTrigger className="h-9 w-[100px] text-xs border-none bg-transparent hover:bg-muted">
+          <Type className="h-3.5 w-3.5 mr-1 shrink-0" />
+          <SelectValue placeholder="Size" />
+        </SelectTrigger>
+        <SelectContent>
+          {FONT_SIZES.map((s) => (
+            <SelectItem key={s.value} value={s.value} className="text-xs">
+              {s.label}
+            </SelectItem>
+          ))}
+          <SelectItem value="reset" className="text-xs text-muted-foreground">
+            Reset
+          </SelectItem>
+        </SelectContent>
+      </Select>
+
+      <div className="w-px h-5 bg-border mx-1" />
+
+      <button
+        type="button"
+        className={cn(
+          "inline-flex items-center justify-center rounded-md text-sm h-9 px-2.5 transition-colors",
+          editor.isActive("bulletList") ? "bg-accent text-accent-foreground" : "hover:bg-muted"
+        )}
+        onClick={() => editor.chain().focus().toggleBulletList().run()}
         aria-label="Bullet List"
       >
         <List className="h-3.5 w-3.5" />
-      </Toggle>
-      <Toggle
-        size="sm"
-        pressed={editor.isActive("orderedList")}
-        onPressedChange={() => editor.chain().focus().toggleOrderedList().run()}
+      </button>
+      <button
+        type="button"
+        className={cn(
+          "inline-flex items-center justify-center rounded-md text-sm h-9 px-2.5 transition-colors",
+          editor.isActive("orderedList") ? "bg-accent text-accent-foreground" : "hover:bg-muted"
+        )}
+        onClick={() => editor.chain().focus().toggleOrderedList().run()}
         aria-label="Ordered List"
       >
         <ListOrdered className="h-3.5 w-3.5" />
-      </Toggle>
-      <Toggle
-        size="sm"
-        pressed={editor.isActive("blockquote")}
-        onPressedChange={() => editor.chain().focus().toggleBlockquote().run()}
+      </button>
+      <button
+        type="button"
+        className={cn(
+          "inline-flex items-center justify-center rounded-md text-sm h-9 px-2.5 transition-colors",
+          editor.isActive("blockquote") ? "bg-accent text-accent-foreground" : "hover:bg-muted"
+        )}
+        onClick={() => editor.chain().focus().toggleBlockquote().run()}
         aria-label="Blockquote"
       >
         <Quote className="h-3.5 w-3.5" />
-      </Toggle>
+      </button>
 
       <div className="w-px h-5 bg-border mx-1" />
 
@@ -195,6 +291,7 @@ function Toolbar({ editor }: ToolbarProps) {
       <Popover>
         <PopoverTrigger asChild>
           <button
+            type="button"
             className="inline-flex items-center justify-center rounded-md text-sm h-9 px-2.5 hover:bg-muted transition-colors"
             aria-label="Text Color"
           >
@@ -206,6 +303,7 @@ function Toolbar({ editor }: ToolbarProps) {
             {COLORS.map((color) => (
               <button
                 key={color}
+                type="button"
                 className="w-6 h-6 rounded-full border border-border hover:scale-110 transition-transform"
                 style={{ backgroundColor: color }}
                 onClick={() => editor.chain().focus().setColor(color).run()}
@@ -214,6 +312,7 @@ function Toolbar({ editor }: ToolbarProps) {
             ))}
           </div>
           <button
+            type="button"
             className="w-full text-xs mt-2 text-muted-foreground hover:text-foreground transition-colors"
             onClick={() => editor.chain().focus().unsetColor().run()}
           >
@@ -225,6 +324,7 @@ function Toolbar({ editor }: ToolbarProps) {
       <div className="w-px h-5 bg-border mx-1" />
 
       <button
+        type="button"
         className="inline-flex items-center justify-center rounded-md text-sm h-9 px-2.5 hover:bg-muted transition-colors disabled:opacity-50"
         onClick={() => editor.chain().focus().undo().run()}
         disabled={!editor.can().undo()}
@@ -233,6 +333,7 @@ function Toolbar({ editor }: ToolbarProps) {
         <Undo className="h-3.5 w-3.5" />
       </button>
       <button
+        type="button"
         className="inline-flex items-center justify-center rounded-md text-sm h-9 px-2.5 hover:bg-muted transition-colors disabled:opacity-50"
         onClick={() => editor.chain().focus().redo().run()}
         disabled={!editor.can().redo()}
@@ -268,6 +369,7 @@ export default function RichTextEditor({
       TextStyle,
       Color,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
+      FontSize,
       PasteAsParas,
     ],
     content,
