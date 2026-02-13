@@ -140,9 +140,9 @@ export default function SermonDetail() {
 
             <article className="prose prose-invert prose-lg max-w-none space-y-5">
               {(isFullAccess ? paragraphs : previewParagraphs).map((p, i) => (
-                <p key={i} className="text-white leading-relaxed">
+                <div key={i} className="text-white leading-relaxed">
                   {renderContent(p)}
-                </p>
+                </div>
               ))}
             </article>
 
