@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, Video as VideoIcon, ExternalLink, Upload, ImageIcon } from "lucide-react";
+import { Plus, Pencil, Trash2, Video as VideoIcon, ExternalLink, Upload, ImageIcon, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 
@@ -199,7 +199,12 @@ export default function AdminVideoManager() {
         <div className="grid gap-4">
           {videoList.map((video) => (
             <Card key={video.id} className="overflow-hidden">
-              <div className="flex items-center gap-4 p-4">
+              {/* Status badge */}
+              <div className={`px-4 py-1.5 text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 ${video.is_active ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>
+                {video.is_active ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                {video.is_active ? "Published — Live on site" : "Draft — Hidden from public"}
+              </div>
+              <div className="flex items-start gap-4 p-4">
                 <div className="w-28 h-16 rounded-md overflow-hidden bg-muted shrink-0">
                   {video.thumbnail || video.youtube_url ? (
                     <img
@@ -215,26 +220,36 @@ export default function AdminVideoManager() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-medium text-sm truncate">{video.title}</h3>
-                  <div className="flex items-center gap-2 mt-1">
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
                     <Badge variant="secondary" className="text-xs">{video.category}</Badge>
                     <span className="text-xs text-muted-foreground">{video.duration}</span>
                     {video.featured && <Badge className="text-xs">Featured</Badge>}
+                    {!video.is_free && <Badge variant="outline" className="text-xs">${video.price}</Badge>}
                   </div>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  {video.youtube_url && (
-                    <Button variant="ghost" size="icon" asChild>
-                      <a href={video.youtube_url} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
+                  {/* Action buttons */}
+                  <div className="flex flex-wrap items-center gap-2 mt-3">
+                    <Button
+                      variant={video.is_active ? "outline" : "default"}
+                      size="sm"
+                      className="text-xs"
+                      onClick={() => updateVideo.mutateAsync({ id: video.id, is_active: !video.is_active }).then(() => toast({ title: video.is_active ? "Video unpublished" : "Video published" }))}
+                    >
+                      {video.is_active ? <><EyeOff className="h-3.5 w-3.5 mr-1.5" /> Unpublish (Draft)</> : <><Eye className="h-3.5 w-3.5 mr-1.5" /> Publish to Site</>}
                     </Button>
-                  )}
-                  <Button variant="ghost" size="icon" onClick={() => openEdit(video)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => handleDelete(video.id)} disabled={deleteVideo.isPending}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                    <Button variant="ghost" size="sm" className="text-xs" onClick={() => openEdit(video)}>
+                      <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
+                    </Button>
+                    {video.youtube_url && (
+                      <Button variant="ghost" size="sm" className="text-xs" asChild>
+                        <a href={video.youtube_url} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> View
+                        </a>
+                      </Button>
+                    )}
+                    <Button variant="outline" size="sm" className="text-xs text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30 ml-auto" onClick={() => handleDelete(video.id)} disabled={deleteVideo.isPending}>
+                      <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete
+                    </Button>
+                  </div>
                 </div>
               </div>
             </Card>
