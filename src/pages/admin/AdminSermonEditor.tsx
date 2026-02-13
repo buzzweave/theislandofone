@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,11 +53,16 @@ export default function AdminSermonEditor() {
   }, [sermonList, activeId]);
 
   // Sync draft when activeId changes
+  const prevActiveId = useRef<string | null>(null);
+
   useEffect(() => {
     const active = sermonList.find((s) => s.id === activeId);
-    if (active) {
+    if (!active) return;
+
+    if (activeId !== prevActiveId.current || !dirty) {
       setDraft(active);
       setDirty(false);
+      prevActiveId.current = activeId;
     }
   }, [activeId, sermonList]);
 
