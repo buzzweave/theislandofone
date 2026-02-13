@@ -1,59 +1,49 @@
 
 
-# Fix SMTP for Office365 (smtp.office365.com)
+# Switch Email Delivery from SMTP to Resend
 
-## Root Cause
+## Overview
+Replace the custom SMTP implementation with Resend's simple REST API for all outgoing emails. This eliminates the SMTP authentication issues you've been experiencing and provides reliable email delivery with a single API call.
 
-The current raw TCP SMTP implementation has several issues that cause failures with Office365:
+## What Changes
 
-1. **Multi-line response handling**: Office365 sends multi-line EHLO responses (e.g., `250-SIZE 157286400\r\n250-STARTTLS\r\n250 OK`). The current `read()` function does a single buffer read and may get partial data, causing missed STARTTLS capability detection or garbled responses.
+### 1. Store Your Resend API Key
+- You'll provide your Resend API key and it will be securely stored as a backend secret (`RESEND_API_KEY`)
 
-2. **STARTTLS response not validated**: After sending `STARTTLS`, the code doesn't verify it got a `220` response before upgrading the connection.
+### 2. Rewrite the Email Sending Logic
+- Remove the entire raw SMTP/TCP connection code (~130 lines) from the `send-notification` backend function
+- Replace it with a simple Resend API call (`POST https://api.resend.com/emails`)
+- All existing email types continue working: **Contact form submissions**, **Speaker request notifications**, and **SMTP test emails**
 
-3. **Read timing**: No delay between write and read, so the server may not have responded yet, causing empty reads.
+### 3. Simplify the Admin Settings Page
+- Remove the SMTP configuration section (host, port, username, password, encryption fields)
+- Replace with a simple "Resend" integration card showing status (configured / not configured)
+- Keep the existing "From Name", "From Email", and "Reply-To" fields so you can still customize sender identity
+- Remove the "Test SMTP" button and replace with a "Send Test Email" button that uses Resend
 
-4. **Connection not properly closed on TLS upgrade**: The original plain connection remains referenced in the catch block even after TLS upgrade.
+### 4. Update the Database
+- The `smtp_settings` table will still be used to store `from_name`, `from_email`, and `reply_to` preferences, but the SMTP-specific fields (host, port, username, encrypted_password, encryption) become unused
 
-## Solution
+## Email Flow After Changes
 
-Rewrite the `sendSmtpEmail` function in `supabase/functions/send-notification/index.ts` with:
-
-### 1. Proper multi-line SMTP response reader
-Read in a loop until we get a complete SMTP response (lines ending with `XXX ` pattern indicating final line, vs `XXX-` indicating continuation).
-
-### 2. Add small delays for read reliability
-Use a brief delay before reads to ensure the server has time to respond.
-
-### 3. Validate STARTTLS response
-Check for `220` response before calling `Deno.startTls`.
-
-### 4. Better error propagation
-Include the actual SMTP response text in error messages so failures are debuggable.
-
-### 5. Proper connection lifecycle
-Track whether we've upgraded to TLS and close the correct connection in the catch block.
+1. Visitor submits Contact or Speaker Request form
+2. Backend function validates and saves to database
+3. Backend function calls Resend API to send the formatted HTML email to `support@buzzweave.com`
+4. In-app notification is created
 
 ## Technical Details
 
-The rewritten `sendSmtpEmail` function will:
+**Edge Function (`send-notification/index.ts`):**
+- Remove `sendSmtpEmail()`, `encryptPassword()`, `decryptPassword()` functions
+- Add `sendResendEmail()` function that calls `https://api.resend.com/emails` with the `RESEND_API_KEY` secret
+- Update `save_smtp` action to only save from_name, from_email, reply_to
+- Update `test_smtp` action to send a test email via Resend instead
+- Update the contact/speaker_request handlers to use Resend
 
-```text
-1. Connect via plain TCP to smtp.office365.com:587
-2. Read greeting (wait for 220)
-3. Send EHLO, read full multi-line response
-4. Send STARTTLS, verify 220 response
-5. Upgrade to TLS via Deno.startTls
-6. Send EHLO again over TLS, read response
-7. AUTH LOGIN with base64-encoded credentials
-8. MAIL FROM, RCPT TO, DATA, send email body
-9. QUIT and close
-```
+**Admin Settings (`AdminSettings.tsx`):**
+- Remove SMTP host/port/username/password/encryption fields
+- Show a simple "Email (Resend)" card with from_name, from_email, reply_to inputs and a Test button
+- Remove SMTP verified/unverified status indicators
 
-Key helper: `readFullResponse()` that accumulates data until a complete SMTP response is received (final line matches `/^\d{3} /` pattern).
-
-## Files Changed
-
-| File | Change |
-|------|--------|
-| `supabase/functions/send-notification/index.ts` | Rewrite `sendSmtpEmail` with robust multi-line response handling, STARTTLS validation, and proper error messages |
+**Important:** You will need to verify your sending domain (`buzzweave.com` or whichever domain you use for `from_email`) in the Resend dashboard for emails to deliver reliably. Until then, you can use Resend's default `onboarding@resend.dev` as the from address for testing.
 
