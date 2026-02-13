@@ -1,25 +1,42 @@
 
+# Fix Graphics Admin: Multi-Upload and Mobile-Friendly
 
-# Fix "Failed to fetch" on Unpublish
+## Problem
+The current upload flow uses programmatic `document.createElement("input")` which:
+1. Only allows selecting one file at a time (no `multiple` attribute)
+2. Requires two separate file picker dialogs (preview then download file) -- confusing on mobile
+3. Has no visible upload UI -- just invisible inputs triggered by JavaScript
 
-## Root Cause
-The `graphics-admin` edge function's CORS headers do not include `Access-Control-Allow-Methods`. When the browser sends a preflight (OPTIONS) request for a PUT call (used by Unpublish), the response lacks the required `Access-Control-Allow-Methods` header, so the browser blocks the actual request entirely -- resulting in a "Failed to fetch" error.
+## Solution
 
-## Fix
+### Simplify the upload flow
+Instead of requiring two separate file selections (preview + download), use a single multi-file picker. Each selected image will be used as both the preview AND the downloadable file. This is much more practical for phone usage.
 
-### Update `supabase/functions/graphics-admin/index.ts`
-Add the missing `Access-Control-Allow-Methods` header to the CORS configuration:
+### Changes to `src/pages/admin/AdminGraphics.tsx`
 
+1. **Enable multi-file selection**: Add `multiple` attribute to the file input so users can select many images at once from their phone gallery.
+
+2. **Simplify to single file picker**: Use the same image for both preview and download (the current two-step picker is impractical on mobile). Each selected file uploads as both preview and download.
+
+3. **Batch upload with progress**: Loop through all selected files, uploading each one sequentially with a progress indicator showing "Uploading 3 of 7..."
+
+4. **Mobile-friendly button sizing**: Make the "Add Graphic" button larger with touch-friendly padding on small screens.
+
+5. **Responsive card layout**: Ensure graphic cards stack vertically on mobile with appropriately sized touch targets for all action buttons.
+
+### Technical Details
+
+```text
+Current flow:
+  Click "Add" -> Pick 1 preview image -> Pick 1 download file -> Upload
+
+New flow:
+  Click "Add" -> Pick multiple images -> Upload all (each image = preview + download)
 ```
-Before:
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-admin-token",
 
-After:
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-admin-token",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-```
-
-This is a one-line addition to the existing CORS headers object. No other files need to change.
-
+Key code changes:
+- `handleAddClick`: Create input with `multiple` attribute, iterate over `files` list
+- New `addGraphicSimple(file: File)` helper that uploads the same file for both preview and download URLs
+- Add upload progress state: `uploadProgress: { current: number, total: number } | null`
+- Display progress text in button: "Uploading 3 of 7..."
+- Add responsive classes to action buttons and card layout for better mobile touch targets
