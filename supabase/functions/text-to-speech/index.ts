@@ -7,7 +7,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const VOICE_MAP: Record<string, string> = {
+const ELEVENLABS_VOICE_MAP: Record<string, string> = {
   "deep-smooth": "JBFqnCBsd6RMkjVDRZzb",
   "warm-narrator": "onwK4e9ZLuTAKqWW03F9",
   "calm-male": "N2lVS1w4EtoT3dr4eOWO",
@@ -17,7 +17,8 @@ const VOICE_MAP: Record<string, string> = {
   "gentle-female": "pFZP5JQG7iQjIQuC4Bku",
 };
 
-// In-memory rate limiter: 10 requests per hour per user (TTS is expensive)
+const OPENAI_VOICE_OPTIONS = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
+
 const rateLimits = new Map<string, { count: number; resetAt: number }>();
 const MAX_REQUESTS = 10;
 const WINDOW_MS = 60 * 60 * 1000;
@@ -35,19 +36,128 @@ function checkRateLimit(userId: string): boolean {
   return true;
 }
 
+async function generateWithElevenLabs(text: string, voiceKey: string): Promise<Uint8Array> {
+  const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
+  if (!ELEVENLABS_API_KEY) throw new Error("ElevenLabs API key not configured");
+
+  const voiceId = ELEVENLABS_VOICE_MAP[voiceKey] || ELEVENLABS_VOICE_MAP["deep-smooth"];
+  const chunks: string[] = [];
+  const maxChunkSize = 4500;
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+  let currentChunk = "";
+  for (const sentence of sentences) {
+    if ((currentChunk + sentence).length > maxChunkSize && currentChunk) {
+      chunks.push(currentChunk.trim());
+      currentChunk = sentence;
+    } else {
+      currentChunk += sentence;
+    }
+  }
+  if (currentChunk.trim()) chunks.push(currentChunk.trim());
+
+  const audioBuffers: ArrayBuffer[] = [];
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    const body: Record<string, unknown> = {
+      text: chunk,
+      model_id: "eleven_turbo_v2_5",
+      voice_settings: { stability: 0.6, similarity_boost: 0.8, style: 0.4, use_speaker_boost: true, speed: 0.95 },
+    };
+    if (i > 0) body.previous_text = chunks[i - 1].slice(-200);
+    if (i < chunks.length - 1) body.next_text = chunks[i + 1].slice(0, 200);
+
+    const response = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
+      {
+        method: "POST",
+        headers: { "xi-api-key": ELEVENLABS_API_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }
+    );
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("ElevenLabs error:", response.status, errText);
+      throw new Error("ElevenLabs TTS error");
+    }
+    audioBuffers.push(await response.arrayBuffer());
+  }
+
+  const totalLength = audioBuffers.reduce((sum, buf) => sum + buf.byteLength, 0);
+  const combined = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const buf of audioBuffers) {
+    combined.set(new Uint8Array(buf), offset);
+    offset += buf.byteLength;
+  }
+  return combined;
+}
+
+async function generateWithOpenAI(text: string, voiceKey: string): Promise<Uint8Array> {
+  const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+  if (!OPENAI_API_KEY) throw new Error("OpenAI API key not configured");
+
+  const voice = OPENAI_VOICE_OPTIONS.includes(voiceKey) ? voiceKey : "alloy";
+
+  // OpenAI TTS has a 4096 char limit per request, chunk if needed
+  const maxChunk = 4000;
+  const chunks: string[] = [];
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+  let currentChunk = "";
+  for (const sentence of sentences) {
+    if ((currentChunk + sentence).length > maxChunk && currentChunk) {
+      chunks.push(currentChunk.trim());
+      currentChunk = sentence;
+    } else {
+      currentChunk += sentence;
+    }
+  }
+  if (currentChunk.trim()) chunks.push(currentChunk.trim());
+
+  const audioBuffers: ArrayBuffer[] = [];
+  for (const chunk of chunks) {
+    const response = await fetch("https://api.openai.com/v1/audio/speech", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "tts-1-hd",
+        input: chunk,
+        voice,
+        response_format: "mp3",
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("OpenAI TTS error:", response.status, errText);
+      throw new Error("OpenAI TTS error");
+    }
+    audioBuffers.push(await response.arrayBuffer());
+  }
+
+  const totalLength = audioBuffers.reduce((sum, buf) => sum + buf.byteLength, 0);
+  const combined = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const buf of audioBuffers) {
+    combined.set(new Uint8Array(buf), offset);
+    offset += buf.byteLength;
+  }
+  return combined;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Authenticate request
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Authentication required" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Authentication required" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const supabaseClient = createClient(
@@ -59,129 +169,51 @@ serve(async (req) => {
     const token = authHeader.replace("Bearer ", "");
     const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
     if (claimsError || !claimsData?.claims) {
-      return new Response(
-        JSON.stringify({ error: "Invalid authentication token" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Invalid authentication token" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const userId = claimsData.claims.sub as string;
 
-    // Check admin role
     const serviceClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
     const { data: roleData } = await serviceClient
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId)
-      .eq("role", "admin")
-      .maybeSingle();
+      .from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
 
     if (!roleData) {
-      return new Response(
-        JSON.stringify({ error: "Admin access required" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Rate limit check
-    if (!checkRateLimit(userId)) {
-      return new Response(
-        JSON.stringify({ error: "Rate limit exceeded. Please try again later (max 10 requests/hour)." }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const { text, voice, title } = await req.json();
-    const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
-    if (!ELEVENLABS_API_KEY) {
-      return new Response(JSON.stringify({ error: "ElevenLabs API key not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ error: "Admin access required" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    if (!checkRateLimit(userId)) {
+      return new Response(JSON.stringify({ error: "Rate limit exceeded. Max 10 requests/hour." }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { text, voice, title, provider } = await req.json();
 
     if (!text || typeof text !== "string" || text.trim().length === 0) {
       return new Response(JSON.stringify({ error: "No text provided" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
     if (text.length > MAX_TEXT_LENGTH) {
       return new Response(JSON.stringify({ error: `Text too long (max ${MAX_TEXT_LENGTH} characters)` }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const voiceId = VOICE_MAP[voice] || VOICE_MAP["deep-smooth"];
-    const chunks: string[] = [];
-    const maxChunkSize = 4500;
-
-    const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
-    let currentChunk = "";
-    for (const sentence of sentences) {
-      if ((currentChunk + sentence).length > maxChunkSize && currentChunk) {
-        chunks.push(currentChunk.trim());
-        currentChunk = sentence;
-      } else {
-        currentChunk += sentence;
-      }
-    }
-    if (currentChunk.trim()) chunks.push(currentChunk.trim());
-
-    const audioBuffers: ArrayBuffer[] = [];
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      const body: Record<string, unknown> = {
-        text: chunk,
-        model_id: "eleven_turbo_v2_5",
-        voice_settings: {
-          stability: 0.6,
-          similarity_boost: 0.8,
-          style: 0.4,
-          use_speaker_boost: true,
-          speed: 0.95,
-        },
-      };
-
-      if (i > 0) body.previous_text = chunks[i - 1].slice(-200);
-      if (i < chunks.length - 1) body.next_text = chunks[i + 1].slice(0, 200);
-
-      const response = await fetch(
-        `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
-        {
-          method: "POST",
-          headers: {
-            "xi-api-key": ELEVENLABS_API_KEY,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(body),
-        }
-      );
-
-      if (!response.ok) {
-        const errText = await response.text();
-        console.error("ElevenLabs error:", response.status, errText);
-        return new Response(
-          JSON.stringify({ error: "Text-to-speech service error" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      audioBuffers.push(await response.arrayBuffer());
-    }
-
-    const totalLength = audioBuffers.reduce((sum, buf) => sum + buf.byteLength, 0);
-    const combined = new Uint8Array(totalLength);
-    let offset = 0;
-    for (const buf of audioBuffers) {
-      combined.set(new Uint8Array(buf), offset);
-      offset += buf.byteLength;
+    let audioData: Uint8Array;
+    if (provider === "openai") {
+      audioData = await generateWithOpenAI(text, voice);
+    } else {
+      audioData = await generateWithElevenLabs(text, voice);
     }
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -192,33 +224,28 @@ serve(async (req) => {
       `${SUPABASE_URL}/storage/v1/object/audio-files/${fileName}`,
       {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-          "Content-Type": "audio/mpeg",
-        },
-        body: combined,
+        headers: { Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`, "Content-Type": "audio/mpeg" },
+        body: audioData,
       }
     );
 
     if (!uploadResponse.ok) {
       const uploadErr = await uploadResponse.text();
       console.error("Upload error:", uploadErr);
-      return new Response(
-        JSON.stringify({ error: "Failed to upload audio file" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Failed to upload audio file" }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const audioUrl = `${SUPABASE_URL}/storage/v1/object/public/audio-files/${fileName}`;
 
-    return new Response(
-      JSON.stringify({ audioUrl, fileName }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ audioUrl, fileName }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (e) {
     console.error("TTS error:", e);
     return new Response(
-      JSON.stringify({ error: "An internal error occurred" }),
+      JSON.stringify({ error: e instanceof Error ? e.message : "An internal error occurred" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
