@@ -74,12 +74,12 @@ export default function SermonDetail() {
     if (isHtml) {
       return (
         <div
-          className="prose prose-invert prose-sm max-w-none"
+          className="prose prose-invert prose-sm max-w-none [&_*]:!text-white"
           dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }}
         />
       );
     }
-    return <p className="text-secondary-foreground leading-relaxed whitespace-pre-wrap">{content}</p>;
+    return <p className="text-white leading-relaxed whitespace-pre-wrap">{content}</p>;
   };
 
   return (
@@ -140,7 +140,7 @@ export default function SermonDetail() {
 
             <article className="prose prose-invert prose-lg max-w-none space-y-5">
               {(isFullAccess ? paragraphs : previewParagraphs).map((p, i) => (
-                <p key={i} className="text-foreground/90 leading-relaxed">
+                <p key={i} className="text-white leading-relaxed">
                   {renderContent(p)}
                 </p>
               ))}

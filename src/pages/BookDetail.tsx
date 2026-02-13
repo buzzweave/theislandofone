@@ -50,13 +50,13 @@ export default function BookDetail() {
     if (isHtml) {
       return (
         <div
-          className="prose prose-invert prose-sm max-w-none"
+          className="prose prose-invert prose-sm max-w-none [&_*]:!text-white"
           dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }}
         />
       );
     }
     return (
-      <p className="text-secondary-foreground leading-relaxed whitespace-pre-wrap">{content}</p>
+      <p className="text-white leading-relaxed whitespace-pre-wrap">{content}</p>
     );
   };
 
@@ -100,7 +100,7 @@ export default function BookDetail() {
                 <p className="text-muted-foreground text-lg mb-1">{book.subtitle}</p>
               )}
               <p className="text-muted-foreground text-sm mb-6">by {book.author}</p>
-              <div className="text-secondary-foreground leading-relaxed text-base mb-8 max-w-xl">
+              <div className="text-white leading-relaxed text-base mb-8 max-w-xl">
                 {renderContent(book.description)}
               </div>
 
@@ -204,7 +204,7 @@ export default function BookDetail() {
                   {isOpen && !isLocked && (
                     <div className="px-5 pb-5 animate-fade-up">
                       <div className="border-t border-border pt-4 ml-12">
-                        <div className="prose prose-invert prose-sm max-w-none">
+                        <div className="prose prose-invert prose-sm max-w-none [&_*]:!text-white">
                           {renderContent(chapter.content)}
                         </div>
 

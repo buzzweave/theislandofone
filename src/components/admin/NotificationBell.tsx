@@ -82,7 +82,15 @@ export default function NotificationBell() {
                     <NotificationIcon type={n.type} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{n.title}</p>
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <p className="text-sm font-medium text-foreground truncate">{n.title}</p>
+                      {n.type === "contact" && (
+                        <span className="text-[9px] px-1 py-0.5 rounded bg-blue-500/10 text-blue-400 font-medium shrink-0">Contact</span>
+                      )}
+                      {n.type === "speaker_request" && (
+                        <span className="text-[9px] px-1 py-0.5 rounded bg-purple-500/10 text-purple-400 font-medium shrink-0">Speaker</span>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground truncate">{n.preview}</p>
                     <p className="text-[10px] text-muted-foreground mt-1">
                       {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
