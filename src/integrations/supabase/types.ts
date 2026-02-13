@@ -506,6 +506,8 @@ export type Database = {
           featured: boolean
           id: string
           is_active: boolean
+          is_free: boolean
+          price: number
           sort_order: number
           thumbnail: string
           title: string
@@ -519,6 +521,8 @@ export type Database = {
           featured?: boolean
           id?: string
           is_active?: boolean
+          is_free?: boolean
+          price?: number
           sort_order?: number
           thumbnail?: string
           title: string
@@ -532,6 +536,8 @@ export type Database = {
           featured?: boolean
           id?: string
           is_active?: boolean
+          is_free?: boolean
+          price?: number
           sort_order?: number
           thumbnail?: string
           title?: string

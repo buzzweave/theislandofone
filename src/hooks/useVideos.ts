@@ -11,6 +11,8 @@ export interface Video {
   youtube_url: string;
   is_active: boolean;
   sort_order: number;
+  price: number;
+  is_free: boolean;
   created_at: string;
   updated_at: string;
 }

@@ -54,9 +54,11 @@ type VideoForm = {
   category: string;
   featured: boolean;
   youtube_url: string;
+  price: number;
+  is_free: boolean;
 };
 
-const emptyForm: VideoForm = { title: "", thumbnail: "", duration: "", category: "Ministry", featured: false, youtube_url: "" };
+const emptyForm: VideoForm = { title: "", thumbnail: "", duration: "", category: "Ministry", featured: false, youtube_url: "", price: 0, is_free: true };
 
 export default function AdminVideoManager() {
   const { data: videoList = [], isLoading } = useVideos();
@@ -84,6 +86,8 @@ export default function AdminVideoManager() {
       category: video.category,
       featured: video.featured,
       youtube_url: video.youtube_url,
+      price: (video as any).price ?? 0,
+      is_free: (video as any).is_free ?? true,
     });
     setDialogOpen(true);
   };
@@ -166,6 +170,18 @@ export default function AdminVideoManager() {
               <div className="flex items-center gap-2">
                 <Switch checked={form.featured} onCheckedChange={(v) => setForm({ ...form, featured: v })} />
                 <Label>Featured</Label>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Switch checked={!form.is_free} onCheckedChange={(v) => setForm({ ...form, is_free: !v, price: v ? form.price : 0 })} />
+                  <Label>For Sale</Label>
+                </div>
+                {!form.is_free && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Price ($)</Label>
+                    <Input type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: parseFloat(e.target.value) || 0 })} />
+                  </div>
+                )}
               </div>
               <Button onClick={handleSave} className="w-full" disabled={addVideo.isPending || updateVideo.isPending}>
                 {editingId ? "Save Changes" : "Add Video"}
