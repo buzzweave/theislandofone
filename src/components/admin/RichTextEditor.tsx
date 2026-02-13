@@ -147,6 +147,7 @@ interface ToolbarProps {
 
 function Toolbar({ editor }: ToolbarProps) {
   const currentFontSize = editor.getAttributes("textStyle")?.fontSize || null;
+  const savedSelection = useRef<{ from: number; to: number } | null>(null);
 
   return (
     <div className="flex flex-wrap items-center gap-0.5 p-1.5 border-b border-border bg-muted/30">
@@ -200,6 +201,10 @@ function Toolbar({ editor }: ToolbarProps) {
       <Select
         value={currentFontSize || ""}
         onValueChange={(val) => {
+          // Restore saved selection before applying font size
+          if (savedSelection.current) {
+            editor.chain().focus().setTextSelection(savedSelection.current).run();
+          }
           if (val === "reset") {
             (editor.chain().focus() as any).unsetFontSize().run();
           } else {
@@ -207,7 +212,14 @@ function Toolbar({ editor }: ToolbarProps) {
           }
         }}
       >
-        <SelectTrigger className="h-9 w-[100px] text-xs border-none bg-transparent hover:bg-muted">
+        <SelectTrigger
+          className="h-9 w-[100px] text-xs border-none bg-transparent hover:bg-muted"
+          onPointerDown={() => {
+            // Save selection before dropdown steals focus
+            const { from, to } = editor.state.selection;
+            savedSelection.current = { from, to };
+          }}
+        >
           <Type className="h-3.5 w-3.5 mr-1 shrink-0" />
           <SelectValue placeholder="Size" />
         </SelectTrigger>
@@ -360,7 +372,7 @@ export default function RichTextEditor({
   className,
   minHeight = "200px",
 }: RichTextEditorProps) {
-  const isInternalUpdate = useRef(false);
+  const lastEmittedHTML = useRef(content);
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -388,20 +400,19 @@ export default function RichTextEditor({
       },
     },
     onUpdate: ({ editor }) => {
-      isInternalUpdate.current = true;
-      onChange(editor.getHTML());
+      const html = editor.getHTML();
+      lastEmittedHTML.current = html;
+      onChange(html);
     },
   });
 
   // Sync external content changes (e.g., AI insert/replace) but skip when change came from user typing
   useEffect(() => {
-    if (isInternalUpdate.current) {
-      isInternalUpdate.current = false;
-      return;
-    }
-    if (editor && content !== editor.getHTML()) {
-      editor.commands.setContent(content, { emitUpdate: false });
-    }
+    if (!editor) return;
+    // Only sync if the incoming content differs from the last HTML we emitted
+    if (content === lastEmittedHTML.current) return;
+    editor.commands.setContent(content, { emitUpdate: false });
+    lastEmittedHTML.current = content;
   }, [content, editor]);
 
   if (!editor) return null;
