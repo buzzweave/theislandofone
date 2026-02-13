@@ -116,6 +116,7 @@ export default function AdminGraphics() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const [allGraphics, setAllGraphics] = useState<Graphic[]>([]);
   const [loadingAll, setLoadingAll] = useState(true);
 
@@ -138,26 +139,18 @@ export default function AdminGraphics() {
     fetchAll();
   };
 
-  const addGraphic = async (previewFile: File, downloadFile: File) => {
-    setUploading(true);
-    try {
-      const [previewUrl, fileUrl] = await Promise.all([
-        uploadToStorage(previewFile, "previews"),
-        uploadToStorage(downloadFile, "files"),
-      ]);
-      await adminApi("POST", {
-        title: previewFile.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "),
-        preview_url: previewUrl,
-        file_url: fileUrl,
-        sort_order: allGraphics.length,
-        price: 4.99,
-      });
-      toast({ title: "Graphic added" });
-      invalidate();
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    }
-    setUploading(false);
+  const addGraphicSimple = async (file: File) => {
+    const [previewUrl, fileUrl] = await Promise.all([
+      uploadToStorage(file, "previews"),
+      uploadToStorage(file, "files"),
+    ]);
+    await adminApi("POST", {
+      title: file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "),
+      preview_url: previewUrl,
+      file_url: fileUrl,
+      sort_order: allGraphics.length,
+      price: 4.99,
+    });
   };
 
   const updateGraphic = async (id: string, updates: Partial<Graphic>) => {
@@ -180,23 +173,29 @@ export default function AdminGraphics() {
   };
 
   const handleAddClick = () => {
-    const previewInput = document.createElement("input");
-    previewInput.type = "file";
-    previewInput.accept = "image/*";
-    previewInput.onchange = (e) => {
-      const previewFile = (e.target as HTMLInputElement).files?.[0];
-      if (!previewFile) return;
-      const downloadInput = document.createElement("input");
-      downloadInput.type = "file";
-      downloadInput.accept = "image/*,.zip,.psd,.ai,.svg,.pdf";
-      downloadInput.onchange = (e2) => {
-        const downloadFile = (e2.target as HTMLInputElement).files?.[0];
-        if (!downloadFile) return;
-        addGraphic(previewFile, downloadFile);
-      };
-      downloadInput.click();
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.multiple = true;
+    input.onchange = async (e) => {
+      const files = Array.from((e.target as HTMLInputElement).files || []);
+      if (files.length === 0) return;
+      setUploading(true);
+      setUploadProgress({ current: 0, total: files.length });
+      for (let i = 0; i < files.length; i++) {
+        setUploadProgress({ current: i + 1, total: files.length });
+        try {
+          await addGraphicSimple(files[i]);
+        } catch (err: any) {
+          toast({ title: "Upload failed", description: `${files[i].name}: ${err.message}`, variant: "destructive" });
+        }
+      }
+      toast({ title: `${files.length} graphic(s) uploaded` });
+      invalidate();
+      setUploading(false);
+      setUploadProgress(null);
     };
-    previewInput.click();
+    input.click();
   };
 
   const [resizeGraphic, setResizeGraphic] = useState<Graphic | null>(null);
@@ -211,9 +210,11 @@ export default function AdminGraphics() {
           <h2 className="font-display text-2xl font-bold">Graphics</h2>
           <p className="text-sm text-muted-foreground">Upload and manage church screen graphics for purchase.</p>
         </div>
-        <Button onClick={handleAddClick} disabled={uploading}>
-          <Plus className="h-4 w-4 mr-2" />
-          {uploading ? "Uploading…" : "Add Graphic"}
+        <Button onClick={handleAddClick} disabled={uploading} size="lg" className="min-h-[48px] px-6">
+          <Plus className="h-5 w-5 mr-2" />
+          {uploading && uploadProgress
+            ? `Uploading ${uploadProgress.current} of ${uploadProgress.total}…`
+            : "Add Graphics"}
         </Button>
       </div>
 
@@ -263,7 +264,7 @@ export default function AdminGraphics() {
                     </div>
                   </div>
                   {/* Action buttons row */}
-                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border">
+                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border [&>button]:min-h-[44px]">
                     <Button
                       variant={graphic.is_active ? "outline" : "default"}
                       size="sm"
