@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bell, Mail, Mic, Settings, Check, CheckCheck, Trash2 } from "lucide-react";
+import { Bell, Mail, Mic, Settings, Check, CheckCheck, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 import { useNotifications } from "@/hooks/useNotifications";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
@@ -15,8 +15,55 @@ function NotificationIcon({ type }: { type: string }) {
   }
 }
 
+function TypeBadge({ type }: { type: string }) {
+  if (type === "contact") return <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 font-medium">Contact</span>;
+  if (type === "speaker_request") return <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 font-medium">Speaker</span>;
+  return null;
+}
+
+const CONTACT_FIELDS: [string, string][] = [
+  ["name", "Name"],
+  ["email", "Email"],
+  ["phone", "Phone"],
+  ["message", "Message"],
+  ["page_url", "Page URL"],
+];
+
+const SPEAKER_FIELDS: [string, string][] = [
+  ["name", "Name"],
+  ["email", "Email"],
+  ["phone", "Phone"],
+  ["organization", "Organization"],
+  ["event_name", "Event Name"],
+  ["event_date", "Event Date"],
+  ["event_location", "Location"],
+  ["topic", "Topic"],
+  ["message", "Message"],
+];
+
+function NotificationDetails({ data, type }: { data: any; type: string }) {
+  if (!data || typeof data !== "object") return null;
+  const fields = type === "speaker_request" ? SPEAKER_FIELDS : CONTACT_FIELDS;
+
+  return (
+    <div className="mt-3 pt-3 border-t border-border space-y-1.5">
+      {fields.map(([key, label]) => {
+        const value = data[key];
+        if (!value) return null;
+        return (
+          <div key={key} className="flex gap-2 text-xs">
+            <span className="text-muted-foreground font-medium min-w-[80px] shrink-0">{label}:</span>
+            <span className="text-foreground break-all">{value}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function AdminNotifications() {
   const [filter, setFilter] = useState<Filter>("all");
+  const [expanded, setExpanded] = useState<string | null>(null);
   const { notifications, unreadCount, markRead, markAllRead, deleteNotification } = useNotifications();
 
   const filtered = notifications.filter((n) => {
@@ -29,9 +76,13 @@ export default function AdminNotifications() {
   const filters: { key: Filter; label: string }[] = [
     { key: "all", label: "All" },
     { key: "unread", label: `Unread (${unreadCount})` },
-    { key: "contact", label: "Contact" },
+    { key: "contact", label: "Contacts" },
     { key: "speaker_request", label: "Speaker" },
   ];
+
+  const toggleExpand = (id: string) => {
+    setExpanded(expanded === id ? null : id);
+  };
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -72,46 +123,70 @@ export default function AdminNotifications() {
             <p className="text-sm">No notifications match this filter</p>
           </div>
         ) : (
-          filtered.map((n) => (
-            <div
-              key={n.id}
-              className={`flex items-start gap-3 p-4 rounded-lg border border-border transition-colors ${
-                n.is_read ? "bg-card opacity-70" : "bg-primary/5 border-primary/20"
-              }`}
-            >
-              <div className="mt-0.5 shrink-0">
-                <NotificationIcon type={n.type} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground">{n.title}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{n.preview}</p>
-                {n.email_queued && (
-                  <p className="text-[10px] text-destructive mt-1 font-medium">⚠ Email queued (SMTP not configured)</p>
-                )}
-                <p className="text-[10px] text-muted-foreground mt-1">
-                  {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
-                </p>
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                {!n.is_read && (
-                  <button
-                    onClick={() => markRead(n.id)}
-                    className="p-1.5 rounded text-muted-foreground hover:text-primary hover:bg-muted"
-                    title="Mark as read"
-                  >
-                    <Check className="h-3.5 w-3.5" />
-                  </button>
-                )}
-                <button
-                  onClick={() => deleteNotification(n.id)}
-                  className="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-muted"
-                  title="Delete"
+          filtered.map((n) => {
+            const isExpanded = expanded === n.id;
+            const hasData = n.data && typeof n.data === "object" && Object.keys(n.data).length > 0;
+
+            return (
+              <div
+                key={n.id}
+                className={`rounded-lg border transition-colors ${
+                  n.is_read ? "bg-card opacity-70" : "bg-primary/5 border-primary/20"
+                } ${isExpanded ? "border-primary/30" : "border-border"}`}
+              >
+                <div
+                  className={`flex items-start gap-3 p-4 ${hasData ? "cursor-pointer" : ""}`}
+                  onClick={() => hasData && toggleExpand(n.id)}
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                  <div className="mt-0.5 shrink-0">
+                    <NotificationIcon type={n.type} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <p className="text-sm font-medium text-foreground">{n.title}</p>
+                      <TypeBadge type={n.type} />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">{n.preview}</p>
+                    {n.email_queued && (
+                      <p className="text-[10px] text-destructive mt-1 font-medium">⚠ Email queued (SMTP not configured)</p>
+                    )}
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {hasData && (
+                      isExpanded
+                        ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                        : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                    )}
+                    {!n.is_read && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); markRead(n.id); }}
+                        className="p-1.5 rounded text-muted-foreground hover:text-primary hover:bg-muted"
+                        title="Mark as read"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteNotification(n.id); }}
+                      className="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-muted"
+                      title="Delete"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {isExpanded && hasData && (
+                  <div className="px-4 pb-4 ml-7">
+                    <NotificationDetails data={n.data} type={n.type} />
+                  </div>
+                )}
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
