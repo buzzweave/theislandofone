@@ -68,96 +68,110 @@ async function encryptPassword(plaintext: string, key: string): Promise<string> 
   return `${ivHex}:${dataHex}`;
 }
 
-// Raw SMTP send via Deno TCP
+// Robust SMTP send via Deno TCP with proper multi-line response handling
 async function sendSmtpEmail(smtp: any, password: string, to: string, subject: string, body: string, replyTo: string) {
-  const conn = smtp.encryption === "ssl"
-    ? await Deno.connectTls({ hostname: smtp.host, port: smtp.port })
-    : await Deno.connect({ hostname: smtp.host, port: smtp.port });
-
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
 
-  async function read(): Promise<string> {
-    const buf = new Uint8Array(4096);
-    const n = await conn.read(buf);
-    return n ? decoder.decode(buf.subarray(0, n)) : "";
+  // Helper: read a full SMTP response (handles multi-line responses like 250-xxx / 250 xxx)
+  async function readFullResponse(conn: Deno.TcpConn | Deno.TlsConn): Promise<string> {
+    let accumulated = "";
+    const maxAttempts = 30; // 30 * 200ms = 6s max wait
+    for (let i = 0; i < maxAttempts; i++) {
+      const buf = new Uint8Array(4096);
+      try {
+        const n = await conn.read(buf);
+        if (n === null) break;
+        accumulated += decoder.decode(buf.subarray(0, n));
+      } catch {
+        break;
+      }
+      // Check if we have a complete response: last line matches "XXX " (3 digits + space)
+      const lines = accumulated.trimEnd().split("\r\n");
+      const lastLine = lines[lines.length - 1];
+      if (/^\d{3} /.test(lastLine) || /^\d{3}$/.test(lastLine)) {
+        return accumulated;
+      }
+      // If last line is a continuation (XXX-), keep reading
+    }
+    if (!accumulated) throw new Error("SMTP: No response from server");
+    return accumulated;
   }
 
-  async function write(cmd: string) {
+  async function writeCmd(conn: Deno.TcpConn | Deno.TlsConn, cmd: string) {
     await conn.write(encoder.encode(cmd + "\r\n"));
   }
 
-  async function writeAndRead(cmd: string): Promise<string> {
-    await write(cmd);
-    return await read();
+  async function writeAndRead(conn: Deno.TcpConn | Deno.TlsConn, cmd: string): Promise<string> {
+    await writeCmd(conn, cmd);
+    // Small delay to let server process
+    await new Promise((r) => setTimeout(r, 150));
+    return await readFullResponse(conn);
   }
 
+  function getCode(response: string): string {
+    return response.substring(0, 3);
+  }
+
+  let activeConn: Deno.TcpConn | Deno.TlsConn | null = null;
+
   try {
-    await read(); // greeting
+    // Step 1: Connect
+    const plainConn: Deno.TcpConn = smtp.encryption === "ssl"
+      ? await Deno.connectTls({ hostname: smtp.host, port: smtp.port }) as unknown as Deno.TcpConn
+      : await Deno.connect({ hostname: smtp.host, port: smtp.port });
+    activeConn = plainConn;
 
-    let response = await writeAndRead(`EHLO localhost`);
+    // Step 2: Read greeting
+    await new Promise((r) => setTimeout(r, 300));
+    const greeting = await readFullResponse(plainConn);
+    if (!getCode(greeting).startsWith("2")) throw new Error("SMTP greeting failed: " + greeting.trim());
 
-    // STARTTLS for TLS mode
-    if (smtp.encryption === "tls" && response.includes("STARTTLS")) {
-      await writeAndRead("STARTTLS");
-      const tlsConn = await Deno.startTls(conn as Deno.TcpConn, { hostname: smtp.host });
-      // Re-assign read/write to TLS connection
-      const tlsRead = async (): Promise<string> => {
-        const buf = new Uint8Array(4096);
-        const n = await tlsConn.read(buf);
-        return n ? decoder.decode(buf.subarray(0, n)) : "";
-      };
-      const tlsWrite = async (cmd: string) => {
-        await tlsConn.write(encoder.encode(cmd + "\r\n"));
-      };
-      const tlsWriteAndRead = async (cmd: string): Promise<string> => {
-        await tlsWrite(cmd);
-        return await tlsRead();
-      };
+    // Step 3: EHLO
+    const ehloResp = await writeAndRead(plainConn, "EHLO localhost");
+    if (!getCode(ehloResp).startsWith("2")) throw new Error("SMTP EHLO failed: " + ehloResp.trim());
 
-      await tlsWriteAndRead("EHLO localhost");
+    // Step 4: STARTTLS if needed
+    if (smtp.encryption === "tls") {
+      if (!ehloResp.toUpperCase().includes("STARTTLS")) {
+        throw new Error("SMTP server does not support STARTTLS. EHLO response: " + ehloResp.trim());
+      }
 
-      // AUTH LOGIN
-      await tlsWriteAndRead("AUTH LOGIN");
-      await tlsWriteAndRead(btoa(smtp.username));
-      const authResult = await tlsWriteAndRead(btoa(password));
-      if (!authResult.startsWith("235")) throw new Error("SMTP auth failed: " + authResult);
+      const starttlsResp = await writeAndRead(plainConn, "STARTTLS");
+      if (getCode(starttlsResp) !== "220") {
+        throw new Error("SMTP STARTTLS rejected: " + starttlsResp.trim());
+      }
 
-      await tlsWriteAndRead(`MAIL FROM:<${smtp.from_email}>`);
-      await tlsWriteAndRead(`RCPT TO:<${to}>`);
-      await tlsWriteAndRead("DATA");
+      // Step 5: Upgrade to TLS
+      const tlsConn = await Deno.startTls(plainConn, { hostname: smtp.host });
+      activeConn = tlsConn;
 
-      const emailContent = [
-        `From: ${smtp.from_name} <${smtp.from_email}>`,
-        `To: ${to}`,
-        `Reply-To: ${replyTo}`,
-        `Subject: ${subject}`,
-        `MIME-Version: 1.0`,
-        `Content-Type: text/html; charset=utf-8`,
-        `Date: ${new Date().toUTCString()}`,
-        ``,
-        body,
-        `.`,
-      ].join("\r\n");
-
-      const sendResult = await tlsWriteAndRead(emailContent);
-      await tlsWrite("QUIT");
-      tlsConn.close();
-
-      if (!sendResult.startsWith("250")) throw new Error("SMTP send failed: " + sendResult);
-      return;
+      // Step 6: EHLO again over TLS
+      const ehlo2 = await writeAndRead(tlsConn, "EHLO localhost");
+      if (!getCode(ehlo2).startsWith("2")) throw new Error("SMTP EHLO (TLS) failed: " + ehlo2.trim());
     }
 
-    // AUTH LOGIN (no TLS)
-    await writeAndRead("AUTH LOGIN");
-    await writeAndRead(btoa(smtp.username));
-    const authResult = await writeAndRead(btoa(password));
-    if (!authResult.startsWith("235")) throw new Error("SMTP auth failed: " + authResult);
+    // Step 7: AUTH LOGIN
+    const authPrompt = await writeAndRead(activeConn, "AUTH LOGIN");
+    if (!getCode(authPrompt).startsWith("3")) throw new Error("SMTP AUTH LOGIN rejected: " + authPrompt.trim());
 
-    await writeAndRead(`MAIL FROM:<${smtp.from_email}>`);
-    await writeAndRead(`RCPT TO:<${to}>`);
-    await writeAndRead("DATA");
+    const userResp = await writeAndRead(activeConn, btoa(smtp.username));
+    if (!getCode(userResp).startsWith("3")) throw new Error("SMTP username rejected: " + userResp.trim());
 
+    const passResp = await writeAndRead(activeConn, btoa(password));
+    if (!getCode(passResp).startsWith("2")) throw new Error("SMTP auth failed: " + passResp.trim());
+
+    // Step 8: MAIL FROM / RCPT TO / DATA
+    const mailResp = await writeAndRead(activeConn, `MAIL FROM:<${smtp.from_email}>`);
+    if (!getCode(mailResp).startsWith("2")) throw new Error("SMTP MAIL FROM failed: " + mailResp.trim());
+
+    const rcptResp = await writeAndRead(activeConn, `RCPT TO:<${to}>`);
+    if (!getCode(rcptResp).startsWith("2")) throw new Error("SMTP RCPT TO failed: " + rcptResp.trim());
+
+    const dataResp = await writeAndRead(activeConn, "DATA");
+    if (!getCode(dataResp).startsWith("3")) throw new Error("SMTP DATA rejected: " + dataResp.trim());
+
+    // Step 9: Send email content
     const emailContent = [
       `From: ${smtp.from_name} <${smtp.from_email}>`,
       `To: ${to}`,
@@ -168,16 +182,18 @@ async function sendSmtpEmail(smtp: any, password: string, to: string, subject: s
       `Date: ${new Date().toUTCString()}`,
       ``,
       body,
+      ``,
       `.`,
     ].join("\r\n");
 
-    const sendResult = await writeAndRead(emailContent);
-    await write("QUIT");
-    conn.close();
+    const sendResult = await writeAndRead(activeConn, emailContent);
+    if (!getCode(sendResult).startsWith("2")) throw new Error("SMTP send failed: " + sendResult.trim());
 
-    if (!sendResult.startsWith("250")) throw new Error("SMTP send failed: " + sendResult);
+    // Step 10: QUIT
+    try { await writeCmd(activeConn, "QUIT"); } catch { /* ignore */ }
+    try { activeConn.close(); } catch { /* ignore */ }
   } catch (e) {
-    try { conn.close(); } catch {}
+    try { if (activeConn) activeConn.close(); } catch { /* ignore */ }
     throw e;
   }
 }
