@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Save, Globe, Bell, Shield, CheckCircle2, Cloud, Bot, Headphones, Trash2, Mail, Loader2, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
@@ -37,85 +36,74 @@ export default function AdminSettings() {
   const [localChatgptKey, setLocalChatgptKey] = useState("");
   const [localElevenlabsKey, setLocalElevenlabsKey] = useState("");
 
-  // SMTP state
-  const [smtp, setSmtp] = useState({
-    host: "", port: "587", username: "", password: "",
-    encryption: "tls", from_name: "", from_email: "", reply_to: "",
+  // Email settings state
+  const [emailSettings, setEmailSettings] = useState({
+    from_name: "", from_email: "", reply_to: "",
   });
-  const [smtpVerified, setSmtpVerified] = useState(false);
-  const [smtpLoading, setSmtpLoading] = useState(false);
-  const [smtpTestLoading, setSmtpTestLoading] = useState(false);
-  const [smtpLoaded, setSmtpLoaded] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [emailTestLoading, setEmailTestLoading] = useState(false);
+  const [emailLoaded, setEmailLoaded] = useState(false);
 
-  // Load SMTP settings
+  // Load email settings
   useEffect(() => {
-    async function loadSmtp() {
+    async function loadEmailSettings() {
       const { data } = await supabase.from("smtp_settings").select("*").limit(1).single();
       if (data) {
-        setSmtp({
-          host: data.host || "",
-          port: String(data.port || 587),
-          username: data.username || "",
-          password: "", // never sent back
-          encryption: data.encryption || "tls",
+        setEmailSettings({
           from_name: data.from_name || "",
           from_email: data.from_email || "",
           reply_to: data.reply_to || "",
         });
-        setSmtpVerified(data.is_verified || false);
+        setEmailVerified(data.is_verified || false);
       }
-      setSmtpLoaded(true);
+      setEmailLoaded(true);
     }
-    loadSmtp();
+    loadEmailSettings();
   }, []);
+
   useEffect(() => { if (!siteName.isLoading) setLocalName(siteName.value); }, [siteName.value, siteName.isLoading]);
   useEffect(() => { if (!siteDescription.isLoading) setLocalDesc(siteDescription.value); }, [siteDescription.value, siteDescription.isLoading]);
   useEffect(() => { if (!contactEmail.isLoading) setLocalEmail(contactEmail.value); }, [contactEmail.value, contactEmail.isLoading]);
   useEffect(() => { if (!chatgptApiKey.isLoading) setLocalChatgptKey(chatgptApiKey.value); }, [chatgptApiKey.value, chatgptApiKey.isLoading]);
   useEffect(() => { if (!elevenlabsApiKey.isLoading) setLocalElevenlabsKey(elevenlabsApiKey.value); }, [elevenlabsApiKey.value, elevenlabsApiKey.isLoading]);
 
-  const handleSaveSmtp = async () => {
-    setSmtpLoading(true);
+  const handleSaveEmail = async () => {
+    setEmailSaving(true);
     try {
       const { error } = await supabase.functions.invoke("send-notification", {
         body: {
           action: "save_smtp",
           data: {
-            host: smtp.host,
-            port: parseInt(smtp.port) || 587,
-            username: smtp.username,
-            password: smtp.password || undefined,
-            encryption: smtp.encryption,
-            from_name: smtp.from_name,
-            from_email: smtp.from_email,
-            reply_to: smtp.reply_to,
+            from_name: emailSettings.from_name,
+            from_email: emailSettings.from_email,
+            reply_to: emailSettings.reply_to,
           },
         },
       });
       if (error) throw error;
-      toast({ title: "SMTP settings saved" });
-      setSmtp((s) => ({ ...s, password: "" }));
+      toast({ title: "Email settings saved" });
     } catch {
-      toast({ title: "Failed to save SMTP settings", variant: "destructive" });
+      toast({ title: "Failed to save email settings", variant: "destructive" });
     } finally {
-      setSmtpLoading(false);
+      setEmailSaving(false);
     }
   };
 
-  const handleTestSmtp = async () => {
-    setSmtpTestLoading(true);
+  const handleTestEmail = async () => {
+    setEmailTestLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("send-notification", {
         body: { action: "test_smtp", data: {} },
       });
       if (error) throw error;
-      setSmtpVerified(true);
-      toast({ title: "SMTP test successful", description: "A test email was sent." });
+      setEmailVerified(true);
+      toast({ title: "Test email sent!", description: "Check your inbox at support@buzzweave.com" });
     } catch (e: any) {
-      setSmtpVerified(false);
-      toast({ title: "SMTP test failed", description: e.message || "Check your settings.", variant: "destructive" });
+      setEmailVerified(false);
+      toast({ title: "Email test failed", description: e.message || "Check your Resend configuration.", variant: "destructive" });
     } finally {
-      setSmtpTestLoading(false);
+      setEmailTestLoading(false);
     }
   };
 
@@ -352,75 +340,50 @@ export default function AdminSettings() {
         </CardContent>
       </Card>
 
-      {/* Email / SMTP Settings */}
+      {/* Email / Resend Settings */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Mail className="h-4 w-4 text-primary" />
-            Email Settings (SMTP)
+            Email Settings (Resend)
           </CardTitle>
-          <CardDescription>Configure outgoing email for notifications</CardDescription>
+          <CardDescription>Configure outgoing email via Resend</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {smtpLoaded && (
+          {emailLoaded && (
             <>
               <div className="flex items-center gap-2 mb-2">
-                {smtpVerified ? (
-                  <span className="text-xs text-primary flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Configured & Verified</span>
-                ) : smtp.host ? (
-                  <span className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3.5 w-3.5" /> Not verified — run test</span>
+                {emailVerified ? (
+                  <span className="text-xs text-primary flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Connected & Verified</span>
                 ) : (
-                  <span className="text-xs text-muted-foreground">Not configured</span>
+                  <span className="text-xs text-muted-foreground flex items-center gap-1"><AlertCircle className="h-3.5 w-3.5" /> Not verified — send a test email</span>
                 )}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>SMTP Host</Label>
-                  <Input value={smtp.host} onChange={(e) => setSmtp((s) => ({ ...s, host: e.target.value }))} placeholder="smtp.gmail.com" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Port</Label>
-                  <Input value={smtp.port} onChange={(e) => setSmtp((s) => ({ ...s, port: e.target.value }))} placeholder="587" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Username</Label>
-                  <Input value={smtp.username} onChange={(e) => setSmtp((s) => ({ ...s, username: e.target.value }))} placeholder="user@example.com" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Password</Label>
-                  <Input type="password" value={smtp.password} onChange={(e) => setSmtp((s) => ({ ...s, password: e.target.value }))} placeholder={smtp.host ? "••••••••" : "Enter password"} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Encryption</Label>
-                  <Select value={smtp.encryption} onValueChange={(v) => setSmtp((s) => ({ ...s, encryption: v }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="tls">TLS</SelectItem>
-                      <SelectItem value="ssl">SSL</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
                   <Label>From Name</Label>
-                  <Input value={smtp.from_name} onChange={(e) => setSmtp((s) => ({ ...s, from_name: e.target.value }))} placeholder="The Island of One" />
+                  <Input value={emailSettings.from_name} onChange={(e) => setEmailSettings((s) => ({ ...s, from_name: e.target.value }))} placeholder="The Island of One" />
                 </div>
                 <div className="space-y-2">
                   <Label>From Email</Label>
-                  <Input value={smtp.from_email} onChange={(e) => setSmtp((s) => ({ ...s, from_email: e.target.value }))} placeholder="noreply@example.com" />
+                  <Input value={emailSettings.from_email} onChange={(e) => setEmailSettings((s) => ({ ...s, from_email: e.target.value }))} placeholder="noreply@yourdomain.com" />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 md:col-span-2">
                   <Label>Reply-To Email</Label>
-                  <Input value={smtp.reply_to} onChange={(e) => setSmtp((s) => ({ ...s, reply_to: e.target.value }))} placeholder="support@buzzweeve.com" />
+                  <Input value={emailSettings.reply_to} onChange={(e) => setEmailSettings((s) => ({ ...s, reply_to: e.target.value }))} placeholder="support@buzzweave.com" />
                 </div>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Note: Your sending domain must be verified in Resend. Until then, use <code className="text-xs">onboarding@resend.dev</code> as the From Email.
+              </p>
               <div className="flex gap-3 pt-2">
-                <Button onClick={handleSaveSmtp} disabled={smtpLoading} size="sm">
-                  {smtpLoading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
-                  Save SMTP
+                <Button onClick={handleSaveEmail} disabled={emailSaving} size="sm">
+                  {emailSaving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+                  Save Email Settings
                 </Button>
-                <Button onClick={handleTestSmtp} disabled={smtpTestLoading || !smtp.host} variant="outline" size="sm">
-                  {smtpTestLoading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Mail className="h-4 w-4 mr-1" />}
-                  Test SMTP
+                <Button onClick={handleTestEmail} disabled={emailTestLoading} variant="outline" size="sm">
+                  {emailTestLoading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Mail className="h-4 w-4 mr-1" />}
+                  Send Test Email
                 </Button>
               </div>
             </>
