@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Mic, Send, CheckCircle, Loader2, Phone } from "lucide-react";
 import { speakingTopics } from "@/data/content";
-import { api } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
 
@@ -11,6 +11,10 @@ const speakingRequestSchema = z.object({
   organization: z.string().trim().max(200, "Organization must be under 200 characters").optional().nullable(),
   event_name: z.string().trim().min(1, "Event type is required").max(200, "Event type must be under 200 characters"),
   event_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format"),
+  phone: z.string().trim().max(30).optional().nullable(),
+  event_location: z.string().trim().max(300).optional().nullable(),
+  expected_attendance: z.string().trim().max(100).optional().nullable(),
+  budget: z.string().trim().max(200).optional().nullable(),
   message: z.string().trim().max(2000, "Message must be under 2000 characters").optional().nullable(),
 });
 
@@ -25,6 +29,13 @@ export default function Speaking() {
     const form = e.currentTarget;
     const formData = new FormData(form);
 
+    // Honeypot check
+    if (formData.get("website")) {
+      setLoading(false);
+      setSubmitted(true);
+      return;
+    }
+
     try {
       const validated = speakingRequestSchema.parse({
         name: formData.get("name"),
@@ -32,10 +43,21 @@ export default function Speaking() {
         organization: (formData.get("organization") as string) || null,
         event_name: (formData.get("event_type") as string) || "Event",
         event_date: formData.get("event_date"),
+        phone: (formData.get("phone") as string) || null,
+        event_location: (formData.get("event_location") as string) || null,
+        expected_attendance: (formData.get("expected_attendance") as string) || null,
+        budget: (formData.get("budget") as string) || null,
         message: (formData.get("message") as string) || null,
       });
 
-      await api.post("/api/speaking-requests", validated);
+      const { error } = await supabase.functions.invoke("send-notification", {
+        body: {
+          type: "speaker_request",
+          data: validated,
+        },
+      });
+
+      if (error) throw error;
 
       setLoading(false);
       setSubmitted(true);
@@ -94,6 +116,11 @@ export default function Speaking() {
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-5">
+                {/* Honeypot */}
+                <div className="absolute -left-[9999px]" aria-hidden="true">
+                  <input type="text" name="website" tabIndex={-1} autoComplete="off" />
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
                     <label className="block text-sm font-medium mb-1.5 text-foreground">Your Name *</label>
@@ -109,23 +136,39 @@ export default function Speaking() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1.5 text-foreground">Phone</label>
-                    <input type="tel" className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                    <input name="phone" type="tel" maxLength={30} className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5 text-foreground">Event Type</label>
+                    <select name="event_type" className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
+                      <option>Church Service</option>
+                      <option>Conference</option>
+                      <option>Leadership Summit</option>
+                      <option>Men's / Women's Retreat</option>
+                      <option>Youth Event</option>
+                      <option>Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5 text-foreground">Event Date (Approximate) *</label>
+                    <input required name="event_date" type="date" className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5 text-foreground">Event Location</label>
+                    <input name="event_location" type="text" maxLength={300} placeholder="City, State" className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5 text-foreground">Expected Attendance</label>
+                    <input name="expected_attendance" type="text" maxLength={100} placeholder="e.g., 50-100" className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1.5 text-foreground">Event Type</label>
-                  <select name="event_type" className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
-                    <option>Church Service</option>
-                    <option>Conference</option>
-                    <option>Leadership Summit</option>
-                    <option>Men's / Women's Retreat</option>
-                    <option>Youth Event</option>
-                    <option>Other</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1.5 text-foreground">Event Date (Approximate) *</label>
-                  <input required name="event_date" type="date" className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                  <label className="block text-sm font-medium mb-1.5 text-foreground">Budget / Honorarium (Optional)</label>
+                  <input name="budget" type="text" maxLength={200} placeholder="e.g., $500 or negotiable" className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1.5 text-foreground">Tell us about your event *</label>

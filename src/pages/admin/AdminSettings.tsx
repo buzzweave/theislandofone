@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { Save, Globe, Bell, Shield, CheckCircle2, Cloud, Bot, Headphones, Trash2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Save, Globe, Bell, Shield, CheckCircle2, Cloud, Bot, Headphones, Trash2, Mail, Loader2, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function AdminSettings() {
   const { toast } = useToast();
@@ -35,11 +37,87 @@ export default function AdminSettings() {
   const [localChatgptKey, setLocalChatgptKey] = useState("");
   const [localElevenlabsKey, setLocalElevenlabsKey] = useState("");
 
+  // SMTP state
+  const [smtp, setSmtp] = useState({
+    host: "", port: "587", username: "", password: "",
+    encryption: "tls", from_name: "", from_email: "", reply_to: "",
+  });
+  const [smtpVerified, setSmtpVerified] = useState(false);
+  const [smtpLoading, setSmtpLoading] = useState(false);
+  const [smtpTestLoading, setSmtpTestLoading] = useState(false);
+  const [smtpLoaded, setSmtpLoaded] = useState(false);
+
+  // Load SMTP settings
+  useEffect(() => {
+    async function loadSmtp() {
+      const { data } = await supabase.from("smtp_settings").select("*").limit(1).single();
+      if (data) {
+        setSmtp({
+          host: data.host || "",
+          port: String(data.port || 587),
+          username: data.username || "",
+          password: "", // never sent back
+          encryption: data.encryption || "tls",
+          from_name: data.from_name || "",
+          from_email: data.from_email || "",
+          reply_to: data.reply_to || "",
+        });
+        setSmtpVerified(data.is_verified || false);
+      }
+      setSmtpLoaded(true);
+    }
+    loadSmtp();
+  }, []);
   useEffect(() => { if (!siteName.isLoading) setLocalName(siteName.value); }, [siteName.value, siteName.isLoading]);
   useEffect(() => { if (!siteDescription.isLoading) setLocalDesc(siteDescription.value); }, [siteDescription.value, siteDescription.isLoading]);
   useEffect(() => { if (!contactEmail.isLoading) setLocalEmail(contactEmail.value); }, [contactEmail.value, contactEmail.isLoading]);
   useEffect(() => { if (!chatgptApiKey.isLoading) setLocalChatgptKey(chatgptApiKey.value); }, [chatgptApiKey.value, chatgptApiKey.isLoading]);
   useEffect(() => { if (!elevenlabsApiKey.isLoading) setLocalElevenlabsKey(elevenlabsApiKey.value); }, [elevenlabsApiKey.value, elevenlabsApiKey.isLoading]);
+
+  const handleSaveSmtp = async () => {
+    setSmtpLoading(true);
+    try {
+      const { error } = await supabase.functions.invoke("send-notification", {
+        body: {
+          action: "save_smtp",
+          data: {
+            host: smtp.host,
+            port: parseInt(smtp.port) || 587,
+            username: smtp.username,
+            password: smtp.password || undefined,
+            encryption: smtp.encryption,
+            from_name: smtp.from_name,
+            from_email: smtp.from_email,
+            reply_to: smtp.reply_to,
+          },
+        },
+      });
+      if (error) throw error;
+      toast({ title: "SMTP settings saved" });
+      setSmtp((s) => ({ ...s, password: "" }));
+    } catch {
+      toast({ title: "Failed to save SMTP settings", variant: "destructive" });
+    } finally {
+      setSmtpLoading(false);
+    }
+  };
+
+  const handleTestSmtp = async () => {
+    setSmtpTestLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-notification", {
+        body: { action: "test_smtp", data: {} },
+      });
+      if (error) throw error;
+      setSmtpVerified(true);
+      toast({ title: "SMTP test successful", description: "A test email was sent." });
+    } catch (e: any) {
+      setSmtpVerified(false);
+      toast({ title: "SMTP test failed", description: e.message || "Check your settings.", variant: "destructive" });
+    } finally {
+      setSmtpTestLoading(false);
+    }
+  };
 
   const handleSave = async () => {
     try {
@@ -274,7 +352,82 @@ export default function AdminSettings() {
         </CardContent>
       </Card>
 
-      {/* Clear Cache */}
+      {/* Email / SMTP Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Mail className="h-4 w-4 text-primary" />
+            Email Settings (SMTP)
+          </CardTitle>
+          <CardDescription>Configure outgoing email for notifications</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {smtpLoaded && (
+            <>
+              <div className="flex items-center gap-2 mb-2">
+                {smtpVerified ? (
+                  <span className="text-xs text-primary flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Configured & Verified</span>
+                ) : smtp.host ? (
+                  <span className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3.5 w-3.5" /> Not verified — run test</span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Not configured</span>
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>SMTP Host</Label>
+                  <Input value={smtp.host} onChange={(e) => setSmtp((s) => ({ ...s, host: e.target.value }))} placeholder="smtp.gmail.com" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Port</Label>
+                  <Input value={smtp.port} onChange={(e) => setSmtp((s) => ({ ...s, port: e.target.value }))} placeholder="587" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Username</Label>
+                  <Input value={smtp.username} onChange={(e) => setSmtp((s) => ({ ...s, username: e.target.value }))} placeholder="user@example.com" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Password</Label>
+                  <Input type="password" value={smtp.password} onChange={(e) => setSmtp((s) => ({ ...s, password: e.target.value }))} placeholder={smtp.host ? "••••••••" : "Enter password"} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Encryption</Label>
+                  <Select value={smtp.encryption} onValueChange={(v) => setSmtp((s) => ({ ...s, encryption: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="tls">TLS</SelectItem>
+                      <SelectItem value="ssl">SSL</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>From Name</Label>
+                  <Input value={smtp.from_name} onChange={(e) => setSmtp((s) => ({ ...s, from_name: e.target.value }))} placeholder="The Island of One" />
+                </div>
+                <div className="space-y-2">
+                  <Label>From Email</Label>
+                  <Input value={smtp.from_email} onChange={(e) => setSmtp((s) => ({ ...s, from_email: e.target.value }))} placeholder="noreply@example.com" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Reply-To Email</Label>
+                  <Input value={smtp.reply_to} onChange={(e) => setSmtp((s) => ({ ...s, reply_to: e.target.value }))} placeholder="support@buzzweeve.com" />
+                </div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <Button onClick={handleSaveSmtp} disabled={smtpLoading} size="sm">
+                  {smtpLoading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+                  Save SMTP
+                </Button>
+                <Button onClick={handleTestSmtp} disabled={smtpTestLoading || !smtp.host} variant="outline" size="sm">
+                  {smtpTestLoading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Mail className="h-4 w-4 mr-1" />}
+                  Test SMTP
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">

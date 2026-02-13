@@ -1,0 +1,410 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
+// Simple in-memory rate limit (per cold start)
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT = 3;
+const RATE_WINDOW = 5 * 60 * 1000; // 5 minutes
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW });
+    return true;
+  }
+  if (entry.count >= RATE_LIMIT) return false;
+  entry.count++;
+  return true;
+}
+
+function validateContact(data: any) {
+  if (!data.name || typeof data.name !== "string" || data.name.length > 100) throw new Error("Invalid name");
+  if (!data.email || typeof data.email !== "string" || data.email.length > 255) throw new Error("Invalid email");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) throw new Error("Invalid email format");
+  if (data.phone && (typeof data.phone !== "string" || data.phone.length > 30)) throw new Error("Invalid phone");
+  if (!data.message || typeof data.message !== "string" || data.message.length > 2000) throw new Error("Invalid message");
+  if (data.page_url && (typeof data.page_url !== "string" || data.page_url.length > 500)) throw new Error("Invalid page_url");
+}
+
+function validateSpeakerRequest(data: any) {
+  if (!data.name || typeof data.name !== "string" || data.name.length > 100) throw new Error("Invalid name");
+  if (!data.email || typeof data.email !== "string" || data.email.length > 255) throw new Error("Invalid email");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) throw new Error("Invalid email format");
+  if (!data.event_name || typeof data.event_name !== "string" || data.event_name.length > 200) throw new Error("Invalid event_name");
+  if (!data.event_date || !/^\d{4}-\d{2}-\d{2}$/.test(data.event_date)) throw new Error("Invalid event_date");
+  if (data.message && (typeof data.message !== "string" || data.message.length > 2000)) throw new Error("Invalid message");
+}
+
+// AES-256-CBC encrypt/decrypt using Web Crypto API
+async function decryptPassword(encrypted: string, key: string): Promise<string> {
+  if (!encrypted) return "";
+  try {
+    const [ivHex, dataHex] = encrypted.split(":");
+    const iv = new Uint8Array(ivHex.match(/.{2}/g)!.map((b: string) => parseInt(b, 16)));
+    const data = new Uint8Array(dataHex.match(/.{2}/g)!.map((b: string) => parseInt(b, 16)));
+    const keyData = new TextEncoder().encode(key.slice(0, 32).padEnd(32, "0"));
+    const cryptoKey = await crypto.subtle.importKey("raw", keyData, "AES-CBC", false, ["decrypt"]);
+    const decrypted = await crypto.subtle.decrypt({ name: "AES-CBC", iv }, cryptoKey, data);
+    return new TextDecoder().decode(decrypted);
+  } catch {
+    return "";
+  }
+}
+
+async function encryptPassword(plaintext: string, key: string): Promise<string> {
+  if (!plaintext) return "";
+  const iv = crypto.getRandomValues(new Uint8Array(16));
+  const keyData = new TextEncoder().encode(key.slice(0, 32).padEnd(32, "0"));
+  const cryptoKey = await crypto.subtle.importKey("raw", keyData, "AES-CBC", false, ["encrypt"]);
+  const encrypted = await crypto.subtle.encrypt({ name: "AES-CBC", iv }, cryptoKey, new TextEncoder().encode(plaintext));
+  const ivHex = Array.from(iv).map((b) => b.toString(16).padStart(2, "0")).join("");
+  const dataHex = Array.from(new Uint8Array(encrypted)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  return `${ivHex}:${dataHex}`;
+}
+
+// Raw SMTP send via Deno TCP
+async function sendSmtpEmail(smtp: any, password: string, to: string, subject: string, body: string, replyTo: string) {
+  const conn = smtp.encryption === "ssl"
+    ? await Deno.connectTls({ hostname: smtp.host, port: smtp.port })
+    : await Deno.connect({ hostname: smtp.host, port: smtp.port });
+
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+
+  async function read(): Promise<string> {
+    const buf = new Uint8Array(4096);
+    const n = await conn.read(buf);
+    return n ? decoder.decode(buf.subarray(0, n)) : "";
+  }
+
+  async function write(cmd: string) {
+    await conn.write(encoder.encode(cmd + "\r\n"));
+  }
+
+  async function writeAndRead(cmd: string): Promise<string> {
+    await write(cmd);
+    return await read();
+  }
+
+  try {
+    await read(); // greeting
+
+    let response = await writeAndRead(`EHLO localhost`);
+
+    // STARTTLS for TLS mode
+    if (smtp.encryption === "tls" && response.includes("STARTTLS")) {
+      await writeAndRead("STARTTLS");
+      const tlsConn = await Deno.startTls(conn as Deno.TcpConn, { hostname: smtp.host });
+      // Re-assign read/write to TLS connection
+      const tlsRead = async (): Promise<string> => {
+        const buf = new Uint8Array(4096);
+        const n = await tlsConn.read(buf);
+        return n ? decoder.decode(buf.subarray(0, n)) : "";
+      };
+      const tlsWrite = async (cmd: string) => {
+        await tlsConn.write(encoder.encode(cmd + "\r\n"));
+      };
+      const tlsWriteAndRead = async (cmd: string): Promise<string> => {
+        await tlsWrite(cmd);
+        return await tlsRead();
+      };
+
+      await tlsWriteAndRead("EHLO localhost");
+
+      // AUTH LOGIN
+      await tlsWriteAndRead("AUTH LOGIN");
+      await tlsWriteAndRead(btoa(smtp.username));
+      const authResult = await tlsWriteAndRead(btoa(password));
+      if (!authResult.startsWith("235")) throw new Error("SMTP auth failed: " + authResult);
+
+      await tlsWriteAndRead(`MAIL FROM:<${smtp.from_email}>`);
+      await tlsWriteAndRead(`RCPT TO:<${to}>`);
+      await tlsWriteAndRead("DATA");
+
+      const emailContent = [
+        `From: ${smtp.from_name} <${smtp.from_email}>`,
+        `To: ${to}`,
+        `Reply-To: ${replyTo}`,
+        `Subject: ${subject}`,
+        `MIME-Version: 1.0`,
+        `Content-Type: text/html; charset=utf-8`,
+        `Date: ${new Date().toUTCString()}`,
+        ``,
+        body,
+        `.`,
+      ].join("\r\n");
+
+      const sendResult = await tlsWriteAndRead(emailContent);
+      await tlsWrite("QUIT");
+      tlsConn.close();
+
+      if (!sendResult.startsWith("250")) throw new Error("SMTP send failed: " + sendResult);
+      return;
+    }
+
+    // AUTH LOGIN (no TLS)
+    await writeAndRead("AUTH LOGIN");
+    await writeAndRead(btoa(smtp.username));
+    const authResult = await writeAndRead(btoa(password));
+    if (!authResult.startsWith("235")) throw new Error("SMTP auth failed: " + authResult);
+
+    await writeAndRead(`MAIL FROM:<${smtp.from_email}>`);
+    await writeAndRead(`RCPT TO:<${to}>`);
+    await writeAndRead("DATA");
+
+    const emailContent = [
+      `From: ${smtp.from_name} <${smtp.from_email}>`,
+      `To: ${to}`,
+      `Reply-To: ${replyTo}`,
+      `Subject: ${subject}`,
+      `MIME-Version: 1.0`,
+      `Content-Type: text/html; charset=utf-8`,
+      `Date: ${new Date().toUTCString()}`,
+      ``,
+      body,
+      `.`,
+    ].join("\r\n");
+
+    const sendResult = await writeAndRead(emailContent);
+    await write("QUIT");
+    conn.close();
+
+    if (!sendResult.startsWith("250")) throw new Error("SMTP send failed: " + sendResult);
+  } catch (e) {
+    try { conn.close(); } catch {}
+    throw e;
+  }
+}
+
+function formatContactEmail(data: any): string {
+  return `
+    <h2>New Contact Form Submission</h2>
+    <table style="border-collapse:collapse;width:100%">
+      <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Name</td><td style="padding:8px;border:1px solid #ddd">${data.name}</td></tr>
+      <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Email</td><td style="padding:8px;border:1px solid #ddd">${data.email}</td></tr>
+      <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Phone</td><td style="padding:8px;border:1px solid #ddd">${data.phone || "N/A"}</td></tr>
+      <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Message</td><td style="padding:8px;border:1px solid #ddd">${data.message}</td></tr>
+      <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Page URL</td><td style="padding:8px;border:1px solid #ddd">${data.page_url || "N/A"}</td></tr>
+      <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Timestamp</td><td style="padding:8px;border:1px solid #ddd">${new Date().toISOString()}</td></tr>
+    </table>
+  `;
+}
+
+function formatSpeakerEmail(data: any): string {
+  return `
+    <h2>New Speaker Request</h2>
+    <table style="border-collapse:collapse;width:100%">
+      <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Name</td><td style="padding:8px;border:1px solid #ddd">${data.name}</td></tr>
+      <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Organization</td><td style="padding:8px;border:1px solid #ddd">${data.organization || "N/A"}</td></tr>
+      <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Email</td><td style="padding:8px;border:1px solid #ddd">${data.email}</td></tr>
+      <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Phone</td><td style="padding:8px;border:1px solid #ddd">${data.phone || "N/A"}</td></tr>
+      <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Event</td><td style="padding:8px;border:1px solid #ddd">${data.event_name}</td></tr>
+      <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Event Date</td><td style="padding:8px;border:1px solid #ddd">${data.event_date}</td></tr>
+      <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Location</td><td style="padding:8px;border:1px solid #ddd">${data.event_location || "N/A"}</td></tr>
+      <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Expected Attendance</td><td style="padding:8px;border:1px solid #ddd">${data.expected_attendance || "N/A"}</td></tr>
+      <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Budget/Honorarium</td><td style="padding:8px;border:1px solid #ddd">${data.budget || "N/A"}</td></tr>
+      <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Message</td><td style="padding:8px;border:1px solid #ddd">${data.message || "N/A"}</td></tr>
+      <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Timestamp</td><td style="padding:8px;border:1px solid #ddd">${new Date().toISOString()}</td></tr>
+    </table>
+  `;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    if (!checkRateLimit(ip)) {
+      return new Response(JSON.stringify({ error: "Too many requests. Try again later." }), {
+        status: 429,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { type, data, action } = await req.json();
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    // Handle SMTP settings save (admin action)
+    if (action === "save_smtp") {
+      const encrypted = data.password ? await encryptPassword(data.password, serviceRoleKey) : undefined;
+      
+      const { data: existing } = await supabase.from("smtp_settings").select("id").limit(1).single();
+      
+      const smtpData: any = {
+        host: data.host,
+        port: data.port,
+        username: data.username,
+        encryption: data.encryption,
+        from_name: data.from_name,
+        from_email: data.from_email,
+        reply_to: data.reply_to,
+      };
+      if (encrypted) smtpData.encrypted_password = encrypted;
+      
+      if (existing) {
+        await supabase.from("smtp_settings").update(smtpData).eq("id", existing.id);
+      } else {
+        if (encrypted) smtpData.encrypted_password = encrypted;
+        await supabase.from("smtp_settings").insert(smtpData);
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Handle SMTP test
+    if (action === "test_smtp") {
+      const { data: smtp } = await supabase.from("smtp_settings").select("*").limit(1).single();
+      if (!smtp || !smtp.host) {
+        return new Response(JSON.stringify({ error: "SMTP not configured" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const password = await decryptPassword(smtp.encrypted_password, serviceRoleKey);
+      try {
+        await sendSmtpEmail(
+          smtp, password,
+          data.to || smtp.from_email,
+          "SMTP Test - The Island of One",
+          "<h2>SMTP Test Successful</h2><p>Your email settings are configured correctly.</p>",
+          smtp.reply_to || smtp.from_email
+        );
+
+        await supabase.from("smtp_settings").update({ is_verified: true }).eq("id", smtp.id);
+
+        // Create success notification
+        await supabase.from("notifications").insert({
+          type: "smtp_test",
+          title: "SMTP Test Successful",
+          preview: "Email configuration is working correctly.",
+        });
+
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (e) {
+        await supabase.from("smtp_settings").update({ is_verified: false }).eq("id", smtp.id);
+
+        await supabase.from("notifications").insert({
+          type: "smtp_test",
+          title: "SMTP Test Failed",
+          preview: e.message?.slice(0, 100) || "Unknown error",
+        });
+
+        return new Response(JSON.stringify({ error: "SMTP test failed: " + e.message }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // Honeypot check
+    if (data.website) {
+      // Silently accept but don't process (spam bot)
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    let notificationTitle = "";
+    let notificationPreview = "";
+    let emailSubject = "";
+    let emailBody = "";
+    let replyTo = data.email || "";
+
+    if (type === "contact") {
+      validateContact(data);
+
+      // Save to contact_submissions
+      const { error } = await supabase.from("contact_submissions").insert({
+        name: data.name.trim(),
+        email: data.email.trim(),
+        phone: data.phone?.trim() || "",
+        message: data.message.trim(),
+        page_url: data.page_url?.trim() || "",
+      });
+      if (error) throw new Error("Failed to save submission: " + error.message);
+
+      notificationTitle = "New Contact Submission";
+      notificationPreview = `${data.name} — ${data.message.slice(0, 80)}`;
+      emailSubject = "New Contact Form Submission";
+      emailBody = formatContactEmail(data);
+
+    } else if (type === "speaker_request") {
+      validateSpeakerRequest(data);
+
+      const { error } = await supabase.from("speaking_requests").insert({
+        name: data.name.trim(),
+        email: data.email.trim(),
+        phone: data.phone?.trim() || "",
+        organization: data.organization?.trim() || null,
+        event_name: data.event_name.trim(),
+        event_date: data.event_date,
+        event_location: data.event_location?.trim() || null,
+        expected_attendance: data.expected_attendance?.trim() || "",
+        budget: data.budget?.trim() || "",
+        message: data.message?.trim() || null,
+      });
+      if (error) throw new Error("Failed to save request: " + error.message);
+
+      notificationTitle = "New Speaker Request";
+      notificationPreview = `${data.name} — ${data.event_name} on ${data.event_date}`;
+      emailSubject = "New Speaker Request";
+      emailBody = formatSpeakerEmail(data);
+
+    } else {
+      return new Response(JSON.stringify({ error: "Invalid type" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Try to send email via SMTP
+    let emailQueued = false;
+    const { data: smtp } = await supabase.from("smtp_settings").select("*").limit(1).single();
+
+    if (smtp?.host && smtp?.is_verified) {
+      try {
+        const password = await decryptPassword(smtp.encrypted_password, serviceRoleKey);
+        await sendSmtpEmail(smtp, password, "support@buzzweave.com", emailSubject, emailBody, replyTo);
+      } catch {
+        emailQueued = true;
+      }
+    } else {
+      emailQueued = true;
+    }
+
+    // Create in-app notification
+    await supabase.from("notifications").insert({
+      type,
+      title: notificationTitle,
+      preview: notificationPreview,
+      data: data,
+      email_queued: emailQueued,
+    });
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
+  } catch (e) {
+    return new Response(JSON.stringify({ error: e.message || "Internal error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});

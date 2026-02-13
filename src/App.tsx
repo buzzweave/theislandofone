@@ -36,10 +36,12 @@ import AdminAudiobooks from "./pages/admin/AdminAudiobooks";
 import SermonDetail from "./pages/SermonDetail";
 import Blog from "./pages/Blog";
 import BlogPost from "./pages/BlogPost";
+import Contact from "./pages/Contact";
 import NotFound from "./pages/NotFound";
 import Copyright from "./pages/Copyright";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import AdminNotifications from "./pages/admin/AdminNotifications";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -73,6 +75,7 @@ const App = () => (
             <Route path="/about" element={<Layout><About /></Layout>} />
             <Route path="/speaking" element={<Layout><Speaking /></Layout>} />
             <Route path="/membership" element={<Layout><Membership /></Layout>} />
+            <Route path="/contact" element={<Layout><Contact /></Layout>} />
             <Route path="/copyright" element={<Layout><Copyright /></Layout>} />
             <Route path="/terms" element={<Layout><TermsOfService /></Layout>} />
             <Route path="/privacy" element={<Layout><PrivacyPolicy /></Layout>} />
@@ -96,6 +99,7 @@ const App = () => (
               <Route path="audiobooks" element={<AdminAudiobooks />} />
               <Route path="blog" element={<AdminBlogManager />} />
               <Route path="publisher" element={<AdminPublisher />} />
+              <Route path="notifications" element={<AdminNotifications />} />
               <Route path="settings" element={<AdminSettings />} />
             </Route>
 

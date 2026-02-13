@@ -240,6 +240,45 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_submissions: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          email: string
+          id: string
+          message: string
+          name: string
+          page_url: string | null
+          phone: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          message?: string
+          name: string
+          page_url?: string | null
+          phone?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          message?: string
+          name?: string
+          page_url?: string | null
+          phone?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       graphics: {
         Row: {
           category: string
@@ -357,6 +396,39 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          created_at: string
+          data: Json | null
+          email_queued: boolean
+          id: string
+          is_read: boolean
+          preview: string
+          title: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json | null
+          email_queued?: boolean
+          id?: string
+          is_read?: boolean
+          preview?: string
+          title?: string
+          type?: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json | null
+          email_queued?: boolean
+          id?: string
+          is_read?: boolean
+          preview?: string
+          title?: string
+          type?: string
+        }
+        Relationships: []
+      }
       sermons: {
         Row: {
           access_level: string
@@ -432,48 +504,102 @@ export type Database = {
         }
         Relationships: []
       }
+      smtp_settings: {
+        Row: {
+          created_at: string
+          encrypted_password: string
+          encryption: string
+          from_email: string
+          from_name: string
+          host: string
+          id: string
+          is_verified: boolean
+          port: number
+          reply_to: string
+          updated_at: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          encrypted_password?: string
+          encryption?: string
+          from_email?: string
+          from_name?: string
+          host?: string
+          id?: string
+          is_verified?: boolean
+          port?: number
+          reply_to?: string
+          updated_at?: string
+          username?: string
+        }
+        Update: {
+          created_at?: string
+          encrypted_password?: string
+          encryption?: string
+          from_email?: string
+          from_name?: string
+          host?: string
+          id?: string
+          is_verified?: boolean
+          port?: number
+          reply_to?: string
+          updated_at?: string
+          username?: string
+        }
+        Relationships: []
+      }
       speaking_requests: {
         Row: {
           admin_notes: string | null
+          budget: string | null
           created_at: string
           email: string
           event_date: string
           event_location: string | null
           event_name: string
+          expected_attendance: string | null
           id: string
           message: string | null
           name: string
           organization: string | null
+          phone: string | null
           status: string
           topic: string | null
           updated_at: string
         }
         Insert: {
           admin_notes?: string | null
+          budget?: string | null
           created_at?: string
           email: string
           event_date: string
           event_location?: string | null
           event_name: string
+          expected_attendance?: string | null
           id?: string
           message?: string | null
           name: string
           organization?: string | null
+          phone?: string | null
           status?: string
           topic?: string | null
           updated_at?: string
         }
         Update: {
           admin_notes?: string | null
+          budget?: string | null
           created_at?: string
           email?: string
           event_date?: string
           event_location?: string | null
           event_name?: string
+          expected_attendance?: string | null
           id?: string
           message?: string | null
           name?: string
           organization?: string | null
+          phone?: string | null
           status?: string
           topic?: string | null
           updated_at?: string

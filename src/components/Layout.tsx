@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Menu, X, BookOpen } from "lucide-react";
 import { useSiteLogo } from "@/hooks/useSiteLogo";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import InstallPrompt from "@/components/InstallPrompt";
 
 const navLinks = [
   { to: "/", label: "Home" },
@@ -12,6 +13,7 @@ const navLinks = [
   { to: "/graphics", label: "Graphics" },
   { to: "/speaking", label: "Speaking" },
   { to: "/blog", label: "Blog" },
+  { to: "/contact", label: "Contact" },
   { to: "/about", label: "About" },
 ];
 
@@ -63,6 +65,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 {link.label}
               </Link>
             ))}
+            <InstallPrompt />
             <Link
               to="/membership"
               className="px-5 py-2 text-sm font-semibold rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
