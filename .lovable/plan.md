@@ -1,40 +1,49 @@
 
 
-# Remove Budget/Attendance Fields & Add Reply Email to Speaker Request Form
+# Update Speaker Request Form
 
 ## Changes
 
 ### 1. `src/pages/Speaking.tsx`
 
-**Schema (lines 8-19):**
-- Remove `expected_attendance` and `budget` from the Zod schema
+**Remove from Zod schema:**
+- `expected_attendance`
+- `budget`
 
-**handleSubmit (around lines 48-55):**
-- Stop sending `expected_attendance` and `budget` values
+**Remove from form UI:**
+- "Expected Attendance" input
+- "Budget / Honorarium" input
 
-**Form UI:**
-- Remove the "Expected Attendance" input field
-- Remove the "Budget / Honorarium" input field
-- The form grid will naturally reflow with the remaining fields
+**Keep all other fields** -- Name, Email, Organization, Phone, Event Type, Event Date, Event Location, and Message ("Tell us about your event").
+
+**Update handleSubmit** to stop sending `expected_attendance` and `budget`.
 
 ### 2. `supabase/functions/send-notification/index.ts`
 
-**formatSpeakerEmail function:**
-- Remove the "Expected Attendance" row from the HTML email table
-- Remove the "Budget/Honorarium" row from the HTML email table
+**Remove from `formatSpeakerEmail`:**
+- "Expected Attendance" row
+- "Budget/Honorarium" row
 
-**Insert logic (around line 168):**
-- Stop inserting `expected_attendance` and `budget` into the `speaking_requests` table (columns stay in DB, they'll just be empty)
+**Remove from insert logic (around line 168):**
+- Stop inserting `expected_attendance` and `budget` into `speaking_requests` table
 
-### 3. Add Admin Reply Email
+**Verify all remaining fields transmit correctly in the notification email:**
+- Name
+- Organization
+- Email
+- Phone
+- Event Type
+- Event Date
+- Event Location
+- Message
 
-No additional "reply email" field is needed on the form -- the user already provides their email address. The `send-notification` edge function already sets the submitter's email as the `Reply-To` header on the outgoing notification email, so when the admin receives the email and hits "Reply", it goes directly to the person who submitted the form. This is already working.
+The Reply-To header is already set to the submitter's email, so the admin can reply directly.
 
-### 4. Test the Form
+### 3. Test
 
-After implementing, I will navigate to the Speaking page and submit a test request to verify the form sends successfully and the edge function processes it without errors.
+After changes, navigate to the Speaking page and submit a test request to confirm the form sends and notification is created with all fields present.
 
-## No Database Migration Needed
+### No Database Migration Needed
 
-The `expected_attendance` and `budget` columns are nullable with defaults -- they can safely remain in the table. New submissions will simply have empty values for those fields.
+The `expected_attendance` and `budget` columns are nullable with defaults -- they remain in the table but will simply be empty for new submissions.
 
