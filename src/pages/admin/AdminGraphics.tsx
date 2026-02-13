@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useGraphics, Graphic } from "@/hooks/useGraphics";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -126,20 +126,18 @@ export default function AdminGraphics() {
   const [loadingAll, setLoadingAll] = useState(true);
 
   // Fetch all graphics (including inactive) via admin edge function
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     setLoadingAll(true);
     try {
       const data = await adminApi("GET");
       setAllGraphics(data);
     } catch {
-      // fallback to public hook data
       setAllGraphics(graphics);
     }
     setLoadingAll(false);
-  };
+  }, [graphics]);
 
-  // Load all on mount
-  useState(() => { fetchAll(); });
+  useEffect(() => { fetchAll(); }, []);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["graphics"] });
