@@ -1,49 +1,69 @@
 
 
-# Fix Rich Text Editor: Font Size and Quotation Marks
+# Fix: Sermon Editor Content Resetting on Background Refetch
 
-## Issues Identified
+## Root Cause
 
-### 1. Font Size Not Working
-The `Select` dropdown for font size steals focus from the editor when opened. When a size is selected, `editor.chain().focus().setFontSize(val).run()` tries to restore focus, but the **text selection is lost**. Since `setMark` requires a selection to apply to, the font size command silently does nothing.
+The `RichTextEditor` fixes are correct, but they are being bypassed by a higher-level issue in `AdminSermonEditor.tsx`.
 
-**Fix:** Save the editor's selection state before the dropdown opens and restore it before applying the font size command.
+**Line 56-62** has this effect:
 
-### 2. Quotation Marks Resetting
-When the user types `"`, TipTap serializes it as `&quot;` in HTML. The parent component stores this value, but on subsequent re-renders (e.g., react-query background refetch triggering the `sermonList` dependency in `AdminSermonEditor`'s sync effect), the `isInternalUpdate` flag is already `false`. The `content !== editor.getHTML()` comparison may find a mismatch due to entity encoding differences, triggering `setContent` and resetting the editor.
-
-**Fix:** Replace the simple boolean flag with a **last-known-HTML ref** approach. Instead of a flag that only protects one render cycle, store the last HTML the editor produced. The sync effect only calls `setContent` if the incoming `content` differs from the **last emitted HTML**, not from `editor.getHTML()`. This is resilient to serialization differences and multiple render cycles.
-
----
-
-## Technical Changes
-
-### File: `src/components/admin/RichTextEditor.tsx`
-
-**A. Font Size -- Save/Restore Selection**
-
-In the `Toolbar` component:
-- Add a `useRef` to store the editor's JSON selection state (`{ from, to }`)
-- On the Select's `onOpenChange(true)`, capture the current selection
-- In `onValueChange`, restore the selection before running the font size command
-
-```text
-Before:
-  Click Select -> editor loses focus/selection -> setFontSize has no selection -> nothing happens
-
-After:
-  Click Select -> save selection to ref -> select size -> restore selection -> setFontSize applies correctly
+```typescript
+useEffect(() => {
+  const active = sermonList.find((s) => s.id === activeId);
+  if (active) {
+    setDraft(active);   // <-- RESETS entire draft, including manuscript
+    setDirty(false);
+  }
+}, [activeId, sermonList]);  // <-- sermonList triggers on EVERY refetch
 ```
 
-**B. Quotation Marks -- Robust Sync Guard**
+Every time react-query background-refetches the sermons list, `sermonList` gets a new array reference. This triggers the effect, which calls `setDraft(active)` with the old server data, overwriting whatever the user just typed or formatted. The new `draft.manuscript` then flows into the `RichTextEditor` as a `content` prop that differs from `lastEmittedHTML`, causing the editor to call `setContent` and reset.
 
-Replace the `isInternalUpdate` boolean ref with a `lastEmittedHTML` string ref:
+## Fix
 
-- In `onUpdate`: store `editor.getHTML()` in `lastEmittedHTML.current`, then call `onChange`
-- In the sync `useEffect`: compare `content` against `lastEmittedHTML.current` (not `editor.getHTML()`). Only call `setContent` if they differ. After calling `setContent`, update `lastEmittedHTML.current` to the new content.
+Split the effect into two concerns:
 
-This approach is more robust because:
-- It survives multiple React render cycles (not just the next one)
-- It ignores HTML serialization differences between the stored content and editor's internal state
-- External updates (AI insert, PDF import) still sync correctly because `lastEmittedHTML` won't match the externally-provided content
+1. **On `activeId` change**: Load the sermon data into draft (this is correct behavior when switching sermons).
+2. **On `sermonList` change**: Do NOT overwrite the draft if `dirty` is true (user has unsaved changes). Only update if the user hasn't made edits yet.
+
+### Technical Change
+
+**File: `src/pages/admin/AdminSermonEditor.tsx` (lines 56-62)**
+
+Replace:
+```typescript
+useEffect(() => {
+  const active = sermonList.find((s) => s.id === activeId);
+  if (active) {
+    setDraft(active);
+    setDirty(false);
+  }
+}, [activeId, sermonList]);
+```
+
+With:
+```typescript
+const prevActiveId = useRef<string | null>(null);
+
+useEffect(() => {
+  const active = sermonList.find((s) => s.id === activeId);
+  if (!active) return;
+
+  // Always load when switching to a different sermon
+  // Only reload from server if user hasn't made local edits
+  if (activeId !== prevActiveId.current || !dirty) {
+    setDraft(active);
+    setDirty(false);
+    prevActiveId.current = activeId;
+  }
+}, [activeId, sermonList]);
+```
+
+This ensures:
+- Switching sermons always loads fresh data (correct).
+- Background refetches do NOT overwrite the user's in-progress edits (fixes the bug).
+- If the user hasn't touched anything (`dirty === false`), the draft stays in sync with server data (keeps data fresh).
+
+This is a ~5-line change in one file that addresses the actual root cause.
 
