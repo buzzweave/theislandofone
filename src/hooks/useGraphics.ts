@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface Graphic {
   id: string;
@@ -8,15 +8,25 @@ export interface Graphic {
   category: string;
   price: number;
   preview_url: string;
+  file_url: string;
   is_active: boolean;
   sort_order: number;
   created_at: string;
+  updated_at: string;
 }
 
+/** Public hook – RLS only returns is_active = true rows */
 export function useGraphics() {
   const { data: graphics = [], isLoading } = useQuery({
     queryKey: ["graphics"],
-    queryFn: () => api.get<Graphic[]>("/api/graphics"),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("graphics")
+        .select("*")
+        .order("sort_order", { ascending: true });
+      if (error) throw error;
+      return data as Graphic[];
+    },
   });
   return { graphics, isLoading };
 }

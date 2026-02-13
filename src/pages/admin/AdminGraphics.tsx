@@ -1,13 +1,15 @@
 import { useState, useRef } from "react";
-import { api } from "@/lib/api";
 import { useGraphics, Graphic } from "@/hooks/useGraphics";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Eye, EyeOff, Image, Maximize2, Download, X } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Plus, Trash2, Eye, EyeOff, Image, Maximize2, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 const RESIZE_PRESETS = [
   { label: "Instagram Post", w: 1080, h: 1080, platform: "Instagram" },
@@ -21,6 +23,35 @@ const RESIZE_PRESETS = [
   { label: "Twitter/X Post", w: 1600, h: 900, platform: "Twitter/X" },
   { label: "Twitter/X Header", w: 1500, h: 500, platform: "Twitter/X" },
 ];
+
+function getAdminToken(): string {
+  return localStorage.getItem("admin_token") || "";
+}
+
+async function adminApi(method: string, body?: Record<string, unknown>) {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/graphics-admin`, {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      "x-admin-token": getAdminToken(),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || "Request failed");
+  }
+  return res.json();
+}
+
+async function uploadToStorage(file: File, folder: string): Promise<string> {
+  const ext = file.name.split(".").pop();
+  const path = `${folder}/${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage.from("graphics").upload(path, file);
+  if (error) throw error;
+  const { data } = supabase.storage.from("graphics").getPublicUrl(path);
+  return data.publicUrl;
+}
 
 function ResizeDialog({ graphic, open, onClose }: { graphic: Graphic | null; open: boolean; onClose: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -38,7 +69,6 @@ function ResizeDialog({ graphic, open, onClose }: { graphic: Graphic | null; ope
       canvas.width = preset.w;
       canvas.height = preset.h;
       const ctx = canvas.getContext("2d")!;
-      // Cover-fit the image
       const scale = Math.max(preset.w / img.width, preset.h / img.height);
       const sw = preset.w / scale, sh = preset.h / scale;
       const sx = (img.width - sw) / 2, sy = (img.height - sh) / 2;
@@ -73,14 +103,7 @@ function ResizeDialog({ graphic, open, onClose }: { graphic: Graphic | null; ope
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{platform}</p>
               <div className="flex flex-wrap gap-2">
                 {RESIZE_PRESETS.filter(p => p.platform === platform).map(preset => (
-                  <Button
-                    key={preset.label}
-                    variant="outline"
-                    size="sm"
-                    disabled={generating}
-                    onClick={() => handleResize(preset)}
-                    className="text-xs"
-                  >
+                  <Button key={preset.label} variant="outline" size="sm" disabled={generating} onClick={() => handleResize(preset)} className="text-xs">
                     <Download className="h-3 w-3 mr-1.5" />
                     {preset.label} ({preset.w}×{preset.h})
                   </Button>
@@ -99,21 +122,42 @@ export default function AdminGraphics() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
+  const [allGraphics, setAllGraphics] = useState<Graphic[]>([]);
+  const [loadingAll, setLoadingAll] = useState(true);
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["graphics"] });
+  // Fetch all graphics (including inactive) via admin edge function
+  const fetchAll = async () => {
+    setLoadingAll(true);
+    try {
+      const data = await adminApi("GET");
+      setAllGraphics(data);
+    } catch {
+      // fallback to public hook data
+      setAllGraphics(graphics);
+    }
+    setLoadingAll(false);
+  };
+
+  // Load all on mount
+  useState(() => { fetchAll(); });
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["graphics"] });
+    fetchAll();
+  };
 
   const addGraphic = async (previewFile: File, downloadFile: File) => {
     setUploading(true);
     try {
-      const [previewData, fileData] = await Promise.all([
-        api.upload<{ url: string }>("/api/upload", previewFile),
-        api.upload<{ url: string }>("/api/upload", downloadFile),
+      const [previewUrl, fileUrl] = await Promise.all([
+        uploadToStorage(previewFile, "previews"),
+        uploadToStorage(downloadFile, "files"),
       ]);
-      await api.post("/api/graphics", {
+      await adminApi("POST", {
         title: previewFile.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "),
-        preview_url: previewData.url,
-        file_url: fileData.url,
-        sort_order: graphics.length,
+        preview_url: previewUrl,
+        file_url: fileUrl,
+        sort_order: allGraphics.length,
         price: 4.99,
       });
       toast({ title: "Graphic added" });
@@ -126,7 +170,7 @@ export default function AdminGraphics() {
 
   const updateGraphic = async (id: string, updates: Partial<Graphic>) => {
     try {
-      await api.put(`/api/graphics/${id}`, updates);
+      await adminApi("PUT", { id, ...updates });
       invalidate();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -135,7 +179,7 @@ export default function AdminGraphics() {
 
   const deleteGraphic = async (id: string) => {
     try {
-      await api.delete(`/api/graphics/${id}`);
+      await adminApi("DELETE", { id });
       toast({ title: "Graphic deleted" });
       invalidate();
     } catch (err: any) {
@@ -164,8 +208,9 @@ export default function AdminGraphics() {
   };
 
   const [resizeGraphic, setResizeGraphic] = useState<Graphic | null>(null);
+  const displayGraphics = loadingAll ? [] : allGraphics;
 
-  if (isLoading) return <div className="text-muted-foreground">Loading…</div>;
+  if (loadingAll) return <div className="text-muted-foreground">Loading…</div>;
 
   return (
     <div className="space-y-6">
@@ -184,14 +229,14 @@ export default function AdminGraphics() {
         When adding: first select the preview image, then select the downloadable file (high-res image, PSD, ZIP, etc.)
       </p>
 
-      {graphics.length === 0 ? (
+      {displayGraphics.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border p-12 text-center text-muted-foreground">
           <Image className="h-10 w-10 mx-auto mb-3 opacity-50" />
           No graphics yet. Add one to get started.
         </div>
       ) : (
         <div className="space-y-4">
-          {graphics.map((graphic) => (
+          {displayGraphics.map((graphic) => (
             <div key={graphic.id} className="rounded-lg border border-border bg-card overflow-hidden">
               <div className="flex flex-col md:flex-row">
                 <div className="relative w-full md:w-56 aspect-video md:aspect-auto md:h-40 shrink-0 bg-muted overflow-hidden">
@@ -202,60 +247,31 @@ export default function AdminGraphics() {
                     <div className="flex-1 space-y-2">
                       <div className="space-y-1">
                         <Label className="text-xs">Title</Label>
-                        <Input
-                          className="h-8 text-sm"
-                          defaultValue={graphic.title}
-                          onBlur={(e) => updateGraphic(graphic.id, { title: e.target.value })}
-                        />
+                        <Input className="h-8 text-sm" defaultValue={graphic.title} onBlur={(e) => updateGraphic(graphic.id, { title: e.target.value })} />
                       </div>
                       <div className="flex gap-2">
                         <div className="space-y-1 flex-1">
                           <Label className="text-xs">Category</Label>
-                          <Input
-                            className="h-8 text-sm"
-                            defaultValue={graphic.category}
-                            onBlur={(e) => updateGraphic(graphic.id, { category: e.target.value })}
-                          />
+                          <Input className="h-8 text-sm" defaultValue={graphic.category} onBlur={(e) => updateGraphic(graphic.id, { category: e.target.value })} />
                         </div>
                         <div className="space-y-1 w-28">
                           <Label className="text-xs">Price ($)</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            className="h-8 text-sm"
-                            defaultValue={graphic.price}
-                            onBlur={(e) => updateGraphic(graphic.id, { price: parseFloat(e.target.value) || 0 })}
-                          />
+                          <Input type="number" step="0.01" className="h-8 text-sm" defaultValue={graphic.price} onBlur={(e) => updateGraphic(graphic.id, { price: parseFloat(e.target.value) || 0 })} />
                         </div>
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs">Description</Label>
-                        <Input
-                          className="h-8 text-sm"
-                          defaultValue={graphic.description}
-                          onBlur={(e) => updateGraphic(graphic.id, { description: e.target.value })}
-                        />
+                        <Input className="h-8 text-sm" defaultValue={graphic.description} onBlur={(e) => updateGraphic(graphic.id, { description: e.target.value })} />
                       </div>
                     </div>
                     <div className="flex flex-col items-center gap-1">
-                      <button
-                        onClick={() => setResizeGraphic(graphic)}
-                        className="p-1.5 rounded text-muted-foreground hover:text-primary"
-                        title="Resize for social media"
-                      >
+                      <button onClick={() => setResizeGraphic(graphic)} className="p-1.5 rounded text-muted-foreground hover:text-primary" title="Resize for social media">
                         <Maximize2 className="h-4 w-4" />
                       </button>
-                      <button
-                        onClick={() => updateGraphic(graphic.id, { is_active: !graphic.is_active })}
-                        className={`p-1.5 rounded text-xs ${graphic.is_active ? "text-primary" : "text-muted-foreground"}`}
-                        title={graphic.is_active ? "Active (Published)" : "Draft (Hidden)"}
-                      >
+                      <button onClick={() => updateGraphic(graphic.id, { is_active: !graphic.is_active })} className={`p-1.5 rounded text-xs ${graphic.is_active ? "text-primary" : "text-muted-foreground"}`} title={graphic.is_active ? "Active (Published)" : "Draft (Hidden)"}>
                         {graphic.is_active ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                       </button>
-                      <button
-                        onClick={() => deleteGraphic(graphic.id)}
-                        className="p-1.5 rounded text-destructive hover:bg-destructive/10"
-                      >
+                      <button onClick={() => deleteGraphic(graphic.id)} className="p-1.5 rounded text-destructive hover:bg-destructive/10">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
