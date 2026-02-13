@@ -41,161 +41,38 @@ function validateSpeakerRequest(data: any) {
   if (data.message && (typeof data.message !== "string" || data.message.length > 2000)) throw new Error("Invalid message");
 }
 
-// AES-256-CBC encrypt/decrypt using Web Crypto API
-async function decryptPassword(encrypted: string, key: string): Promise<string> {
-  if (!encrypted) return "";
-  try {
-    const [ivHex, dataHex] = encrypted.split(":");
-    const iv = new Uint8Array(ivHex.match(/.{2}/g)!.map((b: string) => parseInt(b, 16)));
-    const data = new Uint8Array(dataHex.match(/.{2}/g)!.map((b: string) => parseInt(b, 16)));
-    const keyData = new TextEncoder().encode(key.slice(0, 32).padEnd(32, "0"));
-    const cryptoKey = await crypto.subtle.importKey("raw", keyData, "AES-CBC", false, ["decrypt"]);
-    const decrypted = await crypto.subtle.decrypt({ name: "AES-CBC", iv }, cryptoKey, data);
-    return new TextDecoder().decode(decrypted);
-  } catch {
-    return "";
+// Send email via Resend REST API
+async function sendResendEmail(
+  to: string,
+  subject: string,
+  htmlBody: string,
+  fromName: string,
+  fromEmail: string,
+  replyTo: string
+) {
+  const resendApiKey = Deno.env.get("RESEND_API_KEY");
+  if (!resendApiKey) throw new Error("RESEND_API_KEY is not configured");
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: `${fromName} <${fromEmail}>`,
+      to: [to],
+      reply_to: replyTo || undefined,
+      subject,
+      html: htmlBody,
+    }),
+  });
+
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(`Resend API error [${response.status}]: ${JSON.stringify(result)}`);
   }
-}
-
-async function encryptPassword(plaintext: string, key: string): Promise<string> {
-  if (!plaintext) return "";
-  const iv = crypto.getRandomValues(new Uint8Array(16));
-  const keyData = new TextEncoder().encode(key.slice(0, 32).padEnd(32, "0"));
-  const cryptoKey = await crypto.subtle.importKey("raw", keyData, "AES-CBC", false, ["encrypt"]);
-  const encrypted = await crypto.subtle.encrypt({ name: "AES-CBC", iv }, cryptoKey, new TextEncoder().encode(plaintext));
-  const ivHex = Array.from(iv).map((b) => b.toString(16).padStart(2, "0")).join("");
-  const dataHex = Array.from(new Uint8Array(encrypted)).map((b) => b.toString(16).padStart(2, "0")).join("");
-  return `${ivHex}:${dataHex}`;
-}
-
-// Robust SMTP send via Deno TCP with proper multi-line response handling
-async function sendSmtpEmail(smtp: any, password: string, to: string, subject: string, body: string, replyTo: string) {
-  const encoder = new TextEncoder();
-  const decoder = new TextDecoder();
-
-  // Helper: read a full SMTP response (handles multi-line responses like 250-xxx / 250 xxx)
-  async function readFullResponse(conn: Deno.TcpConn | Deno.TlsConn): Promise<string> {
-    let accumulated = "";
-    const maxAttempts = 30; // 30 * 200ms = 6s max wait
-    for (let i = 0; i < maxAttempts; i++) {
-      const buf = new Uint8Array(4096);
-      try {
-        const n = await conn.read(buf);
-        if (n === null) break;
-        accumulated += decoder.decode(buf.subarray(0, n));
-      } catch {
-        break;
-      }
-      // Check if we have a complete response: last line matches "XXX " (3 digits + space)
-      const lines = accumulated.trimEnd().split("\r\n");
-      const lastLine = lines[lines.length - 1];
-      if (/^\d{3} /.test(lastLine) || /^\d{3}$/.test(lastLine)) {
-        return accumulated;
-      }
-      // If last line is a continuation (XXX-), keep reading
-    }
-    if (!accumulated) throw new Error("SMTP: No response from server");
-    return accumulated;
-  }
-
-  async function writeCmd(conn: Deno.TcpConn | Deno.TlsConn, cmd: string) {
-    await conn.write(encoder.encode(cmd + "\r\n"));
-  }
-
-  async function writeAndRead(conn: Deno.TcpConn | Deno.TlsConn, cmd: string): Promise<string> {
-    await writeCmd(conn, cmd);
-    // Small delay to let server process
-    await new Promise((r) => setTimeout(r, 150));
-    return await readFullResponse(conn);
-  }
-
-  function getCode(response: string): string {
-    return response.substring(0, 3);
-  }
-
-  let activeConn: Deno.TcpConn | Deno.TlsConn | null = null;
-
-  try {
-    // Step 1: Connect
-    const plainConn: Deno.TcpConn = smtp.encryption === "ssl"
-      ? await Deno.connectTls({ hostname: smtp.host, port: smtp.port }) as unknown as Deno.TcpConn
-      : await Deno.connect({ hostname: smtp.host, port: smtp.port });
-    activeConn = plainConn;
-
-    // Step 2: Read greeting
-    await new Promise((r) => setTimeout(r, 300));
-    const greeting = await readFullResponse(plainConn);
-    if (!getCode(greeting).startsWith("2")) throw new Error("SMTP greeting failed: " + greeting.trim());
-
-    // Step 3: EHLO
-    const ehloResp = await writeAndRead(plainConn, "EHLO localhost");
-    if (!getCode(ehloResp).startsWith("2")) throw new Error("SMTP EHLO failed: " + ehloResp.trim());
-
-    // Step 4: STARTTLS if needed
-    if (smtp.encryption === "tls") {
-      if (!ehloResp.toUpperCase().includes("STARTTLS")) {
-        throw new Error("SMTP server does not support STARTTLS. EHLO response: " + ehloResp.trim());
-      }
-
-      const starttlsResp = await writeAndRead(plainConn, "STARTTLS");
-      if (getCode(starttlsResp) !== "220") {
-        throw new Error("SMTP STARTTLS rejected: " + starttlsResp.trim());
-      }
-
-      // Step 5: Upgrade to TLS
-      const tlsConn = await Deno.startTls(plainConn, { hostname: smtp.host });
-      activeConn = tlsConn;
-
-      // Step 6: EHLO again over TLS
-      const ehlo2 = await writeAndRead(tlsConn, "EHLO localhost");
-      if (!getCode(ehlo2).startsWith("2")) throw new Error("SMTP EHLO (TLS) failed: " + ehlo2.trim());
-    }
-
-    // Step 7: AUTH LOGIN
-    const authPrompt = await writeAndRead(activeConn, "AUTH LOGIN");
-    if (!getCode(authPrompt).startsWith("3")) throw new Error("SMTP AUTH LOGIN rejected: " + authPrompt.trim());
-
-    const userResp = await writeAndRead(activeConn, btoa(smtp.username));
-    if (!getCode(userResp).startsWith("3")) throw new Error("SMTP username rejected: " + userResp.trim());
-
-    const passResp = await writeAndRead(activeConn, btoa(password));
-    if (!getCode(passResp).startsWith("2")) throw new Error("SMTP auth failed: " + passResp.trim());
-
-    // Step 8: MAIL FROM / RCPT TO / DATA
-    const mailResp = await writeAndRead(activeConn, `MAIL FROM:<${smtp.from_email}>`);
-    if (!getCode(mailResp).startsWith("2")) throw new Error("SMTP MAIL FROM failed: " + mailResp.trim());
-
-    const rcptResp = await writeAndRead(activeConn, `RCPT TO:<${to}>`);
-    if (!getCode(rcptResp).startsWith("2")) throw new Error("SMTP RCPT TO failed: " + rcptResp.trim());
-
-    const dataResp = await writeAndRead(activeConn, "DATA");
-    if (!getCode(dataResp).startsWith("3")) throw new Error("SMTP DATA rejected: " + dataResp.trim());
-
-    // Step 9: Send email content
-    const emailContent = [
-      `From: ${smtp.from_name} <${smtp.from_email}>`,
-      `To: ${to}`,
-      `Reply-To: ${replyTo}`,
-      `Subject: ${subject}`,
-      `MIME-Version: 1.0`,
-      `Content-Type: text/html; charset=utf-8`,
-      `Date: ${new Date().toUTCString()}`,
-      ``,
-      body,
-      ``,
-      `.`,
-    ].join("\r\n");
-
-    const sendResult = await writeAndRead(activeConn, emailContent);
-    if (!getCode(sendResult).startsWith("2")) throw new Error("SMTP send failed: " + sendResult.trim());
-
-    // Step 10: QUIT
-    try { await writeCmd(activeConn, "QUIT"); } catch { /* ignore */ }
-    try { activeConn.close(); } catch { /* ignore */ }
-  } catch (e) {
-    try { if (activeConn) activeConn.close(); } catch { /* ignore */ }
-    throw e;
-  }
+  return result;
 }
 
 function formatContactEmail(data: any): string {
@@ -251,28 +128,20 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Handle SMTP settings save (admin action)
+    // Handle email settings save (admin action)
     if (action === "save_smtp") {
-      const encrypted = data.password ? await encryptPassword(data.password, serviceRoleKey) : undefined;
-      
       const { data: existing } = await supabase.from("smtp_settings").select("id").limit(1).single();
-      
-      const smtpData: any = {
-        host: data.host,
-        port: data.port,
-        username: data.username,
-        encryption: data.encryption,
+
+      const emailData: any = {
         from_name: data.from_name,
         from_email: data.from_email,
         reply_to: data.reply_to,
       };
-      if (encrypted) smtpData.encrypted_password = encrypted;
-      
+
       if (existing) {
-        await supabase.from("smtp_settings").update(smtpData).eq("id", existing.id);
+        await supabase.from("smtp_settings").update(emailData).eq("id", existing.id);
       } else {
-        if (encrypted) smtpData.encrypted_password = encrypted;
-        await supabase.from("smtp_settings").insert(smtpData);
+        await supabase.from("smtp_settings").insert(emailData);
       }
 
       return new Response(JSON.stringify({ success: true }), {
@@ -280,48 +149,50 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Handle SMTP test
+    // Handle email test via Resend
     if (action === "test_smtp") {
-      const { data: smtp } = await supabase.from("smtp_settings").select("*").limit(1).single();
-      if (!smtp || !smtp.host) {
-        return new Response(JSON.stringify({ error: "SMTP not configured" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+      const { data: emailSettings } = await supabase.from("smtp_settings").select("*").limit(1).single();
 
-      const password = await decryptPassword(smtp.encrypted_password, serviceRoleKey);
+      const fromName = emailSettings?.from_name || "The Island of One";
+      const fromEmail = emailSettings?.from_email || "onboarding@resend.dev";
+      const replyTo = emailSettings?.reply_to || fromEmail;
+      const testTo = data?.to || "support@buzzweave.com";
+
       try {
-        await sendSmtpEmail(
-          smtp, password,
-          data.to || smtp.from_email,
-          "SMTP Test - The Island of One",
-          "<h2>SMTP Test Successful</h2><p>Your email settings are configured correctly.</p>",
-          smtp.reply_to || smtp.from_email
+        await sendResendEmail(
+          testTo,
+          "Email Test - The Island of One",
+          "<h2>Email Test Successful</h2><p>Your Resend email integration is working correctly.</p>",
+          fromName,
+          fromEmail,
+          replyTo
         );
 
-        await supabase.from("smtp_settings").update({ is_verified: true }).eq("id", smtp.id);
+        if (emailSettings?.id) {
+          await supabase.from("smtp_settings").update({ is_verified: true }).eq("id", emailSettings.id);
+        }
 
-        // Create success notification
         await supabase.from("notifications").insert({
           type: "smtp_test",
-          title: "SMTP Test Successful",
-          preview: "Email configuration is working correctly.",
+          title: "Email Test Successful",
+          preview: "Resend email integration is working correctly.",
         });
 
         return new Response(JSON.stringify({ success: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       } catch (e) {
-        await supabase.from("smtp_settings").update({ is_verified: false }).eq("id", smtp.id);
+        if (emailSettings?.id) {
+          await supabase.from("smtp_settings").update({ is_verified: false }).eq("id", emailSettings.id);
+        }
 
         await supabase.from("notifications").insert({
           type: "smtp_test",
-          title: "SMTP Test Failed",
+          title: "Email Test Failed",
           preview: e.message?.slice(0, 100) || "Unknown error",
         });
 
-        return new Response(JSON.stringify({ error: "SMTP test failed: " + e.message }), {
+        return new Response(JSON.stringify({ error: "Email test failed: " + e.message }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -330,7 +201,6 @@ Deno.serve(async (req) => {
 
     // Honeypot check
     if (data.website) {
-      // Silently accept but don't process (spam bot)
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -345,7 +215,6 @@ Deno.serve(async (req) => {
     if (type === "contact") {
       validateContact(data);
 
-      // Save to contact_submissions
       const { error } = await supabase.from("contact_submissions").insert({
         name: data.name.trim(),
         email: data.email.trim(),
@@ -389,18 +258,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Try to send email via SMTP
+    // Send email via Resend
     let emailQueued = false;
-    const { data: smtp } = await supabase.from("smtp_settings").select("*").limit(1).single();
+    const { data: emailSettings } = await supabase.from("smtp_settings").select("*").limit(1).single();
 
-    if (smtp?.host && smtp?.is_verified) {
-      try {
-        const password = await decryptPassword(smtp.encrypted_password, serviceRoleKey);
-        await sendSmtpEmail(smtp, password, "support@buzzweave.com", emailSubject, emailBody, replyTo);
-      } catch {
-        emailQueued = true;
-      }
-    } else {
+    const fromName = emailSettings?.from_name || "The Island of One";
+    const fromEmail = emailSettings?.from_email || "onboarding@resend.dev";
+
+    try {
+      await sendResendEmail("support@buzzweave.com", emailSubject, emailBody, fromName, fromEmail, replyTo);
+    } catch {
       emailQueued = true;
     }
 
