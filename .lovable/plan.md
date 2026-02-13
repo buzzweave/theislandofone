@@ -1,49 +1,32 @@
 
 
-# Switch Email Delivery from SMTP to Resend
+# Fix Bullet Points and Quotation Marks in Rich Text Editor
 
-## Overview
-Replace the custom SMTP implementation with Resend's simple REST API for all outgoing emails. This eliminates the SMTP authentication issues you've been experiencing and provides reliable email delivery with a single API call.
+## Problem
+Two issues stem from the same root cause:
 
-## What Changes
+1. **Bullet points not working** -- Clicking the bullet list button toggles the list, but the `useEffect` content sync immediately resets the editor because the HTML serialization of list markup differs slightly between the parent state and `editor.getHTML()`, causing a false mismatch that triggers `setContent` and undoes the toggle.
 
-### 1. Store Your Resend API Key
-- You'll provide your Resend API key and it will be securely stored as a backend secret (`RESEND_API_KEY`)
+2. **Double quotes (`"`) not working** -- Typing `"` produces an HTML entity (`&quot;`) that differs from the raw character stored in parent state, again triggering the sync reset loop.
 
-### 2. Rewrite the Email Sending Logic
-- Remove the entire raw SMTP/TCP connection code (~130 lines) from the `send-notification` backend function
-- Replace it with a simple Resend API call (`POST https://api.resend.com/emails`)
-- All existing email types continue working: **Contact form submissions**, **Speaker request notifications**, and **SMTP test emails**
+## Solution
+Add a flag (`skipNextSync`) that prevents the `useEffect` from overwriting the editor when the change originated from user typing inside the editor. The `onUpdate` callback sets the flag before calling `onChange`, and the `useEffect` checks/clears it before running `setContent`.
 
-### 3. Simplify the Admin Settings Page
-- Remove the SMTP configuration section (host, port, username, password, encryption fields)
-- Replace with a simple "Resend" integration card showing status (configured / not configured)
-- Keep the existing "From Name", "From Email", and "Reply-To" fields so you can still customize sender identity
-- Remove the "Test SMTP" button and replace with a "Send Test Email" button that uses Resend
+## Technical Changes
 
-### 4. Update the Database
-- The `smtp_settings` table will still be used to store `from_name`, `from_email`, and `reply_to` preferences, but the SMTP-specific fields (host, port, username, encrypted_password, encryption) become unused
+**File: `src/components/admin/RichTextEditor.tsx`**
 
-## Email Flow After Changes
+1. Add a `useRef` boolean flag (`isInternalUpdate`).
+2. In the `onUpdate` callback, set the flag to `true` before calling `onChange`.
+3. In the `useEffect` that syncs `content`, skip the `setContent` call if the flag is `true`, then reset the flag. This ensures external updates (AI insert/replace, PDF import) still sync correctly, while user-driven edits are never overwritten.
 
-1. Visitor submits Contact or Speaker Request form
-2. Backend function validates and saves to database
-3. Backend function calls Resend API to send the formatted HTML email to `support@buzzweave.com`
-4. In-app notification is created
+```text
+Before:
+  onUpdate -> onChange(html) -> parent re-renders -> useEffect sees mismatch -> setContent (RESETS EDITOR)
 
-## Technical Details
+After:
+  onUpdate -> flag=true -> onChange(html) -> parent re-renders -> useEffect sees flag -> skip setContent
+  External update (AI/PDF) -> parent sets content -> useEffect sees flag=false -> setContent (CORRECT)
+```
 
-**Edge Function (`send-notification/index.ts`):**
-- Remove `sendSmtpEmail()`, `encryptPassword()`, `decryptPassword()` functions
-- Add `sendResendEmail()` function that calls `https://api.resend.com/emails` with the `RESEND_API_KEY` secret
-- Update `save_smtp` action to only save from_name, from_email, reply_to
-- Update `test_smtp` action to send a test email via Resend instead
-- Update the contact/speaker_request handlers to use Resend
-
-**Admin Settings (`AdminSettings.tsx`):**
-- Remove SMTP host/port/username/password/encryption fields
-- Show a simple "Email (Resend)" card with from_name, from_email, reply_to inputs and a Test button
-- Remove SMTP verified/unverified status indicators
-
-**Important:** You will need to verify your sending domain (`buzzweave.com` or whichever domain you use for `from_email`) in the Resend dashboard for emails to deliver reliably. Until then, you can use Resend's default `onboarding@resend.dev` as the from address for testing.
-
+This is a small, targeted fix (adding ~5 lines) that resolves both issues without changing any other behavior.
