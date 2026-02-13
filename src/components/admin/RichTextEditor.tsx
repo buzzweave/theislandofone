@@ -6,7 +6,7 @@ import Color from "@tiptap/extension-color";
 import TextAlign from "@tiptap/extension-text-align";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Slice, Fragment } from "@tiptap/pm/model";
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 
 /**
  * Custom FontSize extension that works with TextStyle mark
@@ -360,6 +360,7 @@ export default function RichTextEditor({
   className,
   minHeight = "200px",
 }: RichTextEditorProps) {
+  const isInternalUpdate = useRef(false);
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -387,12 +388,17 @@ export default function RichTextEditor({
       },
     },
     onUpdate: ({ editor }) => {
+      isInternalUpdate.current = true;
       onChange(editor.getHTML());
     },
   });
 
-  // Sync external content changes (e.g., AI insert/replace)
+  // Sync external content changes (e.g., AI insert/replace) but skip when change came from user typing
   useEffect(() => {
+    if (isInternalUpdate.current) {
+      isInternalUpdate.current = false;
+      return;
+    }
     if (editor && content !== editor.getHTML()) {
       editor.commands.setContent(content, { emitUpdate: false });
     }
