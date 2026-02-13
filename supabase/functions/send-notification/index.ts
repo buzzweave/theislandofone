@@ -100,8 +100,6 @@ function formatSpeakerEmail(data: any): string {
       <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Event</td><td style="padding:8px;border:1px solid #ddd">${data.event_name}</td></tr>
       <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Event Date</td><td style="padding:8px;border:1px solid #ddd">${data.event_date}</td></tr>
       <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Location</td><td style="padding:8px;border:1px solid #ddd">${data.event_location || "N/A"}</td></tr>
-      <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Expected Attendance</td><td style="padding:8px;border:1px solid #ddd">${data.expected_attendance || "N/A"}</td></tr>
-      <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Budget/Honorarium</td><td style="padding:8px;border:1px solid #ddd">${data.budget || "N/A"}</td></tr>
       <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Message</td><td style="padding:8px;border:1px solid #ddd">${data.message || "N/A"}</td></tr>
       <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Timestamp</td><td style="padding:8px;border:1px solid #ddd">${new Date().toISOString()}</td></tr>
     </table>
@@ -240,8 +238,6 @@ Deno.serve(async (req) => {
         event_name: data.event_name.trim(),
         event_date: data.event_date,
         event_location: data.event_location?.trim() || null,
-        expected_attendance: data.expected_attendance?.trim() || "",
-        budget: data.budget?.trim() || "",
         message: data.message?.trim() || null,
       });
       if (error) throw new Error("Failed to save request: " + error.message);
