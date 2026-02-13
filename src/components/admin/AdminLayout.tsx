@@ -22,8 +22,10 @@ import {
   Menu,
   BookUp,
   Headphones,
+  Bell as BellIcon,
 } from "lucide-react";
 import AISidebar from "./AISidebar";
+import NotificationBell from "./NotificationBell";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -43,6 +45,7 @@ const navItems = [
   { to: "/admin/audiobooks", label: "Audiobooks", icon: Headphones },
   { to: "/admin/blog", label: "Blog", icon: PenLine },
   { to: "/admin/publisher", label: "Publisher", icon: BookUp },
+  { to: "/admin/notifications", label: "Notifications", icon: BellIcon },
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
@@ -135,22 +138,25 @@ export default function AdminLayout() {
                 {navItems.find((n) => isActive(n.to, n.end))?.label || "Admin"}
               </h1>
             </div>
-            {!isMobile && (
-              <button
-                onClick={() => setAiSidebarOpen(!aiSidebarOpen)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-border"
-              >
-                {aiSidebarOpen ? (
-                  <>
-                    <PanelRightClose className="h-3.5 w-3.5" /> Hide AI
-                  </>
-                ) : (
-                  <>
-                    <PanelRightOpen className="h-3.5 w-3.5" /> Show AI
-                  </>
-                )}
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              <NotificationBell />
+              {!isMobile && (
+                <button
+                  onClick={() => setAiSidebarOpen(!aiSidebarOpen)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-border"
+                >
+                  {aiSidebarOpen ? (
+                    <>
+                      <PanelRightClose className="h-3.5 w-3.5" /> Hide AI
+                    </>
+                  ) : (
+                    <>
+                      <PanelRightOpen className="h-3.5 w-3.5" /> Show AI
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
           </header>
 
           {/* Content + AI sidebar */}
