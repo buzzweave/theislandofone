@@ -1,40 +1,28 @@
 
 
-# Fix: Notifications Not Loading Due to RLS Policy Mismatch
+# Fix: Rich Text Editor Default Text Color to White
 
-## Root Cause
+## Problem
 
-The admin panel authenticates through a custom API on an external VPS (`/api/auth/login`), not through the database's built-in auth system. However, the `notifications` table has Row Level Security (RLS) policies that check for a database auth session (`auth.uid()`), which is always `null` since the admin never signs in through the database auth.
+The rich text editor (TipTap) renders typed text in a dark/gray color that's nearly invisible against the dark background. The screenshot shows "dddddd" barely visible.
 
-This means every query to the `notifications` table from the frontend returns zero rows -- the database silently blocks all reads.
+## Solution
 
-## Fix
+Add a CSS rule to force the TipTap editor's content area to use white text by default.
 
-Since the admin panel is already protected by the `AdminGuard` component (which checks the custom VPS auth), and the `useNotifications` hook queries Supabase directly, we need to allow the Supabase anon client to read, update, and delete notifications.
+## Technical Details
 
-### Database Migration
+**File: `src/index.css`**
 
-Update RLS policies on the `notifications` table to allow public access for SELECT, UPDATE, and DELETE operations. The admin guard in the frontend already protects these pages, and the notification data is admin-facing operational data (form submissions).
+Add a global style targeting the ProseMirror editor content area to set the default text color to white:
 
-```sql
--- Drop existing restrictive policies
-DROP POLICY IF EXISTS "Admins can view notifications" ON notifications;
-DROP POLICY IF EXISTS "Admins can update notifications" ON notifications;
-DROP POLICY IF EXISTS "Admins can delete notifications" ON notifications;
-
--- Create permissive policies for the anon client
-CREATE POLICY "Allow read notifications" ON notifications FOR SELECT USING (true);
-CREATE POLICY "Allow update notifications" ON notifications FOR UPDATE USING (true);
-CREATE POLICY "Allow delete notifications" ON notifications FOR DELETE USING (true);
+```css
+.ProseMirror {
+  color: white;
+}
 ```
 
-### No Code Changes Needed
+This ensures all text typed in the rich text editor defaults to white, matching the site's dark theme. Users can still override with the color picker toolbar button.
 
-The frontend code (`useNotifications`, `AdminNotifications`, `NotificationBell`) is already correctly implemented. Once the RLS policies are fixed, notifications will appear immediately.
-
-## Files Changed
-
-| File | Change |
-|------|--------|
-| Database migration | Update RLS policies on `notifications` table to allow anon access |
+No other files need changes.
 
