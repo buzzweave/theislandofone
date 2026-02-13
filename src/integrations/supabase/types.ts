@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      audiobooks: {
+        Row: {
+          audio_url: string
+          content_id: string
+          content_type: string
+          created_at: string
+          id: string
+          is_separate_price: boolean
+          is_visible: boolean
+          price: number
+          title: string
+          updated_at: string
+          voice_id: string
+          voice_provider: string
+        }
+        Insert: {
+          audio_url?: string
+          content_id: string
+          content_type: string
+          created_at?: string
+          id?: string
+          is_separate_price?: boolean
+          is_visible?: boolean
+          price?: number
+          title?: string
+          updated_at?: string
+          voice_id?: string
+          voice_provider?: string
+        }
+        Update: {
+          audio_url?: string
+          content_id?: string
+          content_type?: string
+          created_at?: string
+          id?: string
+          is_separate_price?: boolean
+          is_visible?: boolean
+          price?: number
+          title?: string
+          updated_at?: string
+          voice_id?: string
+          voice_provider?: string
+        }
+        Relationships: []
+      }
       blog_posts: {
         Row: {
           author: string
