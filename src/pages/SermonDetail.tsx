@@ -177,10 +177,10 @@ export default function SermonDetail() {
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {[
-                    { format: "GoodNotes", icon: Tablet, desc: "iPad-optimized PDF" },
-                    { format: "PDF", icon: FileText, desc: "Print-ready format" },
+                    { format: "GoodNotes", icon: Tablet, desc: "iPad pulpit format (A4)" },
+                    { format: "PDF", icon: FileText, desc: "Print-ready pulpit format" },
                     { format: "EPUB", icon: BookOpen, desc: "Kindle compatible" },
-                    { format: "Word", icon: FileDown, desc: "Editable document" },
+                    { format: "Word", icon: FileDown, desc: "Editable pulpit format" },
                   ].map(({ format, icon: Icon, desc }) => (
                     <button
                       key={format}

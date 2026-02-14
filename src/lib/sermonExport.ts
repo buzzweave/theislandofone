@@ -1,92 +1,132 @@
 import { jsPDF } from "jspdf";
-import { stripHtml, normalizeParagraphs, buildEpubZip, crc32 } from "@/lib/bookExport";
+import { buildEpubZip } from "@/lib/bookExport";
 import { triggerDownload } from "@/lib/downloadHelper";
+import {
+  parsePulpitFormat,
+  layoutPages,
+  COPYRIGHT,
+  A4_W,
+  A4_H,
+  MARGIN,
+  CONTENT_W,
+  FONT,
+} from "@/lib/pulpitFormat";
 import type { Sermon } from "@/hooks/useSermons";
-
-const COPYRIGHT = () =>
-  `© ${new Date().getFullYear()} The Island of One. All rights reserved. For personal use only.`;
 
 const safeTitle = (title: string) => title.replace(/[^a-zA-Z0-9]/g, "_");
 
-// ─── PDF ────────────────────────────────────────────────────────────────────
+// ── Shared helper ───────────────────────────────────────────────────────
+
+function normalizeParagraphs(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<\/h[1-6]>/gi, "\n\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .trim();
+}
+
+// ─── PDF — GOODNOTES PULPIT FORMAT ──────────────────────────────────────
 
 export function exportSermonToPdf(sermon: Sermon) {
-  const doc = new jsPDF({ unit: "mm", format: "a5" });
-  const pageW = doc.internal.pageSize.getWidth();
-  const pageH = doc.internal.pageSize.getHeight();
-  const marginTop = 20;
-  const marginBottom = 18;
-  const marginSide = 18;
-  const contentW = pageW - marginSide * 2;
-  const lineHeight = 5.5;
-  const paraGap = 4;
-  const firstLineIndent = 8;
+  const doc = new jsPDF({ unit: "pt", format: "a4" }); // 595 × 842 portrait
+  const pageW = A4_W;
+  const pageH = A4_H;
+  let y = MARGIN;
 
-  // Title page
+  const newPage = () => { doc.addPage(); y = MARGIN; };
+  const checkPage = (needed: number) => { if (y + needed > pageH - MARGIN) newPage(); };
+
+  // ── Title Page ──
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(26);
-  const titleLines = doc.splitTextToSize(sermon.title, contentW - 10);
-  const titleY = pageH * 0.3;
-  doc.text(titleLines, pageW / 2, titleY, { align: "center" });
+  doc.setFontSize(FONT.title.size);
+  const titleLines = doc.splitTextToSize(sermon.title, CONTENT_W);
+  const titleBlockH = titleLines.length * FONT.title.leading;
+  y = Math.max(MARGIN, (pageH - titleBlockH) * 0.35);
+  doc.text(titleLines, pageW / 2, y, { align: "center" });
+  y += titleBlockH + 30;
 
   if (sermon.scripture) {
-    doc.setFont("helvetica", "italic");
-    doc.setFontSize(14);
-    const subY = titleY + titleLines.length * 11 + 8;
-    doc.text(doc.splitTextToSize(sermon.scripture, contentW - 10), pageW / 2, subY, {
-      align: "center",
-    });
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(FONT.scriptureHeader.size);
+    const refLines = doc.splitTextToSize(sermon.scripture.toUpperCase(), CONTENT_W - 40);
+    doc.text(refLines, pageW / 2, y, { align: "center" });
+    y += refLines.length * FONT.scriptureHeader.leading + 16;
   }
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(12);
-  doc.text("By Bryant Clark", pageW / 2, pageH * 0.6, { align: "center" });
+  doc.setFontSize(14);
+  doc.text("By Bryant Clark", pageW / 2, Math.min(y + 20, pageH * 0.65), { align: "center" });
 
-  doc.setFontSize(8);
   doc.setFont("helvetica", "italic");
-  doc.text(COPYRIGHT(), pageW / 2, pageH * 0.85, { align: "center" });
+  doc.setFontSize(FONT.copyright.size);
+  doc.text(COPYRIGHT(), pageW / 2, pageH - 40, { align: "center" });
 
-  // Manuscript body
-  doc.addPage();
-  let y = marginTop;
-  doc.setFont("times", "normal");
-  doc.setFontSize(11);
+  // ── Main Point Pages ──
+  const pulpit = parsePulpitFormat(sermon.manuscript, sermon.title, sermon.scripture);
+  const pages = layoutPages(pulpit.sections);
 
-  const normalized = normalizeParagraphs(sermon.manuscript);
-  const paras = normalized.split("\n\n").filter((p) => p.trim());
+  for (const page of pages) {
+    newPage();
 
-  paras.forEach((para, pIdx) => {
-    const wrapped: string[] = doc.splitTextToSize(para, contentW - firstLineIndent);
-
-    if (y + wrapped.length * lineHeight > pageH - marginBottom && y > marginTop + 10) {
-      doc.addPage();
-      y = marginTop;
+    if (page.heading) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(FONT.mainPoint.size);
+      const hLines = doc.splitTextToSize(page.heading.toUpperCase(), CONTENT_W);
+      for (const hl of hLines) {
+        doc.text(hl, MARGIN, y);
+        y += FONT.mainPoint.leading;
+      }
+      y += 16;
     }
 
-    wrapped.forEach((line: string, lIdx: number) => {
-      if (y > pageH - marginBottom) {
-        doc.addPage();
-        y = marginTop;
+    const bulletCount = page.bullets.length;
+    const availableH = pageH - MARGIN - y;
+    const baseLineH = FONT.bullet.leading;
+    const dynamicGap = Math.max(baseLineH, Math.min(availableH / Math.max(bulletCount, 1), 60));
+
+    for (const bullet of page.bullets) {
+      doc.setFont("times", "normal");
+      doc.setFontSize(FONT.bullet.size);
+      const bLines = doc.splitTextToSize(bullet, CONTENT_W - 24);
+
+      for (let i = 0; i < bLines.length; i++) {
+        checkPage(baseLineH);
+        if (i === 0) {
+          doc.text("\u2022", MARGIN + 4, y);
+          doc.text(bLines[i], MARGIN + 24, y);
+        } else {
+          doc.text(bLines[i], MARGIN + 24, y);
+        }
+        y += baseLineH;
       }
-      const x = lIdx === 0 && pIdx > 0 ? marginSide + firstLineIndent : marginSide;
-      doc.text(line, x, y);
-      y += lineHeight;
-    });
-    y += paraGap;
-  });
+      y += dynamicGap - baseLineH;
+    }
+  }
+
+  // Final copyright
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(FONT.copyright.size);
+  doc.text(COPYRIGHT(), pageW / 2, pageH - 40, { align: "center" });
 
   const pdfBlob = doc.output("blob");
   triggerDownload(pdfBlob, `${safeTitle(sermon.title)}.pdf`);
 }
 
-// ─── EPUB ───────────────────────────────────────────────────────────────────
+// ─── EPUB (unchanged — e-reader format) ─────────────────────────────────
 
 export function exportSermonToEpub(sermon: Sermon) {
   const sanitize = (t: string) =>
     t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
   const bookId = crypto.randomUUID();
-
   const mimetype = "application/epub+zip";
 
   const container = `<?xml version="1.0" encoding="UTF-8"?>
@@ -135,9 +175,8 @@ p { text-indent: 1.5em; margin: 0.6em 0; text-align: justify; }
 p.first { text-indent: 0; }
 .copyright { font-size: 0.75em; font-style: italic; color: #999; text-align: center; margin-top: 3em; border-top: 1px solid #ddd; padding-top: 1em; }`;
 
-  const paras = normalizeParagraphs(sermon.manuscript)
-    .split("\n\n")
-    .filter((p) => p.trim());
+  const normalized = normalizeParagraphs(sermon.manuscript);
+  const paras = normalized.split("\n\n").filter((p) => p.trim());
   const bodyHtml = paras
     .map((p, i) => `  <p${i === 0 ? ' class="first"' : ''}>${sanitize(p)}</p>`)
     .join("\n");
@@ -166,7 +205,7 @@ ${bodyHtml}
   triggerDownload(blob, `${safeTitle(sermon.title)}.epub`);
 }
 
-// ─── GoodNotes PDF (server-side, iPad-safe) ────────────────────────────────
+// ─── GoodNotes PDF (server-side, iPad-safe) ─────────────────────────────
 
 export async function exportSermonToGoodNotesPdf(sermon: Sermon) {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -185,22 +224,6 @@ export async function exportSermonToGoodNotesPdf(sermon: Sermon) {
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
   if (isIOS) {
-    // POST via hidden form so Safari streams the response as a download
-    const form = document.createElement("form");
-    form.method = "POST";
-    form.action = functionUrl;
-    form.target = "_blank";
-    form.style.display = "none";
-
-    const input = document.createElement("input");
-    input.type = "hidden";
-    input.name = "json";
-    input.value = JSON.stringify(payload);
-    form.appendChild(input);
-
-    document.body.appendChild(form);
-
-    // Safari won't POST JSON via form natively, so use fetch + location fallback
     try {
       const resp = await fetch(functionUrl, {
         method: "POST",
@@ -209,20 +232,15 @@ export async function exportSermonToGoodNotesPdf(sermon: Sermon) {
       });
       if (!resp.ok) throw new Error("Server error");
       const blob = await resp.blob();
-      // Upload to storage for real URL download
-      const { triggerDownload: trigger } = await import("@/lib/downloadHelper");
       const slug = sermon.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-      await trigger(blob, `${slug}-goodnotes.pdf`);
+      await triggerDownload(blob, `${slug}-goodnotes.pdf`);
     } catch {
-      // ultimate fallback: direct fetch didn't work, try location
       window.location.href = functionUrl;
-    } finally {
-      form.remove();
     }
     return;
   }
 
-  // Desktop: fetch and download
+  // Desktop
   try {
     const resp = await fetch(functionUrl, {
       method: "POST",
@@ -245,39 +263,48 @@ export async function exportSermonToGoodNotesPdf(sermon: Sermon) {
   }
 }
 
-// ─── Word (.doc) ────────────────────────────────────────────────────────────
+// ─── Word (.doc) — GOODNOTES PULPIT FORMAT ──────────────────────────────
 
 export function exportSermonToWord(sermon: Sermon) {
-  // Pass raw HTML from rich text editor directly – Word renders it natively
-  const manuscriptHtml = sermon.manuscript || "";
+  const pulpit = parsePulpitFormat(sermon.manuscript, sermon.title, sermon.scripture);
+  const pages = layoutPages(pulpit.sections);
+
+  const sanitize = (t: string) =>
+    t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  let sectionsHtml = "";
+  for (const page of pages) {
+    sectionsHtml += `<div style="page-break-before: always;">`;
+    if (page.heading) {
+      sectionsHtml += `<h2 style="font-size:28pt; font-weight:bold; text-transform:uppercase; text-align:left; margin-top:0.5in; margin-bottom:0.3in;">${sanitize(page.heading)}</h2>`;
+    }
+    sectionsHtml += `<ul style="list-style-type:disc; font-size:16pt; line-height:2.2; margin-left:0.3in;">`;
+    for (const bullet of page.bullets) {
+      sectionsHtml += `<li style="margin-bottom:0.15in;">${sanitize(bullet)}</li>`;
+    }
+    sectionsHtml += `</ul></div>`;
+  }
 
   const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
-<head><meta charset="utf-8"><title>${sermon.title}</title>
+<head><meta charset="utf-8"><title>${sanitize(sermon.title)}</title>
+<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
 <style>
-  body { font-family: Georgia, "Times New Roman", serif; margin: 1in; color: #222; line-height: 1.8; }
-  h1 { text-align: center; font-size: 24pt; margin-top: 2em; }
-  h2 { font-size: 18pt; margin-top: 1.5em; }
-  h3 { font-size: 14pt; margin-top: 1.2em; }
-  .scripture { text-align: center; font-style: italic; color: #555; font-size: 14pt; margin-bottom: 2em; }
-  .author { text-align: center; font-size: 12pt; margin-bottom: 3em; }
-  .copyright { font-size: 9pt; font-style: italic; color: #999; text-align: center; margin-top: 3em; border-top: 1px solid #ddd; padding-top: 1em; }
-  p { margin: 0.6em 0; text-align: justify; }
-  strong, b { font-weight: bold; }
-  em, i { font-style: italic; }
-  u { text-decoration: underline; }
-  ul { list-style-type: disc; margin-left: 1.5em; }
-  ol { list-style-type: decimal; margin-left: 1.5em; }
-  li { margin: 0.3em 0; }
-  blockquote { margin: 1em 2em; padding-left: 1em; border-left: 3px solid #ccc; font-style: italic; color: #555; }
-  sub { vertical-align: sub; font-size: 0.8em; }
-  sup { vertical-align: super; font-size: 0.8em; }
+  @page { size: A4 portrait; margin: 1in; }
+  body { font-family: Georgia, "Times New Roman", serif; margin: 1in; color: #000; line-height: 1.8; }
+  h1 { text-align: center; font-size: 40pt; font-weight: bold; margin-top: 2in; margin-bottom: 0.5in; }
+  .scripture { text-align: center; font-size: 24pt; font-weight: bold; text-transform: uppercase; margin-bottom: 0.3in; }
+  .author { text-align: center; font-size: 14pt; margin-bottom: 2in; }
+  .copyright { font-size: 9pt; font-style: italic; color: #999; text-align: center; margin-top: 2in; border-top: 1px solid #ddd; padding-top: 0.5in; }
+  h2 { font-size: 28pt; font-weight: bold; text-transform: uppercase; text-align: left; }
+  ul { list-style-type: disc; font-size: 16pt; line-height: 2.2; }
+  li { margin-bottom: 0.15in; }
 </style></head>
 <body>
-  <h1>${sermon.title}</h1>
-  <p class="scripture">${sermon.scripture}</p>
+  <h1>${sanitize(sermon.title)}</h1>
+  <p class="scripture">${sanitize(sermon.scripture)}</p>
   <p class="author">By Bryant Clark</p>
-  <div class="manuscript">${manuscriptHtml}</div>
-  <p class="copyright">${COPYRIGHT()}</p>
+${sectionsHtml}
+  <p class="copyright">${sanitize(COPYRIGHT())}</p>
 </body></html>`;
 
   const blob = new Blob([html], { type: "application/msword" });
