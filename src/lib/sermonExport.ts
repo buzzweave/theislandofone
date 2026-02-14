@@ -1,23 +1,12 @@
 import { jsPDF } from "jspdf";
 import { buildEpubZip } from "@/lib/bookExport";
 import { triggerDownload } from "@/lib/downloadHelper";
-import {
-  parsePulpitFormat,
-  layoutPages,
-  filterTitleFromSections,
-  cleanupSections,
-  COPYRIGHT,
-  A4_W,
-  A4_H,
-  MARGIN,
-  CONTENT_W,
-  FONT,
-} from "@/lib/pulpitFormat";
+import { COPYRIGHT } from "@/lib/pulpitFormat";
 import type { Sermon } from "@/hooks/useSermons";
 
 const safeTitle = (title: string) => title.replace(/[^a-zA-Z0-9]/g, "_");
 
-// ── Shared helper ───────────────────────────────────────────────────────
+// ── Shared helpers ──────────────────────────────────────────────────────
 
 function normalizeParagraphs(html: string): string {
   return html
@@ -35,93 +24,250 @@ function normalizeParagraphs(html: string): string {
     .trim();
 }
 
-// ─── PDF — GOODNOTES PULPIT FORMAT ──────────────────────────────────────
+/** Parse HTML into styled segments for jsPDF rendering */
+interface TextSegment {
+  text: string;
+  bold: boolean;
+  italic: boolean;
+  heading: number; // 0 = body, 1-6 = heading level
+}
+
+function parseHtmlToSegments(html: string): TextSegment[][] {
+  // Split by block-level elements into paragraphs
+  const blocks: string[] = [];
+  
+  // Normalize: replace block-level closing tags with markers
+  let processed = html
+    .replace(/<\/h([1-6])>/gi, (_, n) => `\n__BLOCK_END_H${n}__\n`)
+    .replace(/<h([1-6])[^>]*>/gi, (_, n) => `\n__BLOCK_START_H${n}__\n`)
+    .replace(/<\/p>/gi, "\n__BLOCK_END__\n")
+    .replace(/<p[^>]*>/gi, "\n__BLOCK_START__\n")
+    .replace(/<br\s*\/?>/gi, "\n__LINEBREAK__\n")
+    .replace(/<\/li>/gi, "\n__BLOCK_END__\n")
+    .replace(/<li[^>]*>/gi, "\n__BULLET__\n")
+    .replace(/<\/?(?:ul|ol)[^>]*>/gi, "");
+
+  // Now parse segments within each block
+  const lines = processed.split("\n").filter(l => l.trim());
+  const paragraphs: TextSegment[][] = [];
+  let currentHeading = 0;
+  let isBullet = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    
+    if (trimmed.match(/^__BLOCK_START_H(\d)__$/)) {
+      currentHeading = parseInt(trimmed.match(/(\d)/)?.[1] || "0");
+      continue;
+    }
+    if (trimmed.match(/^__BLOCK_END_H\d__$/)) {
+      currentHeading = 0;
+      continue;
+    }
+    if (trimmed === "__BLOCK_START__") continue;
+    if (trimmed === "__BLOCK_END__") continue;
+    if (trimmed === "__LINEBREAK__") {
+      paragraphs.push([{ text: "", bold: false, italic: false, heading: 0 }]);
+      continue;
+    }
+    if (trimmed === "__BULLET__") {
+      isBullet = true;
+      continue;
+    }
+
+    // Parse inline formatting (bold/italic)
+    const segments: TextSegment[] = [];
+    let remaining = trimmed;
+    
+    // Add bullet prefix if needed
+    if (isBullet) {
+      remaining = "• " + remaining;
+      isBullet = false;
+    }
+
+    // Simple regex-based inline parsing
+    const inlineRegex = /<(strong|b|em|i)(?:\s[^>]*)?>|<\/(strong|b|em|i)>/gi;
+    let bold = false;
+    let italic = false;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = inlineRegex.exec(remaining)) !== null) {
+      // Text before this tag
+      if (match.index > lastIndex) {
+        const text = stripInlineTags(remaining.slice(lastIndex, match.index));
+        if (text) segments.push({ text, bold, italic, heading: currentHeading });
+      }
+      
+      const tag = (match[1] || match[2]).toLowerCase();
+      if (match[1]) {
+        // Opening tag
+        if (tag === "strong" || tag === "b") bold = true;
+        if (tag === "em" || tag === "i") italic = true;
+      } else {
+        // Closing tag
+        if (tag === "strong" || tag === "b") bold = false;
+        if (tag === "em" || tag === "i") italic = false;
+      }
+      lastIndex = match.index + match[0].length;
+    }
+
+    // Remaining text after last tag
+    if (lastIndex < remaining.length) {
+      const text = stripInlineTags(remaining.slice(lastIndex));
+      if (text) segments.push({ text, bold, italic, heading: currentHeading });
+    }
+
+    if (segments.length === 0 && remaining.trim()) {
+      const text = stripInlineTags(remaining);
+      if (text) segments.push({ text, bold: false, italic: false, heading: currentHeading });
+    }
+
+    if (segments.length > 0) {
+      paragraphs.push(segments);
+    }
+  }
+
+  return paragraphs;
+}
+
+function stripInlineTags(text: string): string {
+  return text
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ");
+}
+
+// ─── PDF — WYSIWYG Document ────────────────────────────────────────────
 
 export function exportSermonToPdf(sermon: Sermon) {
-  const doc = new jsPDF({ unit: "pt", format: "a4" }); // 595 × 842 portrait
-  const pageW = A4_W;
-  const pageH = A4_H;
-  let y = MARGIN;
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const pageW = 595;
+  const pageH = 842;
+  const margin = 72;
+  const contentW = pageW - margin * 2;
+  let y = margin;
 
-  const newPage = () => { doc.addPage(); y = MARGIN; };
-  const checkPage = (needed: number) => { if (y + needed > pageH - MARGIN) newPage(); };
+  const newPage = () => { doc.addPage(); y = margin; };
+  const checkPage = (needed: number) => { if (y + needed > pageH - margin) newPage(); };
 
-  // ── Title Page ──
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(FONT.title.size);
-  const titleLines = doc.splitTextToSize(sermon.title, CONTENT_W);
-  const titleBlockH = titleLines.length * FONT.title.leading;
-  y = Math.max(MARGIN, (pageH - titleBlockH) * 0.35);
-  doc.text(titleLines, pageW / 2, y, { align: "center" });
-  y += titleBlockH + 30;
+  // Parse manuscript HTML into styled segments
+  const paragraphs = parseHtmlToSegments(sermon.manuscript);
 
-  if (sermon.scripture) {
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(FONT.scriptureHeader.size);
-    const refLines = doc.splitTextToSize(sermon.scripture.toUpperCase(), CONTENT_W - 40);
-    doc.text(refLines, pageW / 2, y, { align: "center" });
-    y += refLines.length * FONT.scriptureHeader.leading + 16;
-  }
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(14);
-  doc.text("By Bryant Clark", pageW / 2, Math.min(y + 20, pageH * 0.65), { align: "center" });
-
-  doc.setFont("helvetica", "italic");
-  doc.setFontSize(FONT.copyright.size);
-  doc.text(COPYRIGHT(), pageW / 2, pageH - 40, { align: "center" });
-
-  // ── Main Point Pages ──
-  const pulpit = parsePulpitFormat(sermon.manuscript, sermon.title, sermon.scripture);
-  const filtered = filterTitleFromSections(pulpit.sections, sermon.title);
-  const cleaned = cleanupSections(filtered);
-  const pages = layoutPages(cleaned);
-
-  for (const page of pages) {
-    newPage();
-
-    if (page.heading) {
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(FONT.mainPoint.size);
-      const hLines = doc.splitTextToSize(page.heading.toUpperCase(), CONTENT_W);
-      for (const hl of hLines) {
-        doc.text(hl, MARGIN, y);
-        y += FONT.mainPoint.leading;
-      }
-      y += 16;
+  for (const segments of paragraphs) {
+    if (segments.length === 1 && segments[0].text === "") {
+      // Empty line / line break
+      y += 12;
+      continue;
     }
 
-    const bulletCount = page.bullets.length;
-    const availableH = pageH - MARGIN - y;
-    const baseLineH = FONT.bullet.leading;
-    const dynamicGap = Math.max(baseLineH, Math.min(availableH / Math.max(bulletCount, 1), 48));
+    // Determine font size based on heading level
+    const headingLevel = segments[0]?.heading || 0;
+    let fontSize = 16; // body
+    let lineHeight = 24;
+    let fontFamily = "times";
 
-    for (const bullet of page.bullets) {
-      doc.setFont("times", "normal");
-      doc.setFontSize(FONT.bullet.size);
-      const bLines = doc.splitTextToSize(bullet, CONTENT_W - 24);
+    if (headingLevel === 1) { fontSize = 28; lineHeight = 36; fontFamily = "helvetica"; }
+    else if (headingLevel === 2) { fontSize = 24; lineHeight = 32; fontFamily = "helvetica"; }
+    else if (headingLevel === 3) { fontSize = 20; lineHeight = 28; fontFamily = "helvetica"; }
+    else if (headingLevel >= 4) { fontSize = 18; lineHeight = 26; fontFamily = "helvetica"; }
 
-      for (let i = 0; i < bLines.length; i++) {
-        checkPage(baseLineH);
-        if (i === 0) {
-          doc.text("\u2022", MARGIN + 4, y);
-          doc.text(bLines[i], MARGIN + 24, y);
-        } else {
-          doc.text(bLines[i], MARGIN + 24, y);
+    // Concatenate all segment text to measure line wrapping
+    const fullText = segments.map(s => s.text).join("");
+    doc.setFontSize(fontSize);
+    doc.setFont(fontFamily, "normal");
+    const wrappedLines: string[] = doc.splitTextToSize(fullText, contentW);
+
+    // For simple single-style paragraphs, render directly
+    const isSingleStyle = segments.length === 1;
+
+    if (isSingleStyle) {
+      const seg = segments[0];
+      const style = seg.bold && seg.italic ? "bolditalic" : seg.bold ? "bold" : seg.italic ? "italic" : "normal";
+      doc.setFont(fontFamily, style);
+      doc.setFontSize(fontSize);
+
+      for (const line of wrappedLines) {
+        checkPage(lineHeight);
+        doc.text(line, margin, y);
+        y += lineHeight;
+      }
+    } else {
+      // Mixed formatting — render segment by segment per wrapped line
+      // For simplicity, render the full text with dominant style
+      // then overlay bold/italic segments
+      for (const line of wrappedLines) {
+        checkPage(lineHeight);
+        
+        // Find which segments contribute to this line
+        let xPos = margin;
+        let remainingLine = line;
+        let segIdx = 0;
+        let charOffset = 0;
+
+        // Simple approach: render each segment's portion
+        for (const seg of segments) {
+          if (remainingLine.length === 0) break;
+          
+          const segText = seg.text.substring(charOffset);
+          const overlap = findOverlap(remainingLine, segText);
+          
+          if (overlap) {
+            const style = seg.bold && seg.italic ? "bolditalic" : seg.bold ? "bold" : seg.italic ? "italic" : "normal";
+            doc.setFont(fontFamily, style);
+            doc.setFontSize(fontSize);
+            doc.text(overlap, xPos, y);
+            xPos += doc.getTextWidth(overlap);
+            remainingLine = remainingLine.substring(overlap.length);
+            
+            if (overlap.length < segText.length) {
+              charOffset += overlap.length;
+            } else {
+              charOffset = 0;
+              segIdx++;
+            }
+          } else {
+            charOffset = 0;
+            segIdx++;
+          }
         }
-        y += baseLineH;
+
+        // Fallback: if overlap logic missed content, render remaining
+        if (remainingLine.length > 0) {
+          doc.setFont(fontFamily, "normal");
+          doc.text(remainingLine, xPos, y);
+        }
+
+        y += lineHeight;
       }
-      y += dynamicGap - baseLineH;
     }
+
+    // Paragraph spacing
+    y += headingLevel > 0 ? 8 : 6;
   }
 
-  // Final copyright
+  // Copyright on last page
   doc.setFont("helvetica", "italic");
-  doc.setFontSize(FONT.copyright.size);
+  doc.setFontSize(9);
   doc.text(COPYRIGHT(), pageW / 2, pageH - 40, { align: "center" });
 
   const pdfBlob = doc.output("blob");
   triggerDownload(pdfBlob, `${safeTitle(sermon.title)}.pdf`);
+}
+
+function findOverlap(line: string, segText: string): string {
+  // Find the longest prefix of segText that matches the start of line
+  const maxLen = Math.min(line.length, segText.length);
+  for (let i = maxLen; i > 0; i--) {
+    if (line.substring(0, i) === segText.substring(0, i)) {
+      return line.substring(0, i);
+    }
+  }
+  return "";
 }
 
 // ─── EPUB (unchanged — e-reader format) ─────────────────────────────────
@@ -218,8 +364,6 @@ export async function exportSermonToGoodNotesPdf(sermon: Sermon) {
   const payload = {
     title: sermon.title,
     scriptureReference: sermon.scripture,
-    scriptureText: "",
-    mainPoints: [] as { heading: string; bullets: string[] }[],
     manuscript: sermon.manuscript,
   };
 
@@ -267,50 +411,29 @@ export async function exportSermonToGoodNotesPdf(sermon: Sermon) {
   }
 }
 
-// ─── Word (.doc) — GOODNOTES PULPIT FORMAT ──────────────────────────────
+// ─── Word (.doc) — WYSIWYG from Rich Editor ────────────────────────────
 
 export function exportSermonToWord(sermon: Sermon) {
-  const pulpit = parsePulpitFormat(sermon.manuscript, sermon.title, sermon.scripture);
-  const filtered = filterTitleFromSections(pulpit.sections, sermon.title);
-  const cleaned = cleanupSections(filtered);
-  const pages = layoutPages(cleaned);
-
-  const sanitize = (t: string) =>
-    t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-  let sectionsHtml = "";
-  for (const page of pages) {
-    sectionsHtml += `<div style="page-break-before: always;">`;
-    if (page.heading) {
-      sectionsHtml += `<h2 style="font-size:28pt; font-weight:bold; text-transform:uppercase; text-align:left; margin-top:0.5in; margin-bottom:0.3in;">${sanitize(page.heading)}</h2>`;
-    }
-    sectionsHtml += `<ul style="list-style-type:disc; font-size:16pt; line-height:2.2; margin-left:0.3in;">`;
-    for (const bullet of page.bullets) {
-      sectionsHtml += `<li style="margin-bottom:0.15in;">${sanitize(bullet)}</li>`;
-    }
-    sectionsHtml += `</ul></div>`;
-  }
-
+  // Pass the manuscript HTML directly — preserves all formatting from the editor
   const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
-<head><meta charset="utf-8"><title>${sanitize(sermon.title)}</title>
+<head><meta charset="utf-8"><title>${sermon.title}</title>
 <!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
 <style>
   @page { size: A4 portrait; margin: 1in; }
-  body { font-family: Georgia, "Times New Roman", serif; margin: 1in; color: #000; line-height: 1.8; }
-  h1 { text-align: center; font-size: 40pt; font-weight: bold; margin-top: 2in; margin-bottom: 0.5in; }
-  .scripture { text-align: center; font-size: 24pt; font-weight: bold; text-transform: uppercase; margin-bottom: 0.3in; }
-  .author { text-align: center; font-size: 14pt; margin-bottom: 2in; }
+  body { font-family: Georgia, "Times New Roman", serif; margin: 1in; color: #000; line-height: 1.6; font-size: 16pt; }
+  h1 { font-size: 28pt; font-weight: bold; }
+  h2 { font-size: 24pt; font-weight: bold; }
+  h3 { font-size: 20pt; font-weight: bold; }
+  p { margin: 0.4em 0; }
+  ul, ol { font-size: 16pt; line-height: 1.6; margin-left: 0.3in; }
+  li { margin-bottom: 0.1in; }
+  strong, b { font-weight: bold; }
+  em, i { font-style: italic; }
   .copyright { font-size: 9pt; font-style: italic; color: #999; text-align: center; margin-top: 2in; border-top: 1px solid #ddd; padding-top: 0.5in; }
-  h2 { font-size: 28pt; font-weight: bold; text-transform: uppercase; text-align: left; }
-  ul { list-style-type: disc; font-size: 16pt; line-height: 2.2; }
-  li { margin-bottom: 0.15in; }
 </style></head>
 <body>
-  <h1>${sanitize(sermon.title)}</h1>
-  <p class="scripture">${sanitize(sermon.scripture)}</p>
-  <p class="author">By Bryant Clark</p>
-${sectionsHtml}
-  <p class="copyright">${sanitize(COPYRIGHT())}</p>
+${sermon.manuscript}
+  <p class="copyright">${COPYRIGHT()}</p>
 </body></html>`;
 
   const blob = new Blob([html], { type: "application/msword" });

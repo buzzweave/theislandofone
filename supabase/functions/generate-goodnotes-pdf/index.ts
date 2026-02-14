@@ -8,18 +8,18 @@ const corsHeaders = {
 
 /* ── Types ────────────────────────────────────────────────────────────── */
 
-interface PulpitSection {
-  heading: string;
-  bullets: string[];
-}
-
 interface SermonPayload {
   title: string;
   scriptureReference?: string;
-  scriptureText?: string;
-  mainPoints?: { heading: string; bullets: string[] }[];
   scripture?: string;
   manuscript?: string;
+}
+
+interface TextSegment {
+  text: string;
+  bold: boolean;
+  italic: boolean;
+  heading: number;
 }
 
 /* ── Constants ────────────────────────────────────────────────────────── */
@@ -28,278 +28,190 @@ const A4_W = 595;
 const A4_H = 842;
 const MARGIN = 72;
 const CONTENT_W = A4_W - MARGIN * 2;
-const MAX_BULLETS = 4;
-const MIN_BULLETS = 4;
 
-const FONT = {
-  title: 44,
-  scriptureHeader: 24,
-  scriptureText: 18,
-  mainPoint: 28,
-  bullet: 16,
-  copyright: 9,
-};
+/* ── HTML → Styled Segments Parser ───────────────────────────────────── */
 
-/* ── Helpers ──────────────────────────────────────────────────────────── */
-
-function stripHtml(html: string): string {
-  return html
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/p>/gi, "\n\n")
-    .replace(/<\/li>/gi, "\n")
-    .replace(/<\/h[1-6]>/gi, "\n\n")
+function stripInlineTags(text: string): string {
+  return text
     .replace(/<[^>]+>/g, "")
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, " ")
-    .trim();
+    .replace(/&nbsp;/g, " ");
 }
 
-function extractBoldSegments(html: string): Set<string> {
-  const bolds = new Set<string>();
-  const re = /<(?:strong|b)(?:\s[^>]*)?>(.+?)<\/(?:strong|b)>/gi;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(html)) !== null) {
-    const text = m[1]
-      .replace(/<[^>]+>/g, "")
-      .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-      .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ")
-      .trim();
-    if (text.length > 0) bolds.add(text);
-  }
-  return bolds;
-}
+function parseHtmlToSegments(html: string): TextSegment[][] {
+  let processed = html
+    .replace(/<\/h([1-6])>/gi, (_, n) => `\n__BLOCK_END_H${n}__\n`)
+    .replace(/<h([1-6])[^>]*>/gi, (_, n) => `\n__BLOCK_START_H${n}__\n`)
+    .replace(/<\/p>/gi, "\n__BLOCK_END__\n")
+    .replace(/<p[^>]*>/gi, "\n__BLOCK_START__\n")
+    .replace(/<br\s*\/?>/gi, "\n__LINEBREAK__\n")
+    .replace(/<\/li>/gi, "\n__BLOCK_END__\n")
+    .replace(/<li[^>]*>/gi, "\n__BULLET__\n")
+    .replace(/<\/?(?:ul|ol)[^>]*>/gi, "");
 
-function splitLongBullet(text: string): string[] {
-  const sentences = text.match(/[^.!?]+[.!?]+[\s]*/g);
-  if (!sentences || sentences.length <= 2) return [text.trim()];
-  const result: string[] = [];
-  for (let i = 0; i < sentences.length; i += 2) {
-    const chunk = (sentences[i] + (sentences[i + 1] || "")).trim();
-    if (chunk) result.push(chunk);
-  }
-  return result;
-}
-
-function parseManuscript(raw: string, title: string, scripture?: string): PulpitSection[] {
-  const boldSegments = raw.includes("<") ? extractBoldSegments(raw) : new Set<string>();
-  const text = raw.includes("<") ? stripHtml(raw) : raw;
-  const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
-
-  const titleNorm = title.trim().toLowerCase();
-  const scriptureNorm = scripture?.trim().toLowerCase() || "";
-
-  const sections: PulpitSection[] = [];
-  let current: PulpitSection | null = null;
+  const lines = processed.split("\n").filter(l => l.trim());
+  const paragraphs: TextSegment[][] = [];
+  let currentHeading = 0;
+  let isBullet = false;
 
   for (const line of lines) {
-    const lineNorm = line.trim().toLowerCase();
-    if (lineNorm === titleNorm || (scriptureNorm && lineNorm === scriptureNorm)) continue;
+    const trimmed = line.trim();
 
-    const isBoldHeading = [...boldSegments].some(
-      (b) => b.toLowerCase() === lineNorm || lineNorm.startsWith(b.toLowerCase())
-    );
-
-    if (isBoldHeading) {
-      current = { heading: line, bullets: [] };
-      sections.push(current);
-    } else if (current) {
-      const split = splitLongBullet(line);
-      current.bullets.push(...split);
-    } else {
-      current = { heading: "", bullets: [line] };
-      sections.push(current);
+    if (trimmed.match(/^__BLOCK_START_H(\d)__$/)) {
+      currentHeading = parseInt(trimmed.match(/(\d)/)?.[1] || "0");
+      continue;
     }
-  }
-  return sections;
-}
+    if (trimmed.match(/^__BLOCK_END_H\d__$/)) { currentHeading = 0; continue; }
+    if (trimmed === "__BLOCK_START__") continue;
+    if (trimmed === "__BLOCK_END__") continue;
+    if (trimmed === "__LINEBREAK__") {
+      paragraphs.push([{ text: "", bold: false, italic: false, heading: 0 }]);
+      continue;
+    }
+    if (trimmed === "__BULLET__") { isBullet = true; continue; }
 
-interface PageSlice {
-  heading: string;
-  bullets: string[];
-}
+    const segments: TextSegment[] = [];
+    let remaining = isBullet ? "• " + trimmed : trimmed;
+    isBullet = false;
 
-function layoutPages(sections: PulpitSection[]): PageSlice[] {
-  const pages: PageSlice[] = [];
-  for (const section of sections) {
-    const { heading, bullets } = section;
-    if (bullets.length <= MAX_BULLETS) {
-      pages.push({ heading, bullets: [...bullets] });
-    } else {
-      let remaining = [...bullets];
-      let first = true;
-      while (remaining.length > 0) {
-        let take = Math.min(MAX_BULLETS, remaining.length);
-        const leftover = remaining.length - take;
-        if (leftover > 0 && leftover < 2) take = remaining.length - 2;
-        if (take < MIN_BULLETS && remaining.length > take) take = MIN_BULLETS;
-        pages.push({ heading: first ? heading : "", bullets: remaining.slice(0, take) });
-        remaining = remaining.slice(take);
-        first = false;
+    const inlineRegex = /<(strong|b|em|i)(?:\s[^>]*)?>|<\/(strong|b|em|i)>/gi;
+    let bold = false;
+    let italic = false;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = inlineRegex.exec(remaining)) !== null) {
+      if (match.index > lastIndex) {
+        const text = stripInlineTags(remaining.slice(lastIndex, match.index));
+        if (text) segments.push({ text, bold, italic, heading: currentHeading });
       }
+      const tag = (match[1] || match[2]).toLowerCase();
+      if (match[1]) {
+        if (tag === "strong" || tag === "b") bold = true;
+        if (tag === "em" || tag === "i") italic = true;
+      } else {
+        if (tag === "strong" || tag === "b") bold = false;
+        if (tag === "em" || tag === "i") italic = false;
+      }
+      lastIndex = match.index + match[0].length;
     }
+
+    if (lastIndex < remaining.length) {
+      const text = stripInlineTags(remaining.slice(lastIndex));
+      if (text) segments.push({ text, bold, italic, heading: currentHeading });
+    }
+
+    if (segments.length === 0 && remaining.trim()) {
+      const text = stripInlineTags(remaining);
+      if (text) segments.push({ text, bold: false, italic: false, heading: currentHeading });
+    }
+
+    if (segments.length > 0) paragraphs.push(segments);
   }
-  return pages;
+
+  return paragraphs;
 }
 
-/* ── PDF Generation — GOODNOTES PULPIT FORMAT ────────────────────────── */
+function findOverlap(line: string, segText: string): string {
+  const maxLen = Math.min(line.length, segText.length);
+  for (let i = maxLen; i > 0; i--) {
+    if (line.substring(0, i) === segText.substring(0, i)) return line.substring(0, i);
+  }
+  return "";
+}
+
+/* ── PDF Generation — WYSIWYG Document ───────────────────────────────── */
 
 function generatePdf(data: SermonPayload): ArrayBuffer {
-  const doc = new jsPDF({ unit: "pt", format: "a4" }); // 595 × 842 portrait
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
-  let y = MARGIN;
+  const margin = MARGIN;
+  const contentW = CONTENT_W;
+  let y = margin;
 
-  const newPage = () => { doc.addPage(); y = MARGIN; };
-  const checkPage = (needed: number) => { if (y + needed > pageH - MARGIN) newPage(); };
+  const newPage = () => { doc.addPage(); y = margin; };
+  const checkPage = (needed: number) => { if (y + needed > pageH - margin) newPage(); };
 
-  // ── PAGE 1: Title Page ──────────────────────────────────────────────
+  const manuscript = data.manuscript || "";
+  const paragraphs = parseHtmlToSegments(manuscript);
 
-  // Title — 44pt bold centered
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(FONT.title);
-  const titleLines: string[] = doc.splitTextToSize(data.title, CONTENT_W);
-  const titleBlockH = titleLines.length * 52;
-  const titleY = Math.max(MARGIN, (pageH - titleBlockH) * 0.35);
-  y = titleY;
-  doc.text(titleLines, pageW / 2, y, { align: "center" });
-  y += titleBlockH + 30;
-
-  // Scripture reference — 24pt bold uppercase
-  const ref = data.scriptureReference || data.scripture || "";
-  if (ref) {
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(FONT.scriptureHeader);
-    const refLines: string[] = doc.splitTextToSize(ref.toUpperCase(), CONTENT_W - 40);
-    doc.text(refLines, pageW / 2, y, { align: "center" });
-    y += refLines.length * 32 + 16;
-  }
-
-  // Scripture text — 18pt normal
-  const scrText = data.scriptureText || "";
-  if (scrText) {
-    doc.setFont("times", "normal");
-    doc.setFontSize(FONT.scriptureText);
-    const sLines: string[] = doc.splitTextToSize(scrText, CONTENT_W - 20);
-    for (const line of sLines) {
-      checkPage(26);
-      doc.text(line, pageW / 2, y, { align: "center" });
-      y += 26;
+  for (const segments of paragraphs) {
+    if (segments.length === 1 && segments[0].text === "") {
+      y += 12;
+      continue;
     }
-    y += 20;
+
+    const headingLevel = segments[0]?.heading || 0;
+    let fontSize = 16;
+    let lineHeight = 24;
+    let fontFamily = "times";
+
+    if (headingLevel === 1) { fontSize = 28; lineHeight = 36; fontFamily = "helvetica"; }
+    else if (headingLevel === 2) { fontSize = 24; lineHeight = 32; fontFamily = "helvetica"; }
+    else if (headingLevel === 3) { fontSize = 20; lineHeight = 28; fontFamily = "helvetica"; }
+    else if (headingLevel >= 4) { fontSize = 18; lineHeight = 26; fontFamily = "helvetica"; }
+
+    const fullText = segments.map(s => s.text).join("");
+    doc.setFontSize(fontSize);
+    doc.setFont(fontFamily, "normal");
+    const wrappedLines: string[] = doc.splitTextToSize(fullText, contentW);
+
+    const isSingleStyle = segments.length === 1;
+
+    if (isSingleStyle) {
+      const seg = segments[0];
+      const style = seg.bold && seg.italic ? "bolditalic" : seg.bold ? "bold" : seg.italic ? "italic" : "normal";
+      doc.setFont(fontFamily, style);
+      doc.setFontSize(fontSize);
+
+      for (const line of wrappedLines) {
+        checkPage(lineHeight);
+        doc.text(line, margin, y);
+        y += lineHeight;
+      }
+    } else {
+      for (const line of wrappedLines) {
+        checkPage(lineHeight);
+        let xPos = margin;
+        let remainingLine = line;
+
+        for (const seg of segments) {
+          if (remainingLine.length === 0) break;
+          const overlap = findOverlap(remainingLine, seg.text);
+          if (overlap) {
+            const style = seg.bold && seg.italic ? "bolditalic" : seg.bold ? "bold" : seg.italic ? "italic" : "normal";
+            doc.setFont(fontFamily, style);
+            doc.setFontSize(fontSize);
+            doc.text(overlap, xPos, y);
+            xPos += doc.getTextWidth(overlap);
+            remainingLine = remainingLine.substring(overlap.length);
+          }
+        }
+
+        if (remainingLine.length > 0) {
+          doc.setFont(fontFamily, "normal");
+          doc.text(remainingLine, xPos, y);
+        }
+
+        y += lineHeight;
+      }
+    }
+
+    y += headingLevel > 0 ? 8 : 6;
   }
 
-  // Author
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(14);
-  doc.text("By Bryant Clark", pageW / 2, Math.min(y + 20, pageH * 0.65), { align: "center" });
-
-  // Copyright on title page
+  // Copyright
   doc.setFont("helvetica", "italic");
-  doc.setFontSize(FONT.copyright);
+  doc.setFontSize(9);
   doc.text(
     `\u00A9 ${new Date().getFullYear()} The Island of One. All rights reserved.`,
     pageW / 2,
     pageH - 40,
-    { align: "center" },
-  );
-
-  // ── MAIN POINT PAGES ───────────────────────────────────────────────
-
-  const rawSections =
-    data.mainPoints && data.mainPoints.length > 0
-      ? data.mainPoints
-      : data.manuscript
-        ? parseManuscript(data.manuscript, data.title, ref)
-        : [];
-
-  // Remove sections whose heading duplicates the sermon title (already on page 1)
-  const titleUpper = data.title.trim().toUpperCase();
-  const sections: PulpitSection[] = [];
-  for (const s of rawSections) {
-    if (s.heading && s.heading.trim().toUpperCase() === titleUpper) {
-      // Prepend orphaned bullets to the next section so no content is lost
-      if (s.bullets.length > 0) {
-        const next = rawSections[rawSections.indexOf(s) + 1];
-        if (next) {
-          next.bullets = [...s.bullets, ...next.bullets];
-        }
-      }
-      continue;
-    }
-    sections.push(s);
-  }
-
-  // Cleanup: merge empty sections (orphan headers) into neighbors
-  const cleaned: PulpitSection[] = [];
-  for (let i = 0; i < sections.length; i++) {
-    const s = sections[i];
-    if (s.bullets.length === 0 && s.heading) {
-      const next = sections[i + 1];
-      if (next) {
-        next.bullets = [s.heading, ...next.bullets];
-      } else if (cleaned.length > 0) {
-        cleaned[cleaned.length - 1].bullets.push(s.heading);
-      }
-      continue;
-    }
-    cleaned.push(s);
-  }
-
-  const pages = layoutPages(cleaned);
-
-  for (const page of pages) {
-    newPage();
-
-    // Heading — 28pt bold uppercase left-aligned, NO bullet
-    if (page.heading) {
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(FONT.mainPoint);
-      const hLines: string[] = doc.splitTextToSize(page.heading.toUpperCase(), CONTENT_W);
-      for (const hl of hLines) {
-        doc.text(hl, MARGIN, y);
-        y += 36;
-      }
-      y += 16; // gap after heading
-    }
-
-    // Bullets — 16pt with round bullet, generous spacing
-    const bulletCount = page.bullets.length;
-    // Calculate spacing to fill page evenly
-    const availableH = pageH - MARGIN - y;
-    const baseLineH = 24;
-    const dynamicGap = Math.max(baseLineH, Math.min(availableH / Math.max(bulletCount, 1), 48));
-
-    for (const bullet of page.bullets) {
-      doc.setFont("times", "normal");
-      doc.setFontSize(FONT.bullet);
-      const bLines: string[] = doc.splitTextToSize(bullet, CONTENT_W - 24);
-
-      for (let i = 0; i < bLines.length; i++) {
-        checkPage(24);
-        if (i === 0) {
-          doc.text("\u2022", MARGIN + 4, y);
-          doc.text(bLines[i], MARGIN + 24, y);
-        } else {
-          doc.text(bLines[i], MARGIN + 24, y);
-        }
-        y += baseLineH;
-      }
-      y += dynamicGap - baseLineH; // extra gap between bullets
-    }
-  }
-
-  // Final copyright on last page
-  const lastPageH = doc.internal.pageSize.getHeight();
-  doc.setFont("helvetica", "italic");
-  doc.setFontSize(FONT.copyright);
-  doc.text(
-    `\u00A9 ${new Date().getFullYear()} The Island of One. All rights reserved. For personal use only.`,
-    pageW / 2,
-    lastPageH - 40,
     { align: "center" },
   );
 
