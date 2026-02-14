@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import { stripHtml, normalizeParagraphs, buildEpubZip, crc32 } from "@/lib/bookExport";
+import { triggerDownload } from "@/lib/downloadHelper";
 import type { Sermon } from "@/hooks/useSermons";
 
 const COPYRIGHT = () =>
@@ -74,7 +75,8 @@ export function exportSermonToPdf(sermon: Sermon) {
     y += paraGap;
   });
 
-  doc.save(`${safeTitle(sermon.title)}.pdf`);
+  const pdfBlob = doc.output("blob");
+  triggerDownload(pdfBlob, `${safeTitle(sermon.title)}.pdf`);
 }
 
 // ─── EPUB ───────────────────────────────────────────────────────────────────
@@ -161,14 +163,7 @@ ${bodyHtml}
   ];
 
   const blob = buildEpubZip(files);
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${safeTitle(sermon.title)}.epub`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  triggerDownload(blob, `${safeTitle(sermon.title)}.epub`);
 }
 
 // ─── Word (.doc) ────────────────────────────────────────────────────────────
@@ -199,12 +194,5 @@ ${paras}
 </body></html>`;
 
   const blob = new Blob([html], { type: "application/msword" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${safeTitle(sermon.title)}.doc`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  triggerDownload(blob, `${safeTitle(sermon.title)}.doc`);
 }
