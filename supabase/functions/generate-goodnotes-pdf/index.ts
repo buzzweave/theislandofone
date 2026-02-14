@@ -78,7 +78,7 @@ function parseManuscript(raw: string): MainPoint[] {
 /* ── PDF generation ──────────────────────────────────────────────────── */
 
 function generatePdf(data: SermonPayload): ArrayBuffer {
-  const doc = new jsPDF({ unit: "pt", format: "a4", orientation: "l" }); // 842 × 595 landscape
+  const doc = new jsPDF({ unit: "pt", format: "a4" }); // 595 × 842 portrait
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
   const margin = 72; // 1 inch
