@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.graphics-admin]
 verify_jwt = false
+
+[functions.generate-goodnotes-pdf]
+verify_jwt = false
