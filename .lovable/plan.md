@@ -1,55 +1,42 @@
 
 
-# Fix: Downloads Not Working on Mobile and Files Not Opening
+# Fix Word/PDF Formatting and iPad Downloads
 
-## Problem
+## Problems
+1. **Word and PDF strip all formatting** -- `normalizeParagraphs()` calls `stripHtml()` which removes bold, italic, lists, headings, alignment -- everything from the rich text editor is lost
+2. **iPad downloads fail** -- `window.open(blobUrl)` with blob URLs is unreliable on iPadOS Safari; it silently fails or shows a blank tab
+3. **EPUB stays unchanged** -- per your request, EPUB exports will remain exactly as they are (Kindle-optimized)
 
-Two separate issues:
+## Changes
 
-1. **Downloads fail on iPhone/iPad**: The current download method creates an invisible `<a>` element and programmatically clicks it. iOS Safari blocks this pattern -- programmatic clicks on dynamically created links are silently ignored.
+### 1. `src/lib/downloadHelper.ts` -- Fix iPad downloads
 
-2. **EPUB files won't open**: The custom minimal ZIP builder produces files that some e-reader apps reject because it doesn't write proper ZIP local file headers (missing date/time fields, extra field lengths not zeroed consistently).
+Replace the blob URL approach for iOS/iPad with a **data URL** conversion:
+- Convert blob to a base64 data URL using `FileReader.readAsDataURL()`
+- Open the data URL in a new tab -- iPad Safari handles data URLs reliably unlike blob URLs
+- Desktop download path stays the same (unchanged)
 
-## Root Cause
+### 2. `src/lib/sermonExport.ts` -- Preserve formatting in Word
 
-All three export types (PDF, EPUB, Word) use the same broken download pattern:
-```
-const a = document.createElement("a");
-a.href = url;
-a.download = "file.ext";
-document.body.appendChild(a);
-a.click();  // <-- blocked on iOS Safari
-```
+**Word export**: Stop calling `normalizeParagraphs()` (which strips HTML). Instead, pass the raw HTML manuscript directly into the Word document body. Word natively renders bold, italic, underline, lists, headings, blockquotes -- exactly what the rich text editor produces.
 
-## Solution
+**PDF export**: Keep as plain text. jsPDF cannot render HTML, so the PDF will remain a clean readable document. No change here.
 
-### 1. Create a shared download helper -- `src/lib/downloadHelper.ts`
+**EPUB export**: No changes (stays as Kindle download).
 
-A single robust function that handles triggering downloads across all browsers and devices:
+### 3. `src/lib/bookExport.ts` -- Preserve formatting in Word for books
 
-- First tries the standard `<a>` click approach (works on desktop)
-- If on iOS/mobile Safari, falls back to `window.open(url, '_blank')` which lets the browser handle the file natively
-- Detects iOS/iPad via user agent
+Same approach as sermons: the Word export will pass each chapter's raw HTML content directly instead of stripping it. Add base styles for bold, italic, lists, blockquotes so they render properly in Word.
 
-### 2. Fix `src/lib/bookExport.ts`
+**PDF and EPUB**: No changes.
 
-- Replace all three inline download triggers (PDF save, EPUB blob, Word blob) with calls to the new download helper
-- For PDF: use `doc.output('blob')` to get a Blob, then pass to the helper instead of relying on jsPDF's built-in `save()` which also uses the broken pattern internally
-- Fix the EPUB ZIP builder: zero out the unused date/time and extra-field-length fields in both local and central directory headers to produce spec-compliant ZIP files
-
-### 3. Fix `src/lib/sermonExport.ts`
-
-- Same changes: replace all three inline download triggers with the shared helper
-- For PDF: use `doc.output('blob')` + helper
-- EPUB and Word already use `buildEpubZip` from bookExport (which gets the ZIP fix) and the blob pattern (which gets the helper fix)
-
-### 4. Files affected
+### Files Changed
 
 | File | Change |
 |------|--------|
-| `src/lib/downloadHelper.ts` | New file -- cross-browser download function |
-| `src/lib/bookExport.ts` | Use download helper, fix ZIP header fields |
-| `src/lib/sermonExport.ts` | Use download helper for all three formats |
+| `src/lib/downloadHelper.ts` | Convert blob to data URL for iPad instead of blob URL |
+| `src/lib/sermonExport.ts` | Word export uses raw HTML instead of stripped text |
+| `src/lib/bookExport.ts` | Word export uses raw HTML instead of stripped text |
 
-No UI or page component changes needed.
+No changes to EPUB exports, no changes to page components.
 
