@@ -5,6 +5,7 @@ import {
   parsePulpitFormat,
   layoutPages,
   filterTitleFromSections,
+  cleanupSections,
   COPYRIGHT,
   A4_W,
   A4_H,
@@ -73,7 +74,8 @@ export function exportSermonToPdf(sermon: Sermon) {
   // ── Main Point Pages ──
   const pulpit = parsePulpitFormat(sermon.manuscript, sermon.title, sermon.scripture);
   const filtered = filterTitleFromSections(pulpit.sections, sermon.title);
-  const pages = layoutPages(filtered);
+  const cleaned = cleanupSections(filtered);
+  const pages = layoutPages(cleaned);
 
   for (const page of pages) {
     newPage();
@@ -270,7 +272,8 @@ export async function exportSermonToGoodNotesPdf(sermon: Sermon) {
 export function exportSermonToWord(sermon: Sermon) {
   const pulpit = parsePulpitFormat(sermon.manuscript, sermon.title, sermon.scripture);
   const filtered = filterTitleFromSections(pulpit.sections, sermon.title);
-  const pages = layoutPages(filtered);
+  const cleaned = cleanupSections(filtered);
+  const pages = layoutPages(cleaned);
 
   const sanitize = (t: string) =>
     t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");

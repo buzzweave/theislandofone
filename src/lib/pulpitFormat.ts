@@ -170,7 +170,26 @@ export function layoutPages(sections: PulpitSection[]): PageSlice[] {
   return pages;
 }
 
-// ── Copyright ───────────────────────────────────────────────────────────
+// ── Empty-Section Cleanup ────────────────────────────────────────────────
+
+/** Merge sections with 0 bullets into neighbors to prevent blank pages. */
+export function cleanupSections(sections: PulpitSection[]): PulpitSection[] {
+  const result: PulpitSection[] = [];
+  for (let i = 0; i < sections.length; i++) {
+    const s = sections[i];
+    if (s.bullets.length === 0 && s.heading) {
+      const next = sections[i + 1];
+      if (next) {
+        next.bullets = [s.heading, ...next.bullets];
+      } else if (result.length > 0) {
+        result[result.length - 1].bullets.push(s.heading);
+      }
+      continue;
+    }
+    result.push(s);
+  }
+  return result;
+}
 
 // ── Title Filter ────────────────────────────────────────────────────────
 
