@@ -47,10 +47,10 @@ export default function AdminSermonEditor() {
 
   // Set initial active ID when data loads
   useEffect(() => {
-    if (!activeId && sermonList.length > 0) {
+    if (!activeId && sermonList.length > 0 && !isMobile) {
       setActiveId(sermonList[0].id);
     }
-  }, [sermonList, activeId]);
+  }, [sermonList, activeId, isMobile]);
 
   // Sync draft when activeId changes
   const prevActiveId = useRef<string | null>(null);
