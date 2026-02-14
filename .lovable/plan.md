@@ -1,26 +1,26 @@
 
 
-# Fix: White Text in Rich Text Editor Body and Content Pages
+# Fix: Sermon Page Crash
 
 ## Problem
 
-The rich text editor's body area shows near-invisible text because it uses `dark:prose-invert` (which requires a `dark` class on the HTML element) instead of `prose-invert` (which applies unconditionally). Since the site is always in dark mode without a `dark` class toggle, the prose inversion never activates, leaving text in default dark colors.
+The sermons page shows a blank screen because it crashes with the error:
+**`sermon.price?.toFixed is not a function`**
 
-Additionally, the sermon detail page has an HTML nesting issue where `renderContent()` returns a `<p>` or `<div>` inside another `<p>` tag, which can cause rendering inconsistencies.
+The API returns `price` as a string (e.g. `"0.00"`) but the code calls `.toFixed(2)` on it, which only works on numbers.
 
-## Changes
+## Solution
 
-### 1. `src/components/admin/RichTextEditor.tsx` (line 588)
+**File: `src/pages/Sermons.tsx`** (line ~99, the price display)
 
-Change `dark:prose-invert` to `prose-invert` in the editor's `editorProps.attributes.class` so that text always renders as white in the editor body.
+Change:
+```
+${sermon.price?.toFixed(2)}
+```
+To:
+```
+${Number(sermon.price)?.toFixed(2)}
+```
 
-### 2. `src/pages/SermonDetail.tsx` (lines 141-146)
-
-- Fix the content rendering: the `renderContent()` function returns markup that gets nested inside a `<p>` tag, causing invalid HTML. Change the wrapper from `<p>` to `<div>` to prevent nesting issues and ensure white text renders correctly.
-
-### 3. `src/index.css` -- already fixed
-
-The `.ProseMirror { color: hsl(var(--foreground)); }` rule added in the last edit provides a baseline white color. Combined with switching to `prose-invert`, this ensures full coverage.
-
-No other files need changes.
+This wraps `sermon.price` in `Number()` to convert the string to a number before calling `.toFixed(2)`. This is a one-line fix that will immediately restore the sermons page.
 
