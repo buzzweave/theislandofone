@@ -220,7 +220,23 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
     sections.push(s);
   }
 
-  const pages = layoutPages(sections);
+  // Cleanup: merge empty sections (orphan headers) into neighbors
+  const cleaned: PulpitSection[] = [];
+  for (let i = 0; i < sections.length; i++) {
+    const s = sections[i];
+    if (s.bullets.length === 0 && s.heading) {
+      const next = sections[i + 1];
+      if (next) {
+        next.bullets = [s.heading, ...next.bullets];
+      } else if (cleaned.length > 0) {
+        cleaned[cleaned.length - 1].bullets.push(s.heading);
+      }
+      continue;
+    }
+    cleaned.push(s);
+  }
+
+  const pages = layoutPages(cleaned);
 
   for (const page of pages) {
     newPage();
