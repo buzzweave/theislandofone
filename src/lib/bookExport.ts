@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import type { Book } from "@/hooks/useBooks";
+import { triggerDownload } from "@/lib/downloadHelper";
 
 /**
  * Normalize pasted text into clean paragraphs.
@@ -146,7 +147,8 @@ export function exportBookToPdf(book: Book) {
     });
   });
 
-  doc.save(`${book.title.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`);
+  const pdfBlob = doc.output("blob");
+  triggerDownload(pdfBlob, `${book.title.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`);
 }
 
 export function exportBookToEpub(book: Book) {
@@ -258,14 +260,7 @@ ${bodyHtml}
   ];
 
   const blob = buildEpubZip(files);
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${book.title.replace(/[^a-zA-Z0-9]/g, "_")}.epub`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  triggerDownload(blob, `${book.title.replace(/[^a-zA-Z0-9]/g, "_")}.epub`);
 }
 
 // Minimal ZIP builder for EPUB (store-only, no compression needed for small text files)
@@ -370,12 +365,5 @@ ${chapters}
 </body></html>`;
 
   const blob = new Blob([html], { type: "application/msword" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${book.title.replace(/[^a-zA-Z0-9]/g, "_")}.doc`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  triggerDownload(blob, `${book.title.replace(/[^a-zA-Z0-9]/g, "_")}.doc`);
 }
