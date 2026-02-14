@@ -1,26 +1,44 @@
 
 
-# Fix: Sermon Page Crash
+# Add Proper Download Formats for Sermons and Books
 
 ## Problem
 
-The sermons page shows a blank screen because it crashes with the error:
-**`sermon.price?.toFixed is not a function`**
-
-The API returns `price` as a string (e.g. `"0.00"`) but the code calls `.toFixed(2)` on it, which only works on numbers.
+1. **Sermons**: The download buttons (PDF, EPUB, Word) all generate plain text files with wrong extensions -- not actual formatted documents.
+2. **Books**: Only has PDF and EPUB downloads. Missing Word format entirely.
 
 ## Solution
 
-**File: `src/pages/Sermons.tsx`** (line ~99, the price display)
+### 1. Create `src/lib/sermonExport.ts` -- New file
 
-Change:
-```
-${sermon.price?.toFixed(2)}
-```
-To:
-```
-${Number(sermon.price)?.toFixed(2)}
-```
+Add three export functions for sermons that mirror the quality of book exports:
 
-This wraps `sermon.price` in `Number()` to convert the string to a number before calling `.toFixed(2)`. This is a one-line fix that will immediately restore the sermons page.
+- **`exportSermonToPdf`**: Uses jsPDF to generate a properly formatted A5 PDF with title page (title, scripture, author, copyright), followed by the manuscript body with paragraph indentation and page breaks.
+- **`exportSermonToEpub`**: Uses the same minimal ZIP/EPUB builder pattern from `bookExport.ts` to create a valid EPUB with metadata, table of contents, and styled content.
+- **`exportSermonToWord`**: Generates an HTML-based `.doc` file (Microsoft Word compatible) with proper styling, headers, and copyright footer. This uses the `application/msword` MIME type with an HTML document that Word can open natively.
+
+All three will strip HTML from the manuscript, normalize paragraphs, and append the copyright notice.
+
+### 2. Update `src/lib/bookExport.ts` -- Add Word export
+
+Add a new `exportBookToWord` function that generates an HTML-based `.doc` file containing:
+- Title page with book title, subtitle, author
+- Each chapter as a section with chapter number heading, title, and body
+- Copyright footer
+
+Also export the `stripHtml` and `normalizeParagraphs` helper functions so `sermonExport.ts` can reuse them.
+
+### 3. Update `src/pages/SermonDetail.tsx` -- Wire up real exports
+
+Replace the `handleDownload` function (lines 61-70) with calls to the new dedicated export functions from `sermonExport.ts`. Each format button will call its specific function.
+
+### 4. Update `src/pages/BookDetail.tsx` -- Add Word download button
+
+Add a third download button for Word format alongside the existing PDF and EPUB buttons (around line 127-132), calling the new `exportBookToWord` function.
+
+## Technical Notes
+
+- The Word export uses the standard HTML-to-DOC technique (an HTML file saved with `.doc` extension and `application/msword` MIME type). This opens correctly in Microsoft Word, Google Docs, and LibreOffice without requiring complex OOXML generation.
+- The `stripHtml` and `normalizeParagraphs` functions will be exported from `bookExport.ts` to be shared with `sermonExport.ts`, avoiding code duplication.
+- The sermon type information will be imported from `useSermons` hook's `Sermon` type.
 
