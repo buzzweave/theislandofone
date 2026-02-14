@@ -36,8 +36,8 @@ export const FONT = {
   copyright: { size: 9, leading: 14 },
 } as const;
 
-export const MIN_BULLETS_PER_PAGE = 5;
-export const MAX_BULLETS_PER_PAGE = 6;
+export const MIN_BULLETS_PER_PAGE = 4;
+export const MAX_BULLETS_PER_PAGE = 4;
 
 // ── HTML Stripping ──────────────────────────────────────────────────────
 
@@ -57,28 +57,33 @@ export function stripHtml(html: string): string {
     .trim();
 }
 
-// ── Heading Detection ───────────────────────────────────────────────────
+// ── Bold-Based Heading Detection ────────────────────────────────────────
 
-const ROMAN = /^(I{1,3}|IV|V|VI{0,3}|IX|X{1,3}|XL|L)[\.\)\s—–\-:]/i;
-const NUMBERED = /^\d{1,2}[\.\)\s—–\-:]/;
-const MAIN_POINT_KW = /main\s*point/i;
-
-function isHeading(line: string): boolean {
-  const t = line.trim();
-  if (t.length === 0 || t.length > 150) return false;
-  if (MAIN_POINT_KW.test(t)) return true;
-  if (ROMAN.test(t)) return true;
-  if (NUMBERED.test(t) && t === t.toUpperCase()) return true;
-  if (t === t.toUpperCase() && t.length > 3 && t.length < 150) return true;
-  if (t.endsWith(":") && t.length < 100) return true;
-  return false;
+/**
+ * Extract bold text segments from HTML. Returns an array of plain-text
+ * strings that were wrapped in <strong> or <b> tags.
+ */
+function extractBoldSegments(html: string): Set<string> {
+  const bolds = new Set<string>();
+  const re = /<(?:strong|b)(?:\s[^>]*)?>(.+?)<\/(?:strong|b)>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    const text = m[1]
+      .replace(/<[^>]+>/g, "")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&nbsp;/g, " ")
+      .trim();
+    if (text.length > 0) bolds.add(text);
+  }
+  return bolds;
 }
-
-// ── Bullet Splitting ────────────────────────────────────────────────────
 
 /** Ensure each bullet is at most ~2 sentences. */
 function splitLongBullet(text: string): string[] {
-  // Split on sentence boundaries
   const sentences = text.match(/[^.!?]+[.!?]+[\s]*/g);
   if (!sentences || sentences.length <= 2) return [text.trim()];
 
@@ -93,14 +98,32 @@ function splitLongBullet(text: string): string[] {
 // ── Main Parser ─────────────────────────────────────────────────────────
 
 export function parsePulpitFormat(manuscript: string, title: string, scripture: string): PulpitData {
+  // Step 1: Extract bold segments from raw HTML BEFORE stripping tags
+  const boldSegments = manuscript.includes("<") ? extractBoldSegments(manuscript) : new Set<string>();
+
+  // Step 2: Strip HTML for line-based parsing
   const raw = manuscript.includes("<") ? stripHtml(manuscript) : manuscript;
   const lines = raw.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+
+  // Normalise title & scripture for comparison
+  const titleNorm = title.trim().toLowerCase();
+  const scriptureNorm = scripture?.trim().toLowerCase() || "";
 
   const sections: PulpitSection[] = [];
   let current: PulpitSection | null = null;
 
   for (const line of lines) {
-    if (isHeading(line)) {
+    const lineNorm = line.trim().toLowerCase();
+
+    // Skip lines that are just the title or scripture (they're on the title page)
+    if (lineNorm === titleNorm || (scriptureNorm && lineNorm === scriptureNorm)) continue;
+
+    // A line is a MAIN POINT if its text was bold in the original HTML
+    const isBoldHeading = [...boldSegments].some(
+      (b) => b.toLowerCase() === lineNorm || lineNorm.startsWith(b.toLowerCase())
+    );
+
+    if (isBoldHeading) {
       current = { heading: line, bullets: [] };
       sections.push(current);
     } else if (current) {
