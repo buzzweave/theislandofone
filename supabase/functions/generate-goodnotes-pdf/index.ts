@@ -28,7 +28,7 @@ const A4_W = 595;
 const A4_H = 842;
 const MARGIN = 72;
 const CONTENT_W = A4_W - MARGIN * 2;
-const MAX_BULLETS = 8;
+const MAX_BULLETS = 6;
 const MIN_BULLETS = 5;
 
 const FONT = {
@@ -242,7 +242,7 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
     // Calculate spacing to fill page evenly
     const availableH = pageH - MARGIN - y;
     const baseLineH = 24;
-    const dynamicGap = Math.max(baseLineH, Math.min(availableH / Math.max(bulletCount, 1), 60));
+    const dynamicGap = Math.max(baseLineH, Math.min(availableH / Math.max(bulletCount, 1), 48));
 
     for (const bullet of page.bullets) {
       doc.setFont("times", "normal");

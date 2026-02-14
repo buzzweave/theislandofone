@@ -4,6 +4,7 @@ import { triggerDownload } from "@/lib/downloadHelper";
 import {
   parsePulpitFormat,
   layoutPages,
+  filterTitleFromSections,
   COPYRIGHT,
   A4_W,
   A4_H,
@@ -71,7 +72,8 @@ export function exportSermonToPdf(sermon: Sermon) {
 
   // ── Main Point Pages ──
   const pulpit = parsePulpitFormat(sermon.manuscript, sermon.title, sermon.scripture);
-  const pages = layoutPages(pulpit.sections);
+  const filtered = filterTitleFromSections(pulpit.sections, sermon.title);
+  const pages = layoutPages(filtered);
 
   for (const page of pages) {
     newPage();
@@ -90,7 +92,7 @@ export function exportSermonToPdf(sermon: Sermon) {
     const bulletCount = page.bullets.length;
     const availableH = pageH - MARGIN - y;
     const baseLineH = FONT.bullet.leading;
-    const dynamicGap = Math.max(baseLineH, Math.min(availableH / Math.max(bulletCount, 1), 60));
+    const dynamicGap = Math.max(baseLineH, Math.min(availableH / Math.max(bulletCount, 1), 48));
 
     for (const bullet of page.bullets) {
       doc.setFont("times", "normal");
@@ -267,7 +269,8 @@ export async function exportSermonToGoodNotesPdf(sermon: Sermon) {
 
 export function exportSermonToWord(sermon: Sermon) {
   const pulpit = parsePulpitFormat(sermon.manuscript, sermon.title, sermon.scripture);
-  const pages = layoutPages(pulpit.sections);
+  const filtered = filterTitleFromSections(pulpit.sections, sermon.title);
+  const pages = layoutPages(filtered);
 
   const sanitize = (t: string) =>
     t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
