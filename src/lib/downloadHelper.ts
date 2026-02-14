@@ -11,18 +11,21 @@ function isIOS(): boolean {
 }
 
 export function triggerDownload(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-
   if (isIOS()) {
-    // iOS Safari blocks programmatic <a> clicks – open in a new tab instead
-    const win = window.open(url, "_blank");
-    if (!win) {
-      // Popup blocked – fall back to location change
-      window.location.href = url;
-    }
-    // Revoke after a generous delay so the browser can finish loading
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    // Convert blob to data URL – iPad Safari handles data URLs reliably
+    // unlike blob URLs which are silently blocked
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result as string;
+      const win = window.open(dataUrl, "_blank");
+      if (!win) {
+        // Popup blocked – try location change as last resort
+        window.location.href = dataUrl;
+      }
+    };
+    reader.readAsDataURL(blob);
   } else {
+    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = filename;

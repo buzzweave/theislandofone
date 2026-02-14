@@ -169,27 +169,35 @@ ${bodyHtml}
 // ─── Word (.doc) ────────────────────────────────────────────────────────────
 
 export function exportSermonToWord(sermon: Sermon) {
-  const normalized = normalizeParagraphs(sermon.manuscript);
-  const paras = normalized
-    .split("\n\n")
-    .filter((p) => p.trim())
-    .map((p) => `<p style="text-indent:1.5em;line-height:1.8;margin:0.6em 0;text-align:justify;">${p}</p>`)
-    .join("\n");
+  // Pass raw HTML from rich text editor directly – Word renders it natively
+  const manuscriptHtml = sermon.manuscript || "";
 
   const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
 <head><meta charset="utf-8"><title>${sermon.title}</title>
 <style>
-  body { font-family: Georgia, "Times New Roman", serif; margin: 1in; color: #222; }
+  body { font-family: Georgia, "Times New Roman", serif; margin: 1in; color: #222; line-height: 1.8; }
   h1 { text-align: center; font-size: 24pt; margin-top: 2em; }
+  h2 { font-size: 18pt; margin-top: 1.5em; }
+  h3 { font-size: 14pt; margin-top: 1.2em; }
   .scripture { text-align: center; font-style: italic; color: #555; font-size: 14pt; margin-bottom: 2em; }
   .author { text-align: center; font-size: 12pt; margin-bottom: 3em; }
   .copyright { font-size: 9pt; font-style: italic; color: #999; text-align: center; margin-top: 3em; border-top: 1px solid #ddd; padding-top: 1em; }
+  p { margin: 0.6em 0; text-align: justify; }
+  strong, b { font-weight: bold; }
+  em, i { font-style: italic; }
+  u { text-decoration: underline; }
+  ul { list-style-type: disc; margin-left: 1.5em; }
+  ol { list-style-type: decimal; margin-left: 1.5em; }
+  li { margin: 0.3em 0; }
+  blockquote { margin: 1em 2em; padding-left: 1em; border-left: 3px solid #ccc; font-style: italic; color: #555; }
+  sub { vertical-align: sub; font-size: 0.8em; }
+  sup { vertical-align: super; font-size: 0.8em; }
 </style></head>
 <body>
   <h1>${sermon.title}</h1>
   <p class="scripture">${sermon.scripture}</p>
   <p class="author">By Bryant Clark</p>
-${paras}
+  <div class="manuscript">${manuscriptHtml}</div>
   <p class="copyright">${COPYRIGHT()}</p>
 </body></html>`;
 
