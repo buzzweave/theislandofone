@@ -166,6 +166,85 @@ ${bodyHtml}
   triggerDownload(blob, `${safeTitle(sermon.title)}.epub`);
 }
 
+// ─── GoodNotes PDF (server-side, iPad-safe) ────────────────────────────────
+
+export async function exportSermonToGoodNotesPdf(sermon: Sermon) {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const functionUrl = `${supabaseUrl}/functions/v1/generate-goodnotes-pdf`;
+
+  const payload = {
+    title: sermon.title,
+    scriptureReference: sermon.scripture,
+    scriptureText: "",
+    mainPoints: [] as { heading: string; bullets: string[] }[],
+    manuscript: sermon.manuscript,
+  };
+
+  const isIOS =
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+  if (isIOS) {
+    // POST via hidden form so Safari streams the response as a download
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = functionUrl;
+    form.target = "_blank";
+    form.style.display = "none";
+
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = "json";
+    input.value = JSON.stringify(payload);
+    form.appendChild(input);
+
+    document.body.appendChild(form);
+
+    // Safari won't POST JSON via form natively, so use fetch + location fallback
+    try {
+      const resp = await fetch(functionUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) throw new Error("Server error");
+      const blob = await resp.blob();
+      // Upload to storage for real URL download
+      const { triggerDownload: trigger } = await import("@/lib/downloadHelper");
+      const slug = sermon.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+      await trigger(blob, `${slug}-goodnotes.pdf`);
+    } catch {
+      // ultimate fallback: direct fetch didn't work, try location
+      window.location.href = functionUrl;
+    } finally {
+      form.remove();
+    }
+    return;
+  }
+
+  // Desktop: fetch and download
+  try {
+    const resp = await fetch(functionUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) throw new Error("Server error");
+    const blob = await resp.blob();
+    const slug = sermon.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${slug}-goodnotes.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  } catch (err) {
+    console.error("GoodNotes PDF download failed:", err);
+  }
+}
+
 // ─── Word (.doc) ────────────────────────────────────────────────────────────
 
 export function exportSermonToWord(sermon: Sermon) {

@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import SocialShareLinks from "@/components/SocialShareLinks";
 import AudioPlayer from "@/components/AudioPlayer";
 import DOMPurify from "dompurify";
-import { exportSermonToPdf, exportSermonToEpub, exportSermonToWord } from "@/lib/sermonExport";
+import { exportSermonToPdf, exportSermonToEpub, exportSermonToWord, exportSermonToGoodNotesPdf } from "@/lib/sermonExport";
 
 import {
   ArrowLeft,
@@ -20,6 +20,7 @@ import {
   FileDown,
   CheckCircle2,
   Crown,
+  Tablet,
 } from "lucide-react";
 
 export default function SermonDetail() {
@@ -63,6 +64,7 @@ export default function SermonDetail() {
     if (format === "PDF") exportSermonToPdf(sermon);
     else if (format === "EPUB") exportSermonToEpub(sermon);
     else if (format === "Word") exportSermonToWord(sermon);
+    else if (format === "GoodNotes") exportSermonToGoodNotesPdf(sermon);
   };
 
   const renderContent = (content: string) => {
@@ -173,8 +175,9 @@ export default function SermonDetail() {
                   <Download className="h-5 w-5 text-primary" />
                   Download This Sermon
                 </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {[
+                    { format: "GoodNotes", icon: Tablet, desc: "iPad-optimized PDF" },
                     { format: "PDF", icon: FileText, desc: "Print-ready format" },
                     { format: "EPUB", icon: BookOpen, desc: "Kindle compatible" },
                     { format: "Word", icon: FileDown, desc: "Editable document" },
