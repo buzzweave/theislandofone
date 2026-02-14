@@ -6,7 +6,9 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-interface MainPoint {
+/* ── Types ────────────────────────────────────────────────────────────── */
+
+interface PulpitSection {
   heading: string;
   bullets: string[];
 }
@@ -15,26 +17,37 @@ interface SermonPayload {
   title: string;
   scriptureReference?: string;
   scriptureText?: string;
-  mainPoints?: MainPoint[];
-  // fallback: existing Sermon shape
+  mainPoints?: { heading: string; bullets: string[] }[];
   scripture?: string;
   manuscript?: string;
 }
 
-/* ── helpers ─────────────────────────────────────────────────────────── */
+/* ── Constants ────────────────────────────────────────────────────────── */
 
-function slugify(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
+const A4_W = 595;
+const A4_H = 842;
+const MARGIN = 72;
+const CONTENT_W = A4_W - MARGIN * 2;
+const MAX_BULLETS = 8;
+const MIN_BULLETS = 5;
+
+const FONT = {
+  title: 44,
+  scriptureHeader: 24,
+  scriptureText: 18,
+  mainPoint: 28,
+  bullet: 16,
+  copyright: 9,
+};
+
+/* ── Helpers ──────────────────────────────────────────────────────────── */
 
 function stripHtml(html: string): string {
   return html
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/p>/gi, "\n\n")
     .replace(/<\/li>/gi, "\n")
+    .replace(/<\/h[1-6]>/gi, "\n\n")
     .replace(/<[^>]+>/g, "")
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
@@ -45,165 +58,202 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-/** Parse flat manuscript text into structured main points */
-function parseManuscript(raw: string): MainPoint[] {
-  const text = raw.includes("<") ? stripHtml(raw) : raw;
-  const lines = text.split("\n").filter((l) => l.trim());
-  const points: MainPoint[] = [];
-  let current: MainPoint | null = null;
+const ROMAN = /^(I{1,3}|IV|V|VI{0,3}|IX|X{1,3}|XL|L)[\.\)\s\u2014\u2013\-:]/i;
+const MAIN_POINT_KW = /main\s*point/i;
 
-  for (const line of lines) {
-    const trimmed = line.trim();
-    // Heuristic: lines that are short, all-caps or end with colon → heading
-    const isHeading =
-      trimmed.length < 120 &&
-      (trimmed === trimmed.toUpperCase() ||
-        trimmed.endsWith(":") ||
-        /^\d+[\.\)]\s/.test(trimmed));
-
-    if (isHeading) {
-      current = { heading: trimmed, bullets: [] };
-      points.push(current);
-    } else if (current) {
-      current.bullets.push(trimmed);
-    } else {
-      // No heading yet – create one
-      current = { heading: "", bullets: [trimmed] };
-      points.push(current);
-    }
-  }
-  return points;
+function isHeading(line: string): boolean {
+  const t = line.trim();
+  if (t.length === 0 || t.length > 150) return false;
+  if (MAIN_POINT_KW.test(t)) return true;
+  if (ROMAN.test(t)) return true;
+  if (/^\d{1,2}[\.\)\s\u2014\u2013\-:]/.test(t) && t === t.toUpperCase()) return true;
+  if (t === t.toUpperCase() && t.length > 3 && t.length < 150) return true;
+  if (t.endsWith(":") && t.length < 100) return true;
+  return false;
 }
 
-/* ── PDF generation ──────────────────────────────────────────────────── */
+function splitLongBullet(text: string): string[] {
+  const sentences = text.match(/[^.!?]+[.!?]+[\s]*/g);
+  if (!sentences || sentences.length <= 2) return [text.trim()];
+  const result: string[] = [];
+  for (let i = 0; i < sentences.length; i += 2) {
+    const chunk = (sentences[i] + (sentences[i + 1] || "")).trim();
+    if (chunk) result.push(chunk);
+  }
+  return result;
+}
+
+function parseManuscript(raw: string): PulpitSection[] {
+  const text = raw.includes("<") ? stripHtml(raw) : raw;
+  const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+  const sections: PulpitSection[] = [];
+  let current: PulpitSection | null = null;
+
+  for (const line of lines) {
+    if (isHeading(line)) {
+      current = { heading: line, bullets: [] };
+      sections.push(current);
+    } else if (current) {
+      const split = splitLongBullet(line);
+      current.bullets.push(...split);
+    } else {
+      current = { heading: "", bullets: [line] };
+      sections.push(current);
+    }
+  }
+  return sections;
+}
+
+interface PageSlice {
+  heading: string;
+  bullets: string[];
+}
+
+function layoutPages(sections: PulpitSection[]): PageSlice[] {
+  const pages: PageSlice[] = [];
+  for (const section of sections) {
+    const { heading, bullets } = section;
+    if (bullets.length <= MAX_BULLETS) {
+      pages.push({ heading, bullets: [...bullets] });
+    } else {
+      let remaining = [...bullets];
+      let first = true;
+      while (remaining.length > 0) {
+        let take = Math.min(MAX_BULLETS, remaining.length);
+        const leftover = remaining.length - take;
+        if (leftover > 0 && leftover < 2) take = remaining.length - 2;
+        if (take < MIN_BULLETS && remaining.length > take) take = MIN_BULLETS;
+        pages.push({ heading: first ? heading : "", bullets: remaining.slice(0, take) });
+        remaining = remaining.slice(take);
+        first = false;
+      }
+    }
+  }
+  return pages;
+}
+
+/* ── PDF Generation — GOODNOTES PULPIT FORMAT ────────────────────────── */
 
 function generatePdf(data: SermonPayload): ArrayBuffer {
   const doc = new jsPDF({ unit: "pt", format: "a4" }); // 595 × 842 portrait
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
-  const margin = 72; // 1 inch
-  const contentW = pageW - margin * 2;
-  let y = margin;
+  let y = MARGIN;
 
-  const newPage = () => {
-    doc.addPage();
-    y = margin;
-  };
+  const newPage = () => { doc.addPage(); y = MARGIN; };
+  const checkPage = (needed: number) => { if (y + needed > pageH - MARGIN) newPage(); };
 
-  const checkPage = (needed: number) => {
-    if (y + needed > pageH - margin) {
-      newPage();
-    }
-  };
+  // ── PAGE 1: Title Page ──────────────────────────────────────────────
 
-  // ── Title ──
+  // Title — 44pt bold centered
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(40);
-  const titleLines: string[] = doc.splitTextToSize(data.title, contentW);
-  checkPage(titleLines.length * 48);
+  doc.setFontSize(FONT.title);
+  const titleLines: string[] = doc.splitTextToSize(data.title, CONTENT_W);
+  const titleBlockH = titleLines.length * 52;
+  const titleY = Math.max(MARGIN, (pageH - titleBlockH) * 0.35);
+  y = titleY;
   doc.text(titleLines, pageW / 2, y, { align: "center" });
-  y += titleLines.length * 48 + 30;
+  y += titleBlockH + 30;
 
-  // ── SCRIPTURE ──
+  // Scripture reference — 24pt bold uppercase
   const ref = data.scriptureReference || data.scripture || "";
-  const scrText = data.scriptureText || "";
-
-  if (ref || scrText) {
-    checkPage(60);
+  if (ref) {
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(22);
-    doc.text("SCRIPTURE", margin, y);
-    y += 32;
-
-    if (ref) {
-      doc.setFont("helvetica", "italic");
-      doc.setFontSize(18);
-      const refLines: string[] = doc.splitTextToSize(ref, contentW);
-      checkPage(refLines.length * 24);
-      doc.text(refLines, margin, y);
-      y += refLines.length * 24 + 10;
-    }
-
-    if (scrText) {
-      doc.setFont("times", "normal");
-      doc.setFontSize(16);
-      const sLines: string[] = doc.splitTextToSize(scrText, contentW);
-      for (const line of sLines) {
-        checkPage(22);
-        doc.text(line, margin, y);
-        y += 22;
-      }
-      y += 16;
-    }
+    doc.setFontSize(FONT.scriptureHeader);
+    const refLines: string[] = doc.splitTextToSize(ref.toUpperCase(), CONTENT_W - 40);
+    doc.text(refLines, pageW / 2, y, { align: "center" });
+    y += refLines.length * 32 + 16;
   }
 
-  // ── MAIN POINTS ──
-  const points =
+  // Scripture text — 18pt normal
+  const scrText = data.scriptureText || "";
+  if (scrText) {
+    doc.setFont("times", "normal");
+    doc.setFontSize(FONT.scriptureText);
+    const sLines: string[] = doc.splitTextToSize(scrText, CONTENT_W - 20);
+    for (const line of sLines) {
+      checkPage(26);
+      doc.text(line, pageW / 2, y, { align: "center" });
+      y += 26;
+    }
+    y += 20;
+  }
+
+  // Author
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(14);
+  doc.text("By Bryant Clark", pageW / 2, Math.min(y + 20, pageH * 0.65), { align: "center" });
+
+  // Copyright on title page
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(FONT.copyright);
+  doc.text(
+    `\u00A9 ${new Date().getFullYear()} The Island of One. All rights reserved.`,
+    pageW / 2,
+    pageH - 40,
+    { align: "center" },
+  );
+
+  // ── MAIN POINT PAGES ───────────────────────────────────────────────
+
+  const sections =
     data.mainPoints && data.mainPoints.length > 0
       ? data.mainPoints
       : data.manuscript
         ? parseManuscript(data.manuscript)
         : [];
 
-  if (points.length > 0) {
-    checkPage(50);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(22);
-    doc.text("MAIN POINTS", margin, y);
-    y += 36;
+  const pages = layoutPages(sections);
 
-    let bulletsOnPage = 0;
+  for (const page of pages) {
+    newPage();
 
-    for (const pt of points) {
-      // Heading: bold, no bullet character
-      if (pt.heading) {
-        checkPage(34);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(20);
-        const hLines: string[] = doc.splitTextToSize(pt.heading, contentW);
-        for (const hl of hLines) {
-          checkPage(28);
-          doc.text(hl, margin, y);
-          y += 28;
-        }
-        y += 8;
+    // Heading — 28pt bold uppercase left-aligned, NO bullet
+    if (page.heading) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(FONT.mainPoint);
+      const hLines: string[] = doc.splitTextToSize(page.heading.toUpperCase(), CONTENT_W);
+      for (const hl of hLines) {
+        doc.text(hl, MARGIN, y);
+        y += 36;
       }
+      y += 16; // gap after heading
+    }
 
-      for (const bullet of pt.bullets) {
-        // Enforce 5 bullets per page
-        if (bulletsOnPage >= 5) {
-          newPage();
-          bulletsOnPage = 0;
-        }
+    // Bullets — 16pt with round bullet, generous spacing
+    const bulletCount = page.bullets.length;
+    // Calculate spacing to fill page evenly
+    const availableH = pageH - MARGIN - y;
+    const baseLineH = 24;
+    const dynamicGap = Math.max(baseLineH, Math.min(availableH / Math.max(bulletCount, 1), 60));
 
-        doc.setFont("times", "normal");
-        doc.setFontSize(16);
-        const bLines: string[] = doc.splitTextToSize(bullet, contentW - 20);
-        for (let i = 0; i < bLines.length; i++) {
-          checkPage(22);
-          if (i === 0) {
-            doc.text("\u2022", margin + 4, y);
-            doc.text(bLines[i], margin + 20, y);
-          } else {
-            doc.text(bLines[i], margin + 20, y);
-          }
-          y += 22;
+    for (const bullet of page.bullets) {
+      doc.setFont("times", "normal");
+      doc.setFontSize(FONT.bullet);
+      const bLines: string[] = doc.splitTextToSize(bullet, CONTENT_W - 24);
+
+      for (let i = 0; i < bLines.length; i++) {
+        checkPage(24);
+        if (i === 0) {
+          doc.text("\u2022", MARGIN + 4, y);
+          doc.text(bLines[i], MARGIN + 24, y);
+        } else {
+          doc.text(bLines[i], MARGIN + 24, y);
         }
-        y += 6;
-        bulletsOnPage++;
+        y += baseLineH;
       }
-      y += 14;
+      y += dynamicGap - baseLineH; // extra gap between bullets
     }
   }
 
-  // ── Footer ──
-  checkPage(40);
+  // Final copyright on last page
+  const lastPageH = doc.internal.pageSize.getHeight();
   doc.setFont("helvetica", "italic");
-  doc.setFontSize(9);
+  doc.setFontSize(FONT.copyright);
   doc.text(
-    `\u00A9 ${new Date().getFullYear()} The Island of One. All rights reserved.`,
+    `\u00A9 ${new Date().getFullYear()} The Island of One. All rights reserved. For personal use only.`,
     pageW / 2,
-    pageH - 40,
+    lastPageH - 40,
     { align: "center" },
   );
 
@@ -228,7 +278,7 @@ Deno.serve(async (req) => {
     }
 
     const pdfBuffer = generatePdf(data);
-    const slug = slugify(data.title);
+    const slug = data.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
     const dateStr = new Date().toISOString().slice(0, 10);
     const filename = `${slug}-${dateStr}.pdf`;
 
