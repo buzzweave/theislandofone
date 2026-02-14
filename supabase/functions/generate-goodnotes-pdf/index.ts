@@ -78,17 +78,21 @@ function parseManuscript(raw: string): MainPoint[] {
 /* ── PDF generation ──────────────────────────────────────────────────── */
 
 function generatePdf(data: SermonPayload): ArrayBuffer {
-  const doc = new jsPDF({ unit: "pt", format: "letter" }); // 612 × 792
+  const doc = new jsPDF({ unit: "pt", format: "a4", orientation: "l" }); // 842 × 595 landscape
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
   const margin = 72; // 1 inch
   const contentW = pageW - margin * 2;
   let y = margin;
 
+  const newPage = () => {
+    doc.addPage();
+    y = margin;
+  };
+
   const checkPage = (needed: number) => {
     if (y + needed > pageH - margin) {
-      doc.addPage();
-      y = margin;
+      newPage();
     }
   };
 
@@ -148,7 +152,10 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
     doc.text("MAIN POINTS", margin, y);
     y += 36;
 
+    let bulletsOnPage = 0;
+
     for (const pt of points) {
+      // Heading: bold, no bullet character
       if (pt.heading) {
         checkPage(34);
         doc.setFont("helvetica", "bold");
@@ -163,6 +170,12 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
       }
 
       for (const bullet of pt.bullets) {
+        // Enforce 5 bullets per page
+        if (bulletsOnPage >= 5) {
+          newPage();
+          bulletsOnPage = 0;
+        }
+
         doc.setFont("times", "normal");
         doc.setFontSize(16);
         const bLines: string[] = doc.splitTextToSize(bullet, contentW - 20);
@@ -177,6 +190,7 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
           y += 22;
         }
         y += 6;
+        bulletsOnPage++;
       }
       y += 14;
     }
