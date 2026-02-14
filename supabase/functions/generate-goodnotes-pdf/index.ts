@@ -196,12 +196,29 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
 
   // ── MAIN POINT PAGES ───────────────────────────────────────────────
 
-  const sections =
+  const rawSections =
     data.mainPoints && data.mainPoints.length > 0
       ? data.mainPoints
       : data.manuscript
         ? parseManuscript(data.manuscript)
         : [];
+
+  // Remove sections whose heading duplicates the sermon title (already on page 1)
+  const titleUpper = data.title.trim().toUpperCase();
+  const sections: PulpitSection[] = [];
+  for (const s of rawSections) {
+    if (s.heading && s.heading.trim().toUpperCase() === titleUpper) {
+      // Prepend orphaned bullets to the next section so no content is lost
+      if (s.bullets.length > 0) {
+        const next = rawSections[rawSections.indexOf(s) + 1];
+        if (next) {
+          next.bullets = [...s.bullets, ...next.bullets];
+        }
+      }
+      continue;
+    }
+    sections.push(s);
+  }
 
   const pages = layoutPages(sections);
 
