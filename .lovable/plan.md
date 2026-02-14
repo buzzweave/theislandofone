@@ -1,42 +1,86 @@
 
+# Fix All Downloads for iPad, iPhone, and All Devices
 
-# Fix Word/PDF Formatting and iPad Downloads
+## Problem
 
-## Problems
-1. **Word and PDF strip all formatting** -- `normalizeParagraphs()` calls `stripHtml()` which removes bold, italic, lists, headings, alignment -- everything from the rich text editor is lost
-2. **iPad downloads fail** -- `window.open(blobUrl)` with blob URLs is unreliable on iPadOS Safari; it silently fails or shows a blank tab
-3. **EPUB stays unchanged** -- per your request, EPUB exports will remain exactly as they are (Kindle-optimized)
+The current download approach fails on iPad/iPhone because:
+1. **Data URLs** (current iOS fallback) are too large for Safari -- it silently fails or shows a blank tab
+2. **Blob URLs** are blocked by mobile Safari's security model
+3. Files need to be served from a **real HTTPS URL** with proper `Content-Disposition` and `Content-Type` headers for Safari to trigger its native download sheet and for files to appear in the Files app
 
-## Changes
+## Solution
 
-### 1. `src/lib/downloadHelper.ts` -- Fix iPad downloads
+Upload generated files to cloud storage temporarily, then navigate to the real URL. This gives us proper HTTP headers and full iOS compatibility.
 
-Replace the blob URL approach for iOS/iPad with a **data URL** conversion:
-- Convert blob to a base64 data URL using `FileReader.readAsDataURL()`
-- Open the data URL in a new tab -- iPad Safari handles data URLs reliably unlike blob URLs
-- Desktop download path stays the same (unchanged)
+### 1. Create a `downloads` storage bucket
 
-### 2. `src/lib/sermonExport.ts` -- Preserve formatting in Word
+A public bucket for temporary download files. Files will be organized by a unique ID and auto-cleaned.
 
-**Word export**: Stop calling `normalizeParagraphs()` (which strips HTML). Instead, pass the raw HTML manuscript directly into the Word document body. Word natively renders bold, italic, underline, lists, headings, blockquotes -- exactly what the rich text editor produces.
+### 2. Rewrite `src/lib/downloadHelper.ts`
 
-**PDF export**: Keep as plain text. jsPDF cannot render HTML, so the PDF will remain a clean readable document. No change here.
+Replace the current data-URL/blob-URL approach with a storage-based strategy:
 
-**EPUB export**: No changes (stays as Kindle download).
+- **Generate the blob client-side** (existing PDF/EPUB/Word generation stays the same)
+- **Upload the blob** to the `downloads` storage bucket with a unique filename
+- **Get the public URL** -- this is a real HTTPS URL served with correct headers
+- **Trigger the download**:
+  - iOS/iPad: `window.location.href = publicUrl` -- forces Safari's native download sheet, files appear in Files app
+  - Desktop: Standard `<a download>` click with the public URL
 
-### 3. `src/lib/bookExport.ts` -- Preserve formatting in Word for books
+The MIME types will be set correctly during upload:
+- PDF: `application/pdf`
+- EPUB: `application/epub+zip`
+- Word: `application/msword`
 
-Same approach as sermons: the Word export will pass each chapter's raw HTML content directly instead of stripping it. Add base styles for bold, italic, lists, blockquotes so they render properly in Word.
+### 3. No changes to export logic
 
-**PDF and EPUB**: No changes.
+`bookExport.ts` and `sermonExport.ts` keep their current document generation logic unchanged. Only the final "trigger download" step changes (it already calls `triggerDownload` from the helper).
 
-### Files Changed
+### 4. Periodic cleanup (optional edge function)
+
+Add a simple database-less cleanup: files in the `downloads` bucket older than 1 hour can be cleaned by a scheduled function, or we rely on the bucket being low-traffic enough that manual cleanup suffices.
+
+## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/lib/downloadHelper.ts` | Convert blob to data URL for iPad instead of blob URL |
-| `src/lib/sermonExport.ts` | Word export uses raw HTML instead of stripped text |
-| `src/lib/bookExport.ts` | Word export uses raw HTML instead of stripped text |
+| `src/lib/downloadHelper.ts` | Upload blob to storage, get public URL, use `window.location.href` for iOS |
+| Database migration | Create `downloads` public storage bucket |
 
-No changes to EPUB exports, no changes to page components.
+No changes to `bookExport.ts`, `sermonExport.ts`, `SermonDetail.tsx`, or `BookDetail.tsx` -- they already call `triggerDownload()`.
 
+## How It Works
+
+```text
+User clicks "Download PDF"
+        |
+        v
+Client generates blob (jsPDF / ZIP / HTML)
+        |
+        v
+triggerDownload(blob, "filename.pdf")
+        |
+        v
+Upload blob to storage bucket
+  with correct Content-Type
+        |
+        v
+Get public HTTPS URL
+        |
+        v
+  iOS?  ----Yes----> window.location.href = url
+        |              (Safari download sheet appears,
+        No              file saved to Files app)
+        |
+        v
+  <a href=url download=filename>.click()
+        (standard browser download)
+```
+
+## Why This Works on iPad/iPhone
+
+- Real HTTPS URLs are fully supported by Safari's download manager
+- `Content-Disposition: inline` with proper MIME type lets Safari's native handler take over
+- No blob URLs, no data URLs, no programmatic tricks that Safari blocks
+- Files appear in the Downloads folder in the Files app
+- Works identically in Safari and Chrome on iOS
