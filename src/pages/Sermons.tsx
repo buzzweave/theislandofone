@@ -88,7 +88,7 @@ export default function Sermons() {
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                        <Lock className="h-2.5 w-2.5" /> ${sermon.price?.toFixed(2)}
+                        <Lock className="h-2.5 w-2.5" /> ${Number(sermon.price)?.toFixed(2)}
                       </span>
                     )}
                     {sermon.access_level !== "free" && (
