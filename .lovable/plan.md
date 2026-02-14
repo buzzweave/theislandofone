@@ -1,82 +1,35 @@
 
 
-# GoodNotes PDF Export + iPad-Safe Download
+# Fix iPad Downloads + GoodNotes PDF Update
 
-## Approach
+## Root Cause
 
-Use a backend function to generate the PDF server-side and stream it directly to the browser with proper HTTP headers. The frontend navigates to the function URL, which triggers Safari's native download sheet on iPad/iPhone. No file storage needed -- the PDF is generated on-the-fly and streamed.
+The `downloads` storage bucket has SELECT and DELETE policies but is **missing an INSERT policy**. When the app tries to upload a generated file for download, it fails silently. The code falls back to a blob URL, which iPad Safari blocks. This affects ALL download formats (PDF, EPUB, Word, GoodNotes).
 
-## Changes
+## Fix 1: Add missing INSERT policy (database migration)
 
-### 1. New backend function: `generate-goodnotes-pdf`
+Add an RLS policy allowing anonymous inserts to the `downloads` bucket so the upload step succeeds and produces a real HTTPS URL.
 
-Creates a new function at `supabase/functions/generate-goodnotes-pdf/index.ts` that:
+```sql
+CREATE POLICY "Anyone can upload downloads"
+ON storage.objects FOR INSERT
+WITH CHECK (bucket_id = 'downloads');
+```
 
-- Accepts a POST request with sermon data (title, scripture reference, scripture text, main points with headings and bullets)
-- Also accepts the existing Sermon object format (falls back to parsing `manuscript` HTML into structured sections)
-- Uses jsPDF (imported from esm.sh) to generate a US Letter PDF with GoodNotes-optimized formatting:
-  - Title: 40pt bold, centered at top
-  - "SCRIPTURE" section header: 22pt bold
-  - Scripture reference: 18pt italic on its own line
-  - Scripture text: 16pt with generous line spacing
-  - "MAIN POINTS" section header: 22pt bold
-  - Each main point heading: 20pt bold
-  - Bullet points: 16pt with bullet character prefix and generous spacing
-  - Margins: 1 inch on all sides for handwriting room
-  - Automatic page breaks with clean content flow
-- Returns the PDF as a binary stream with headers:
-  - `Content-Type: application/pdf`
-  - `Content-Disposition: attachment; filename="sermon-title-slug-date.pdf"`
-  - `Cache-Control: no-store`
+## Fix 2: Update GoodNotes PDF to A4 Landscape + 5 Bullets Per Page
 
-### 2. Update `src/lib/sermonExport.ts` -- Add GoodNotes export function
+Update `supabase/functions/generate-goodnotes-pdf/index.ts`:
 
-Add a new `exportSermonToGoodNotesPdf` function that:
-
-- Constructs the sermon payload from the existing Sermon object
-- For iOS devices: opens `window.location.href` pointing to the edge function URL with the data encoded, triggering Safari's native download sheet
-- For desktop: uses fetch to POST the data, receives the PDF blob, and triggers download via anchor tag
-- Falls back to client-side jsPDF generation if the server call fails
-
-### 3. Update `src/pages/SermonDetail.tsx` -- Add GoodNotes download button
-
-Add a prominent "Download for GoodNotes (PDF)" button in the download section with a tablet icon. This sits alongside the existing PDF, EPUB, and Word download options. The button calls the new `exportSermonToGoodNotesPdf` function.
-
-### 4. Keep existing downloads unchanged
-
-The current PDF, EPUB, and Word download buttons continue to work exactly as they do now through the storage bucket approach. The GoodNotes PDF is an additional download option.
+- Change format from US Letter portrait to **A4 landscape** (`orientation: "l"`)
+- Main point headings: bold text, no bullet character
+- Limit to **5 bullet points per page**, then force a new page
+- Reset bullet counter after each page break
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `supabase/functions/generate-goodnotes-pdf/index.ts` | New -- generates GoodNotes-formatted PDF server-side with proper HTTP headers |
-| `src/lib/sermonExport.ts` | Add `exportSermonToGoodNotesPdf` function |
-| `src/pages/SermonDetail.tsx` | Add "Download for GoodNotes (PDF)" button |
+| Database migration | Add INSERT policy on `storage.objects` for `downloads` bucket |
+| `supabase/functions/generate-goodnotes-pdf/index.ts` | A4 landscape, 5 bullets/page max, no bullets on headings |
 
-## How iPad Download Works
-
-```text
-User taps "Download for GoodNotes (PDF)"
-        |
-        v
-Frontend builds form with sermon data
-        |
-        v
-Submits POST to edge function URL
-        |
-        v
-Edge function generates PDF with jsPDF
-Returns binary with Content-Type: application/pdf
-and Content-Disposition: attachment
-        |
-        v
-Safari receives PDF with proper headers
-        |
-        v
-Native download sheet appears
-File saved to Files app > Downloads
-```
-
-No blob URLs, no data URLs, no storage upload -- the PDF streams directly from server to browser with correct MIME headers, which Safari handles natively.
-
+These two changes together will make all downloads (PDF, EPUB, Word, GoodNotes) work on iPad by ensuring the storage upload succeeds and Safari receives a real HTTPS URL.
