@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, Download, FileText, Lock, Mail } from "lucide-react";
-import { exportBookToPdf, exportBookToEpub } from "@/lib/bookExport";
+import { exportBookToPdf, exportBookToEpub, exportBookToWord } from "@/lib/bookExport";
 import { useBook } from "@/hooks/useBooks";
 import SocialShareLinks from "@/components/SocialShareLinks";
 import AudioPlayer from "@/components/AudioPlayer";
@@ -129,6 +129,12 @@ export default function BookDetail() {
                       className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-primary/30 text-primary text-sm font-semibold hover:bg-primary/10 transition-colors"
                     >
                       <FileText className="h-4 w-4" /> Download EPUB
+                    </button>
+                    <button
+                      onClick={() => exportBookToWord(book)}
+                      className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-primary/30 text-primary text-sm font-semibold hover:bg-primary/10 transition-colors"
+                    >
+                      <FileText className="h-4 w-4" /> Download Word
                     </button>
                   </>
                 ) : (

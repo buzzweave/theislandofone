@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import SocialShareLinks from "@/components/SocialShareLinks";
 import AudioPlayer from "@/components/AudioPlayer";
 import DOMPurify from "dompurify";
+import { exportSermonToPdf, exportSermonToEpub, exportSermonToWord } from "@/lib/sermonExport";
 
 import {
   ArrowLeft,
@@ -59,14 +60,9 @@ export default function SermonDetail() {
   };
 
   const handleDownload = (format: string) => {
-    const copyright = `\n\n---\n© ${new Date().getFullYear()} The Island of One. All rights reserved. For personal use only.\n`;
-    const blob = new Blob([sermon.manuscript + copyright], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${sermon.title.replace(/\s+/g, "-").toLowerCase()}.${format === "Word" ? "docx" : format.toLowerCase()}`;
-    a.click();
-    URL.revokeObjectURL(url);
+    if (format === "PDF") exportSermonToPdf(sermon);
+    else if (format === "EPUB") exportSermonToEpub(sermon);
+    else if (format === "Word") exportSermonToWord(sermon);
   };
 
   const renderContent = (content: string) => {

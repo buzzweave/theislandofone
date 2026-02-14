@@ -9,7 +9,7 @@ import type { Book } from "@/hooks/useBooks";
 /**
  * Strip HTML tags and decode common entities, then normalize into clean paragraphs.
  */
-function stripHtml(html: string): string {
+export function stripHtml(html: string): string {
   // Replace block-level closing tags with newlines to preserve paragraph breaks
   let text = html.replace(/<\/p>/gi, "\n").replace(/<\/div>/gi, "\n").replace(/<br\s*\/?>/gi, "\n");
   // Remove all remaining HTML tags
@@ -25,7 +25,7 @@ function stripHtml(html: string): string {
   return text;
 }
 
-function normalizeParagraphs(text: string): string {
+export function normalizeParagraphs(text: string): string {
   // First strip any HTML
   const cleaned = stripHtml(text);
   // Split into lines and trim each
@@ -269,7 +269,7 @@ ${bodyHtml}
 }
 
 // Minimal ZIP builder for EPUB (store-only, no compression needed for small text files)
-function buildEpubZip(files: { name: string; content: string; noCompression?: boolean }[]) {
+export function buildEpubZip(files: { name: string; content: string; noCompression?: boolean }[]) {
   const encoder = new TextEncoder();
   const parts: Uint8Array[] = [];
   const centralDir: Uint8Array[] = [];
@@ -327,7 +327,7 @@ function buildEpubZip(files: { name: string; content: string; noCompression?: bo
   return new Blob([...parts, ...centralDir, eocd].map(b => new Uint8Array(b.buffer as ArrayBuffer, b.byteOffset, b.byteLength)), { type: "application/epub+zip" });
 }
 
-function crc32(data: Uint8Array): number {
+export function crc32(data: Uint8Array): number {
   let crc = 0xffffffff;
   for (let i = 0; i < data.length; i++) {
     crc ^= data[i];
@@ -336,4 +336,46 @@ function crc32(data: Uint8Array): number {
     }
   }
   return (crc ^ 0xffffffff) >>> 0;
+}
+
+export function exportBookToWord(book: Book) {
+  const chapters = book.chapters
+    .map((ch, i) => {
+      const paras = normalizeParagraphs(ch.content)
+        .split("\n\n")
+        .filter((p) => p.trim())
+        .map((p) => `<p style="text-indent:1.5em;line-height:1.8;margin:0.6em 0;text-align:justify;">${p}</p>`)
+        .join("\n");
+      return `<h2 style="text-align:center;font-size:11pt;text-transform:uppercase;letter-spacing:0.15em;color:#888;margin-top:3em;">Chapter ${i + 1}</h2>
+<h1 style="text-align:center;font-size:18pt;margin-bottom:1em;">${ch.title}</h1>
+${paras}`;
+    })
+    .join("\n<br clear=all style='page-break-before:always'>\n");
+
+  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8"><title>${book.title}</title>
+<style>
+  body { font-family: Georgia, "Times New Roman", serif; margin: 1in; color: #222; }
+  .copyright { font-size: 9pt; font-style: italic; color: #999; text-align: center; margin-top: 3em; border-top: 1px solid #ddd; padding-top: 1em; }
+</style></head>
+<body>
+  <div style="text-align:center;margin-top:3in;">
+    <h1 style="font-size:26pt;">${book.title}</h1>
+    ${book.subtitle ? `<p style="font-size:14pt;font-style:italic;color:#555;">${book.subtitle}</p>` : ""}
+    <p style="font-size:12pt;margin-top:2em;">by ${book.author}</p>
+  </div>
+  <br clear=all style='page-break-before:always'>
+${chapters}
+  <p class="copyright">© ${new Date().getFullYear()} The Island of One. All rights reserved. For personal use only.</p>
+</body></html>`;
+
+  const blob = new Blob([html], { type: "application/msword" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${book.title.replace(/[^a-zA-Z0-9]/g, "_")}.doc`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
