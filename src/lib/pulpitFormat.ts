@@ -37,7 +37,7 @@ export const FONT = {
 } as const;
 
 export const MIN_BULLETS_PER_PAGE = 5;
-export const MAX_BULLETS_PER_PAGE = 8;
+export const MAX_BULLETS_PER_PAGE = 6;
 
 // ── HTML Stripping ──────────────────────────────────────────────────────
 
@@ -168,6 +168,33 @@ export function layoutPages(sections: PulpitSection[]): PageSlice[] {
   }
 
   return pages;
+}
+
+// ── Copyright ───────────────────────────────────────────────────────────
+
+// ── Title Filter ────────────────────────────────────────────────────────
+
+/** Remove sections whose heading duplicates the sermon title; prepend orphaned bullets to next section. */
+export function filterTitleFromSections(
+  sections: PulpitSection[],
+  title: string
+): PulpitSection[] {
+  const titleUpper = title.trim().toUpperCase();
+  const result: PulpitSection[] = [];
+  let orphanBullets: string[] = [];
+
+  for (const s of sections) {
+    if (s.heading && s.heading.trim().toUpperCase() === titleUpper) {
+      orphanBullets.push(...s.bullets);
+      continue;
+    }
+    if (orphanBullets.length > 0 && result.length === 0) {
+      s.bullets = [...orphanBullets, ...s.bullets];
+      orphanBullets = [];
+    }
+    result.push(s);
+  }
+  return result;
 }
 
 // ── Copyright ───────────────────────────────────────────────────────────
