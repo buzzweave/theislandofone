@@ -334,24 +334,31 @@ export function crc32(data: Uint8Array): number {
 }
 
 export function exportBookToWord(book: Book) {
+  // Pass raw HTML from rich text editor directly – Word renders it natively
   const chapters = book.chapters
     .map((ch, i) => {
-      const paras = normalizeParagraphs(ch.content)
-        .split("\n\n")
-        .filter((p) => p.trim())
-        .map((p) => `<p style="text-indent:1.5em;line-height:1.8;margin:0.6em 0;text-align:justify;">${p}</p>`)
-        .join("\n");
+      const chapterHtml = ch.content || "";
       return `<h2 style="text-align:center;font-size:11pt;text-transform:uppercase;letter-spacing:0.15em;color:#888;margin-top:3em;">Chapter ${i + 1}</h2>
 <h1 style="text-align:center;font-size:18pt;margin-bottom:1em;">${ch.title}</h1>
-${paras}`;
+<div class="chapter-body">${chapterHtml}</div>`;
     })
     .join("\n<br clear=all style='page-break-before:always'>\n");
 
   const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
 <head><meta charset="utf-8"><title>${book.title}</title>
 <style>
-  body { font-family: Georgia, "Times New Roman", serif; margin: 1in; color: #222; }
+  body { font-family: Georgia, "Times New Roman", serif; margin: 1in; color: #222; line-height: 1.8; }
   .copyright { font-size: 9pt; font-style: italic; color: #999; text-align: center; margin-top: 3em; border-top: 1px solid #ddd; padding-top: 1em; }
+  p { margin: 0.6em 0; text-align: justify; }
+  strong, b { font-weight: bold; }
+  em, i { font-style: italic; }
+  u { text-decoration: underline; }
+  ul { list-style-type: disc; margin-left: 1.5em; }
+  ol { list-style-type: decimal; margin-left: 1.5em; }
+  li { margin: 0.3em 0; }
+  blockquote { margin: 1em 2em; padding-left: 1em; border-left: 3px solid #ccc; font-style: italic; color: #555; }
+  sub { vertical-align: sub; font-size: 0.8em; }
+  sup { vertical-align: super; font-size: 0.8em; }
 </style></head>
 <body>
   <div style="text-align:center;margin-top:3in;">
