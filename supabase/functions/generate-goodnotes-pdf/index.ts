@@ -28,8 +28,8 @@ const A4_W = 595;
 const A4_H = 842;
 const MARGIN = 72;
 const CONTENT_W = A4_W - MARGIN * 2;
-const MAX_BULLETS = 6;
-const MIN_BULLETS = 5;
+const MAX_BULLETS = 4;
+const MIN_BULLETS = 4;
 
 const FONT = {
   title: 44,
@@ -58,18 +58,19 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-const ROMAN = /^(I{1,3}|IV|V|VI{0,3}|IX|X{1,3}|XL|L)[\.\)\s\u2014\u2013\-:]/i;
-const MAIN_POINT_KW = /main\s*point/i;
-
-function isHeading(line: string): boolean {
-  const t = line.trim();
-  if (t.length === 0 || t.length > 150) return false;
-  if (MAIN_POINT_KW.test(t)) return true;
-  if (ROMAN.test(t)) return true;
-  if (/^\d{1,2}[\.\)\s\u2014\u2013\-:]/.test(t) && t === t.toUpperCase()) return true;
-  if (t === t.toUpperCase() && t.length > 3 && t.length < 150) return true;
-  if (t.endsWith(":") && t.length < 100) return true;
-  return false;
+function extractBoldSegments(html: string): Set<string> {
+  const bolds = new Set<string>();
+  const re = /<(?:strong|b)(?:\s[^>]*)?>(.+?)<\/(?:strong|b)>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    const text = m[1]
+      .replace(/<[^>]+>/g, "")
+      .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ")
+      .trim();
+    if (text.length > 0) bolds.add(text);
+  }
+  return bolds;
 }
 
 function splitLongBullet(text: string): string[] {
@@ -83,14 +84,26 @@ function splitLongBullet(text: string): string[] {
   return result;
 }
 
-function parseManuscript(raw: string): PulpitSection[] {
+function parseManuscript(raw: string, title: string, scripture?: string): PulpitSection[] {
+  const boldSegments = raw.includes("<") ? extractBoldSegments(raw) : new Set<string>();
   const text = raw.includes("<") ? stripHtml(raw) : raw;
   const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+
+  const titleNorm = title.trim().toLowerCase();
+  const scriptureNorm = scripture?.trim().toLowerCase() || "";
+
   const sections: PulpitSection[] = [];
   let current: PulpitSection | null = null;
 
   for (const line of lines) {
-    if (isHeading(line)) {
+    const lineNorm = line.trim().toLowerCase();
+    if (lineNorm === titleNorm || (scriptureNorm && lineNorm === scriptureNorm)) continue;
+
+    const isBoldHeading = [...boldSegments].some(
+      (b) => b.toLowerCase() === lineNorm || lineNorm.startsWith(b.toLowerCase())
+    );
+
+    if (isBoldHeading) {
       current = { heading: line, bullets: [] };
       sections.push(current);
     } else if (current) {
@@ -200,7 +213,7 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
     data.mainPoints && data.mainPoints.length > 0
       ? data.mainPoints
       : data.manuscript
-        ? parseManuscript(data.manuscript)
+        ? parseManuscript(data.manuscript, data.title, ref)
         : [];
 
   // Remove sections whose heading duplicates the sermon title (already on page 1)
