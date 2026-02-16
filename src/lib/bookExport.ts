@@ -224,6 +224,7 @@ h1 { text-align: center; font-size: 1.6em; margin-top: 2em; margin-bottom: 0.3em
 .chapter-num { text-align: center; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.15em; color: #888; margin-bottom: 0.5em; }
 p { text-indent: 1.5em; margin: 0.6em 0; text-align: justify; }
 p.first { text-indent: 0; }
+p.first::first-letter { float: left; font-size: 3.8em; line-height: 0.8; padding-right: 0.08em; padding-top: 0.05em; color: #6b2c2c; font-weight: bold; font-family: Georgia, "Times New Roman", serif; }
 .copyright { font-size: 0.75em; font-style: italic; color: #999; text-align: center; margin-top: 3em; border-top: 1px solid #ddd; padding-top: 1em; }`;
 
   const chapterFiles = book.chapters.map((ch, i) => {

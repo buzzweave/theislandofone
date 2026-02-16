@@ -210,7 +210,7 @@ export default function BookDetail() {
                   {isOpen && !isLocked && (
                     <div className="px-5 pb-5 animate-fade-up">
                       <div className="border-t border-border pt-4 ml-12">
-                        <div className="prose prose-invert prose-sm max-w-none [&_*]:!text-white">
+                        <div className="book-chapter-content prose prose-invert prose-sm max-w-none [&_*]:!text-white">
                           {renderContent(chapter.content)}
                         </div>
 
