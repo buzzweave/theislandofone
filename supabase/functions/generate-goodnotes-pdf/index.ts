@@ -147,14 +147,14 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
     }
 
     const headingLevel = segments[0]?.heading || 0;
-    let fontSize = 16;
-    let lineHeight = 24;
+    let fontSize = 13;
+    let lineHeight = 13 * 1.7;
     let fontFamily = "times";
 
-    if (headingLevel === 1) { fontSize = 28; lineHeight = 36; fontFamily = "helvetica"; }
-    else if (headingLevel === 2) { fontSize = 24; lineHeight = 32; fontFamily = "helvetica"; }
-    else if (headingLevel === 3) { fontSize = 20; lineHeight = 28; fontFamily = "helvetica"; }
-    else if (headingLevel >= 4) { fontSize = 18; lineHeight = 26; fontFamily = "helvetica"; }
+    if (headingLevel === 1) { fontSize = 28; lineHeight = 36; fontFamily = "times"; }
+    else if (headingLevel === 2) { fontSize = 16; lineHeight = 16 * 1.5; fontFamily = "times"; }
+    else if (headingLevel === 3) { fontSize = 14; lineHeight = 14 * 1.5; fontFamily = "times"; }
+    else if (headingLevel >= 4) { fontSize = 13; lineHeight = 13 * 1.5; fontFamily = "times"; }
 
     const fullText = segments.map(s => s.text).join("");
     doc.setFontSize(fontSize);
@@ -202,7 +202,10 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
       }
     }
 
-    y += headingLevel > 0 ? 8 : 6;
+    if (headingLevel === 1) y += 20;
+    else if (headingLevel === 2) y += 26;
+    else if (headingLevel >= 3) y += 14;
+    else y += 14;
   }
 
   // Copyright

@@ -167,14 +167,14 @@ export function exportSermonToPdf(sermon: Sermon) {
 
     // Determine font size based on heading level
     const headingLevel = segments[0]?.heading || 0;
-    let fontSize = 16; // body
-    let lineHeight = 24;
+    let fontSize = 13; // body 13pt
+    let lineHeight = 13 * 1.7; // ~22pt
     let fontFamily = "times";
 
-    if (headingLevel === 1) { fontSize = 28; lineHeight = 36; fontFamily = "helvetica"; }
-    else if (headingLevel === 2) { fontSize = 24; lineHeight = 32; fontFamily = "helvetica"; }
-    else if (headingLevel === 3) { fontSize = 20; lineHeight = 28; fontFamily = "helvetica"; }
-    else if (headingLevel >= 4) { fontSize = 18; lineHeight = 26; fontFamily = "helvetica"; }
+    if (headingLevel === 1) { fontSize = 28; lineHeight = 36; fontFamily = "times"; }
+    else if (headingLevel === 2) { fontSize = 16; lineHeight = 16 * 1.5; fontFamily = "times"; }
+    else if (headingLevel === 3) { fontSize = 14; lineHeight = 14 * 1.5; fontFamily = "times"; }
+    else if (headingLevel >= 4) { fontSize = 13; lineHeight = 13 * 1.5; fontFamily = "times"; }
 
     // Concatenate all segment text to measure line wrapping
     const fullText = segments.map(s => s.text).join("");
@@ -246,8 +246,11 @@ export function exportSermonToPdf(sermon: Sermon) {
       }
     }
 
-    // Paragraph spacing
-    y += headingLevel > 0 ? 8 : 6;
+    // Paragraph spacing — sermon breathing room
+    if (headingLevel === 1) y += 20;       // title spacing
+    else if (headingLevel === 2) y += 26;  // main point: 2em above
+    else if (headingLevel >= 3) y += 14;
+    else y += 14;                          // body: ~1.1em
   }
 
   // Copyright on last page
@@ -318,10 +321,14 @@ export function exportSermonToEpub(sermon: Sermon) {
 </body>
 </html>`;
 
-  const epubCss = `body { font-family: Georgia, "Times New Roman", serif; line-height: 1.8; margin: 1.5em; color: #222; }
-h1 { text-align: center; font-size: 1.6em; margin-top: 2em; margin-bottom: 0.3em; }
+  const epubCss = `body { font-family: Georgia, "Times New Roman", serif; line-height: 1.7; margin: 1.5em; color: #222; }
+h1 { text-align: center; font-size: 1.8em; font-weight: bold; margin-top: 1em; margin-bottom: 1.5em; }
+h2 { font-size: 1.2em; font-weight: bold; margin-top: 2em; margin-bottom: 0.6em; }
+h3 { font-size: 1.1em; font-weight: bold; margin-top: 1.5em; margin-bottom: 0.5em; }
 .scripture { text-align: center; font-style: italic; color: #555; margin-bottom: 2em; }
-p { text-indent: 1.5em; margin: 0.6em 0; text-align: justify; }
+p { margin: 0 0 1.1em 0; }
+ul, ol { margin-top: 1em; margin-bottom: 1.5em; padding-left: 1.2em; }
+li { margin-bottom: 0.6em; }
 p.first { text-indent: 0; }
 .copyright { font-size: 0.75em; font-style: italic; color: #999; text-align: center; margin-top: 3em; border-top: 1px solid #ddd; padding-top: 1em; }`;
 
@@ -420,13 +427,13 @@ export function exportSermonToWord(sermon: Sermon) {
 <!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
 <style>
   @page { size: A4 portrait; margin: 1in; }
-  body { font-family: Georgia, "Times New Roman", serif; margin: 1in; color: #000; line-height: 1.6; font-size: 16pt; }
-  h1 { font-size: 28pt; font-weight: bold; }
-  h2 { font-size: 24pt; font-weight: bold; }
-  h3 { font-size: 20pt; font-weight: bold; }
-  p { margin: 0.4em 0; }
-  ul, ol { font-size: 16pt; line-height: 1.6; margin-left: 0.3in; }
-  li { margin-bottom: 0.1in; }
+  body { font-family: Georgia, "Times New Roman", serif; margin: 1in; color: #000; line-height: 1.7; font-size: 13pt; }
+  h1 { font-size: 28pt; font-weight: bold; text-align: center; margin-bottom: 1.5em; }
+  h2 { font-size: 16pt; font-weight: bold; margin-top: 2em; margin-bottom: 0.6em; }
+  h3 { font-size: 14pt; font-weight: bold; margin-top: 1.5em; margin-bottom: 0.5em; }
+  p { margin-bottom: 1.1em; }
+  ul, ol { font-size: 12pt; line-height: 1.6; margin-left: 0.3in; margin-top: 1em; margin-bottom: 1.5em; }
+  li { margin-bottom: 0.6em; }
   strong, b { font-weight: bold; }
   em, i { font-style: italic; }
   .copyright { font-size: 9pt; font-style: italic; color: #999; text-align: center; margin-top: 2in; border-top: 1px solid #ddd; padding-top: 0.5in; }

@@ -121,3 +121,62 @@
 .ProseMirror {
   color: hsl(var(--foreground));
 }
+
+/* ── Sermon Content Typography (sermon pages only) ── */
+.sermon-content {
+  font-family: Georgia, "Times New Roman", serif;
+  max-width: 820px;
+  margin: auto;
+  padding: 40px 24px;
+  line-height: 1.7;
+}
+
+.sermon-content h1 {
+  font-size: 40px;
+  text-align: center;
+  font-weight: bold;
+  margin-bottom: 1.5em;
+}
+
+.sermon-content h2 {
+  font-size: 26px;
+  font-weight: bold;
+  margin-top: 2em;
+  margin-bottom: 0.6em;
+}
+
+.sermon-content h3 {
+  font-size: 22px;
+  font-weight: bold;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+.sermon-content p {
+  font-size: 20px;
+  margin-bottom: 1.1em;
+  line-height: 1.7;
+}
+
+.sermon-content ul,
+.sermon-content ol {
+  margin-top: 1em;
+  margin-bottom: 1.5em;
+  padding-left: 1.2em;
+}
+
+.sermon-content li {
+  font-size: 18px;
+  margin-bottom: 0.6em;
+  line-height: 1.6;
+}
+
+.sermon-content strong,
+.sermon-content b {
+  font-weight: bold;
+}
+
+.sermon-content em,
+.sermon-content i {
+  font-style: italic;
+}
