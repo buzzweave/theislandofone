@@ -72,12 +72,12 @@ export default function SermonDetail() {
     if (isHtml) {
       return (
         <div
-          className="prose prose-invert prose-sm max-w-none [&_*]:!text-white"
+          className="sermon-content [&_*]:!text-white"
           dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }}
         />
       );
     }
-    return <p className="text-white leading-relaxed whitespace-pre-wrap">{content}</p>;
+    return <p className="text-white leading-relaxed whitespace-pre-wrap" style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: '20px', lineHeight: 1.7 }}>{content}</p>;
   };
 
   return (
@@ -136,7 +136,7 @@ export default function SermonDetail() {
               </div>
             </div>
 
-            <article className="prose prose-invert prose-lg max-w-none space-y-5">
+            <article className="sermon-content max-w-none">
               {(isFullAccess ? paragraphs : previewParagraphs).map((p, i) => (
                 <div key={i} className="text-white leading-relaxed">
                   {renderContent(p)}
