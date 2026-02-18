@@ -1,82 +1,50 @@
 
-
-# Add Copyright Protection to Website Content
+# Add Facebook Comments to Blog Posts
 
 ## What This Does
-1. Adds a visible copyright notice at the bottom of every blog post
-2. Disables text copying (select, copy, right-click) across all content pages -- blogs, books, and sermons
+Embeds the Facebook Comments Plugin at the bottom of every blog post, allowing visitors to leave comments using their Facebook account. Comments are tied to your Facebook page (facebook.com/customwebdesigners).
+
+## How It Works
+Facebook provides a free embeddable comments widget. We load the Facebook SDK once, then place a `<div class="fb-comments">` element on each blog post page. Facebook handles all the comment rendering, moderation, and notifications through your Facebook page.
 
 ## Changes
 
-### 1. Global Copy Protection (src/index.css)
-Add CSS rules to disable text selection on content areas site-wide:
-- `user-select: none` on blog prose, sermon content, and book chapter content
-- Disable right-click context menu on these areas
-- Keep navigation and UI elements selectable (only protect the written content)
+### 1. Load Facebook SDK (index.html)
+Add the Facebook JavaScript SDK script to the page. This is required for the comments plugin to render. It uses your Facebook App ID (we'll use your page URL as the identifier).
 
-### 2. Copy Protection Script (src/components/Layout.tsx)
-Add a `useEffect` that prevents:
-- Right-click context menu on the page
-- Ctrl+C / Cmd+C keyboard shortcuts
-- Ctrl+A / Cmd+A select-all shortcuts
-This makes it significantly harder to copy text from the site.
+### 2. Facebook Comments Component (src/components/FacebookComments.tsx)
+Create a reusable component that:
+- Renders the `fb-comments` div with the current page URL
+- Re-initializes the Facebook SDK when the blog post slug changes (since this is a single-page app, we need to tell Facebook to re-parse the comments div on navigation)
+- Configurable width (100%) and number of visible comments
 
-### 3. Copyright Notice on Blog Posts (src/pages/BlogPost.tsx)
-Add a visible copyright line at the bottom of every blog post, above the social share links:
-
-> (c) 2026 The Island of One Ministries. All rights reserved. For personal use only.
-
-Styled in small muted text matching the site design.
-
-### 4. Copyright Notice on Sermon Detail (src/pages/SermonDetail.tsx)
-Add the same copyright notice at the end of the sermon manuscript content.
-
-### 5. Copyright Notice on Book Detail (src/pages/BookDetail.tsx)
-Add the copyright notice at the bottom of the chapter content area.
+### 3. Add to Blog Post Page (src/pages/BlogPost.tsx)
+Place the Facebook Comments component below the social share links, after the copyright notice.
 
 ## Technical Details
 
-### CSS additions (index.css)
-```css
-.blog-post-prose,
-.sermon-content,
-.book-chapter-content,
-.book-reader-shell {
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
-}
+### index.html -- Facebook SDK script
+```html
+<div id="fb-root"></div>
+<script async defer crossorigin="anonymous"
+  src="https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v21.0"
+  nonce="random123">
+</script>
 ```
 
-### Layout.tsx -- global keyboard/right-click protection
+### FacebookComments.tsx -- Reusable component
 ```typescript
-useEffect(() => {
-  const handleContextMenu = (e: MouseEvent) => e.preventDefault();
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'a' || e.key === 'u')) {
-      e.preventDefault();
-    }
-  };
-  document.addEventListener('contextmenu', handleContextMenu);
-  document.addEventListener('keydown', handleKeyDown);
-  return () => {
-    document.removeEventListener('contextmenu', handleContextMenu);
-    document.removeEventListener('keydown', handleKeyDown);
-  };
-}, []);
+// Uses useEffect to call FB.XFBML.parse() when slug changes
+// Renders: <div class="fb-comments" data-href={pageUrl} data-width="100%" data-numposts="5" />
 ```
 
-### Copyright component text
-A small reusable line added to BlogPost.tsx, SermonDetail.tsx, and BookDetail.tsx:
-```
-(c) {year} The Island of One Ministries. All rights reserved. For personal use only.
-```
+### BlogPost.tsx -- Integration point
+The comments section will appear below the social share links, styled to match the dark theme with a "Comments" heading.
 
 ### Files Modified
-- `src/index.css` -- CSS user-select rules
-- `src/components/Layout.tsx` -- global copy/right-click prevention
-- `src/pages/BlogPost.tsx` -- copyright notice
-- `src/pages/SermonDetail.tsx` -- copyright notice
-- `src/pages/BookDetail.tsx` -- copyright notice
+- `index.html` -- add Facebook SDK
+- `src/components/FacebookComments.tsx` -- new component
+- `src/pages/BlogPost.tsx` -- embed comments below share links
 
+### Important Note
+Facebook Comments will only render on a publicly accessible URL (the published site at theislandofone.lovable.app or a custom domain). They won't appear in the local preview. After publishing, comments will be visible and linked to your Facebook page for moderation.
