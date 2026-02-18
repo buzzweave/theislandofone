@@ -33,7 +33,7 @@ Deno.serve(async (req: Request) => {
     return new Response("Not found", { status: 404, headers });
   }
 
-  const site = "https://theislandofone.lovable.app";
+  const site = "https://theislandofone.com";
   const link = site + "/blog/" + post.slug;
   const fallbackImg = site + "/logo.png";
   const img = post.image_url || fallbackImg;
