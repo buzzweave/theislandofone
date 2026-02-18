@@ -1,5 +1,3 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 Deno.serve(async (req: Request) => {
@@ -17,30 +15,21 @@ Deno.serve(async (req: Request) => {
     return new Response("Missing slug", { status: 400, headers });
   }
 
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-  );
+  try {
+    const res = await fetch(`https://api.theislandofone.com/api/blog-posts/by-slug/${encodeURIComponent(slug)}`);
+    if (!res.ok) {
+      return new Response("Not found", { status: 404, headers });
+    }
+    const post = await res.json();
 
-  const { data: post } = await supabase
-    .from("blog_posts")
-    .select("title, excerpt, image_url, slug, author")
-    .eq("slug", slug)
-    .eq("is_published", true)
-    .single();
+    const site = "https://theislandofone.com";
+    const link = site + "/blog/" + post.slug;
+    const fallbackImg = site + "/logo.png";
+    const img = post.image_url || fallbackImg;
+    const desc = post.excerpt || "Faith, healing, and belonging for the ones who felt alone.";
+    const t = post.title;
 
-  if (!post) {
-    return new Response("Not found", { status: 404, headers });
-  }
-
-  const site = "https://theislandofone.com";
-  const link = site + "/blog/" + post.slug;
-  const fallbackImg = site + "/logo.png";
-  const img = post.image_url || fallbackImg;
-  const desc = post.excerpt || "Faith, healing, and belonging for the ones who felt alone.";
-  const t = post.title;
-
-  const page = `<!DOCTYPE html><html><head>
+    const page = `<!DOCTYPE html><html><head>
 <meta charset="UTF-8">
 <title>${esc(t)}</title>
 <link rel="canonical" href="${esc(link)}" />
@@ -62,7 +51,11 @@ Deno.serve(async (req: Request) => {
 <p>Redirecting to The Island of One&hellip;</p>
 </body></html>`;
 
-  return new Response(page, {
-    headers: { ...headers, "Content-Type": "text/html; charset=utf-8" },
-  });
+    return new Response(page, {
+      headers: { ...headers, "Content-Type": "text/html; charset=utf-8" },
+    });
+  } catch (err) {
+    console.error("share-blog error:", err);
+    return new Response("Internal error", { status: 500, headers });
+  }
 });
