@@ -7,6 +7,43 @@ export function fixPunctuation(text: string): string {
   return fixed;
 }
 
+function groupSentences(text: string, perGroup: number = 4): string[] {
+  const sentences = text.match(/[^.!?]*[.!?]+\s*/g);
+  if (!sentences) return [text];
+  const result: string[] = [];
+  let current = "";
+  for (let i = 0; i < sentences.length; i++) {
+    current += sentences[i];
+    if ((i + 1) % perGroup === 0 || i === sentences.length - 1) {
+      result.push(current.trim());
+      current = "";
+    }
+  }
+  return result.filter((p) => p.length > 0);
+}
+
+function smartGroup(units: string[]): string[] {
+  if (units.length === 0) return [];
+  if (units.length === 1) {
+    // Single block — split by sentences if long
+    if (units[0].length > 300) {
+      return groupSentences(units[0], 4);
+    }
+    return units;
+  }
+
+  const avgLen = units.reduce((s, u) => s + u.length, 0) / units.length;
+
+  // If average unit is short (single-sentence lines), merge into proper paragraphs
+  if (avgLen < 80) {
+    const joined = units.join(" ");
+    return groupSentences(joined, 4);
+  }
+
+  // Units are already substantial — author intended those breaks
+  return units;
+}
+
 export function extractParagraphs(content: string): string[] {
   const isHtml = content?.includes("<") && content?.includes(">");
 
@@ -18,25 +55,11 @@ export function extractParagraphs(content: string): string[] {
     const pElements = Array.from(doc.querySelectorAll("p"));
 
     if (pElements.length > 0) {
-      const paragraphs: string[] = [];
-      let current = "";
+      const units = pElements
+        .map((p) => (p.textContent || "").trim())
+        .filter((t) => t.length > 0);
 
-      for (const p of pElements) {
-        const text = (p.textContent || "").trim();
-        if (text.length === 0) {
-          if (current.length > 0) {
-            paragraphs.push(fixPunctuation(current));
-            current = "";
-          }
-        } else {
-          current = current ? current + " " + text : text;
-        }
-      }
-      if (current.length > 0) {
-        paragraphs.push(fixPunctuation(current));
-      }
-
-      return paragraphs;
+      return smartGroup(units).map(fixPunctuation);
     }
 
     const plainText = doc.body.textContent || "";
@@ -56,18 +79,6 @@ export function formatPlainText(rawText: string): string[] {
     paragraphs = normalized.split(/\n/);
   }
 
-  if (paragraphs.length <= 1 && normalized.length > 500) {
-    const sentences = normalized.match(/[^.!?]*[.!?]+\s*/g) || [normalized];
-    paragraphs = [];
-    let current = "";
-    for (let i = 0; i < sentences.length; i++) {
-      current += sentences[i];
-      if ((i + 1) % 3 === 0 || i === sentences.length - 1) {
-        paragraphs.push(current.trim());
-        current = "";
-      }
-    }
-  }
-
-  return paragraphs.map((p) => p.trim()).filter((p) => p.length > 0);
+  const units = paragraphs.map((p) => p.trim()).filter((p) => p.length > 0);
+  return smartGroup(units).map(fixPunctuation);
 }
