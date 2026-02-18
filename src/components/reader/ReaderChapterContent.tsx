@@ -15,6 +15,22 @@ function fixPunctuation(text: string): string {
   fixed = fixed.replace(/ {2,}/g, " ");
   return fixed;
 }
+// Merge short fragments (< ~80 chars) into the previous paragraph
+function mergeShortParagraphs(paragraphs: string[]): string[] {
+  if (paragraphs.length <= 1) return paragraphs;
+  
+  const merged: string[] = [];
+  for (let i = 0; i < paragraphs.length; i++) {
+    const text = paragraphs[i];
+    // If this paragraph is short and there's a previous one, append to it
+    if (text.length < 80 && merged.length > 0) {
+      merged[merged.length - 1] += " " + text;
+    } else {
+      merged.push(text);
+    }
+  }
+  return merged;
+}
 
 function extractParagraphs(content: string): string[] {
   const isHtml = content?.includes("<") && content?.includes(">");
@@ -26,14 +42,14 @@ function extractParagraphs(content: string): string[] {
     const pElements = doc.querySelectorAll("p");
     
     if (pElements.length > 0) {
-      const paragraphs: string[] = [];
+      const rawParagraphs: string[] = [];
       pElements.forEach((p) => {
         const text = (p.textContent || "").trim();
         if (text.length > 0) {
-          paragraphs.push(fixPunctuation(text));
+          rawParagraphs.push(fixPunctuation(text));
         }
       });
-      return paragraphs;
+      return mergeShortParagraphs(rawParagraphs);
     }
     
     // Fallback: no <p> tags, get all text
