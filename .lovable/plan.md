@@ -1,36 +1,47 @@
 
-# Add Facebook App ID Setting to Blog Manager
 
-## What This Does
-Adds a "Facebook Settings" section at the top of the Blog Manager where you can enter and save your Facebook App ID. All three sharing functions (blog, book, sermon) will then read this saved ID from the database instead of using the hardcoded one.
+# Lock All Paid Books and Sermons Behind Purchase
 
-## Changes
+## Current Behavior
 
-### 1. Admin Blog Manager UI (`src/pages/admin/AdminBlogManager.tsx`)
-- Add a collapsible "Facebook Settings" card above the post list
-- Input field for Facebook App ID, pre-filled with the current saved value
-- Save button that writes the value to the `site_settings` table with key `fb_app_id`
-- Loads the current value on page load from `site_settings`
+- **Books**: `canRead = true` is hardcoded, so ALL chapters are fully readable for every book, even paid ones. The inline reader locks chapters after the first for paid books, but the accordion chapter list below shows everything expanded.
+- **Sermons**: Already has a working paywall with preview cutoff and a "Buy" button, but uses a mock/demo purchase flow (`handleMockPurchase` sets state in memory only -- resets on refresh).
 
-### 2. Edge Functions (share-blog, share-book, share-sermon)
-- Each function will query `site_settings` for the `fb_app_id` key before rendering the HTML
-- If no value is found, it falls back to the current default `1169014871775113`
-- This means sharing works immediately (using the existing ID) and updates as soon as you save a new one
+## What Changes
 
-### 3. No Database Changes Needed
-The `site_settings` table already exists with `key` and `value` columns, and already has anon SELECT + admin INSERT/UPDATE policies. The edge functions use the service role key so they can always read it.
+### Books (`src/pages/BookDetail.tsx`)
+- Remove the hardcoded `canRead = true`
+- Replace with `const canRead = book.is_free || purchased` (same pattern sermons use)
+- Add `purchased` state and a checkout sidebar (matching the sermon page design)
+- The accordion chapter list will show only the first chapter expanded for paid books; remaining chapters show a lock icon
+- Download buttons (PDF, EPUB, Word) only appear when the book is free or purchased
+- For paid books, show a "Get This Book" card in the sidebar with price and purchase button
 
-## How It Will Look
+### Sermons (`src/pages/SermonDetail.tsx`)
+- Already correctly implemented with preview cutoff and paywall
+- No structural changes needed; the existing mock purchase flow stays in place
 
-At the top of the Blog Manager page, a small settings panel:
+### Inline Book Reader (`src/components/reader/InlineBookReader.tsx`)
+- Already correctly locks chapters after the first for paid books
+- No changes needed
 
-```text
-+------------------------------------------+
-| Facebook Settings                        |
-|                                          |
-| Facebook App ID                          |
-| [1169014871775113            ]  [ Save ] |
-+------------------------------------------+
-```
+### Books listing page (`src/pages/Books.tsx`)
+- Add a lock icon badge on paid book cards (similar to sermon list) so users can see at a glance which are free vs paid
 
-After saving, all blog/book/sermon shares will use the new ID in their OG metadata.
+### Sermons listing page (`src/pages/Sermons.tsx`)
+- Already shows free/paid badges correctly
+- No changes needed
+
+## Technical Details
+
+### `src/pages/BookDetail.tsx`
+- Add `useState` for `purchased` and `showCheckout` (same as SermonDetail)
+- Change `canRead` from `true` to `book.is_free || purchased`
+- Wrap download buttons in a condition: only show when `canRead` is true
+- For paid + not purchased: show "Contact to Purchase" or a checkout card in a sidebar layout
+- The existing accordion chapters section already respects `canRead` and `isPreview` -- once `canRead` is false, locked chapters will show the lock icon and won't expand
+
+### `src/pages/Books.tsx`
+- Add Lock icon import
+- Show a small price/lock badge on each paid book card (below the "Free" label logic)
+
