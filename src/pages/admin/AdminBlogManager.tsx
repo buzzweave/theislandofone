@@ -132,8 +132,8 @@ export default function AdminBlogManager() {
   };
 
   const shareToFacebook = (post: BlogPost) => {
-    const sharePageUrl = `https://zovakngafdwzbqhwvssf.supabase.co/functions/v1/blog-share?slug=${post.slug}`;
-    const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(sharePageUrl)}`;
+    const sharePageUrl = `https://zovakngafdwzbqhwvssf.supabase.co/functions/v1/blogshare?slug=${post.slug}`;
+    const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(sharePageUrl)}&quote=${encodeURIComponent(post.excerpt || post.title)}`;
     window.open(shareUrl, '_blank', 'width=600,height=400');
   };
 
