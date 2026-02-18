@@ -1,50 +1,74 @@
 
-# Add Facebook Comments to Blog Posts
+# Publish Blog Posts to Facebook
 
 ## What This Does
-Embeds the Facebook Comments Plugin at the bottom of every blog post, allowing visitors to leave comments using their Facebook account. Comments are tied to your Facebook page (facebook.com/customwebdesigners).
+Adds a "Share to Facebook" button next to each blog post in the Admin Blog Manager. When clicked, it opens the Facebook Share Dialog with:
+- The blog post URL (which Facebook crawls for the title, image, and description)
+- A pre-filled quote from the post excerpt
 
-## How It Works
-Facebook provides a free embeddable comments widget. We load the Facebook SDK once, then place a `<div class="fb-comments">` element on each blog post page. Facebook handles all the comment rendering, moderation, and notifications through your Facebook page.
+It also sets dynamic Open Graph meta tags on each blog post page so Facebook picks up the correct title, image, and description when the link is shared.
+
+## How Facebook Sharing Works
+Facebook does not allow apps to upload images directly into a user's post via a simple share button. Instead, when you share a URL, Facebook crawls that URL and pulls the Open Graph meta tags (og:title, og:image, og:description) to build the rich preview card with the picture.
+
+This means the blog post pages need proper OG meta tags set dynamically, and then the Facebook Share Dialog will display the post with its featured image automatically.
 
 ## Changes
 
-### 1. Load Facebook SDK (index.html)
-Add the Facebook JavaScript SDK script to the page. This is required for the comments plugin to render. It uses your Facebook App ID (we'll use your page URL as the identifier).
+### 1. Dynamic Open Graph Meta Tags (src/pages/BlogPost.tsx)
+Add a `useEffect` that updates the page's `<meta>` OG tags when a blog post loads:
+- `og:title` -- the post title
+- `og:description` -- the post excerpt
+- `og:image` -- the post featured image URL
+- `og:url` -- the canonical URL of the post
+- `og:type` -- "article"
 
-### 2. Facebook Comments Component (src/components/FacebookComments.tsx)
-Create a reusable component that:
-- Renders the `fb-comments` div with the current page URL
-- Re-initializes the Facebook SDK when the blog post slug changes (since this is a single-page app, we need to tell Facebook to re-parse the comments div on navigation)
-- Configurable width (100%) and number of visible comments
+This ensures Facebook sees the correct image and text when it crawls the shared link.
 
-### 3. Add to Blog Post Page (src/pages/BlogPost.tsx)
-Place the Facebook Comments component below the social share links, after the copyright notice.
+### 2. Share to Facebook Button in Admin (src/pages/admin/AdminBlogManager.tsx)
+Add a Facebook share icon button next to the Edit and Delete buttons on each post row. Clicking it opens:
+```
+https://www.facebook.com/sharer/sharer.php?u={encoded_blog_post_url}&quote={encoded_excerpt}
+```
+in a new window. This is the standard Facebook Share Dialog -- it opens the "Create post" window (like in your screenshot) with the blog post link pre-attached, showing the image and title from the OG tags.
+
+Only published posts will show the share button (drafts are not publicly accessible).
+
+### 3. Update Default OG Image (index.html)
+Set a default `og:image` to `/logo.png` so pages without a specific image still have a fallback.
 
 ## Technical Details
 
-### index.html -- Facebook SDK script
-```html
-<div id="fb-root"></div>
-<script async defer crossorigin="anonymous"
-  src="https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v21.0"
-  nonce="random123">
-</script>
-```
-
-### FacebookComments.tsx -- Reusable component
+### BlogPost.tsx -- dynamic meta tags
 ```typescript
-// Uses useEffect to call FB.XFBML.parse() when slug changes
-// Renders: <div class="fb-comments" data-href={pageUrl} data-width="100%" data-numposts="5" />
+useEffect(() => {
+  if (!post) return;
+  const setMeta = (property: string, content: string) => {
+    let el = document.querySelector(`meta[property="${property}"]`);
+    if (!el) { el = document.createElement('meta'); el.setAttribute('property', property); document.head.appendChild(el); }
+    el.setAttribute('content', content);
+  };
+  const url = `https://theislandofone.lovable.app/blog/${slug}`;
+  setMeta('og:title', post.title);
+  setMeta('og:description', post.excerpt || '');
+  setMeta('og:image', post.image_url || '');
+  setMeta('og:url', url);
+  setMeta('og:type', 'article');
+  document.title = `${post.title} | The Island of One`;
+}, [post, slug]);
 ```
 
-### BlogPost.tsx -- Integration point
-The comments section will appear below the social share links, styled to match the dark theme with a "Comments" heading.
+### AdminBlogManager.tsx -- share button
+```typescript
+const shareToFacebook = (post: BlogPost) => {
+  const url = `https://theislandofone.lovable.app/blog/${post.slug}`;
+  const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(post.excerpt || post.title)}`;
+  window.open(shareUrl, '_blank', 'width=600,height=400');
+};
+```
+A Facebook icon button will be added to each published post's action buttons.
 
 ### Files Modified
-- `index.html` -- add Facebook SDK
-- `src/components/FacebookComments.tsx` -- new component
-- `src/pages/BlogPost.tsx` -- embed comments below share links
-
-### Important Note
-Facebook Comments will only render on a publicly accessible URL (the published site at theislandofone.lovable.app or a custom domain). They won't appear in the local preview. After publishing, comments will be visible and linked to your Facebook page for moderation.
+- `src/pages/BlogPost.tsx` -- add dynamic OG meta tags via useEffect
+- `src/pages/admin/AdminBlogManager.tsx` -- add Facebook share button per post
+- `index.html` -- set default og:image to /logo.png
