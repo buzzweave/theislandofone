@@ -27,8 +27,8 @@ export default function BlogPost() {
     };
     const url = `https://theislandofone.lovable.app/blog/${slug}`;
     setMeta('og:title', post.title);
-    setMeta('og:description', post.excerpt || '');
-    setMeta('og:image', post.image_url || '');
+    setMeta('og:description', post.excerpt || 'Faith, healing, and belonging for the ones who felt alone.');
+    setMeta('og:image', post.image_url || 'https://theislandofone.lovable.app/logo.png');
     setMeta('og:url', url);
     setMeta('og:type', 'article');
     document.title = `${post.title} | The Island of One`;
