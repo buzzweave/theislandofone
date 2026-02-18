@@ -148,7 +148,7 @@
 .book-reader-prose p {
   text-indent: 1.5em;
   margin: 1.1em 0;
-  text-align: justify;
+  text-align: left;
   font-size: 1.08rem;
   color: #1a1a1a;
 }
