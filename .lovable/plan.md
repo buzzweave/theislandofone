@@ -1,84 +1,44 @@
 
-# Make Blog Posts Readable Like Books
+# Fix Blog Content Formatting for Any Pasted Input
 
 ## Problem
-The blog post content on the detail page has several issues visible in the screenshot:
-- Text is grey/muted instead of white -- hard to read on the dark background
-- Each sentence appears as its own line instead of being grouped into proper paragraphs
-- The first paragraph that just repeats the title ("The Preacher's Wife") is not removed
-- No drop cap on the first letter like the book reader has
-- No punctuation fixing or sentence merging
+When content is pasted into the blog editor (from Word, Notes, web, etc.), it publishes as one giant unreadable block instead of well-formed paragraphs. The text formatting utility merges all `<p>` tags into a single paragraph and only splits by sentences as a last resort.
+
+## Root Cause
+The `extractParagraphs` function in `src/lib/textFormat.ts` has flawed merging logic:
+- In the HTML path, it joins ALL consecutive non-empty `<p>` elements into one block, only breaking on empty `<p>` tags
+- The sentence-grouping fallback (3 sentences per paragraph) only activates for plain text over 500 characters with zero line breaks
+- This means pasted content (which TipTap wraps in `<p>` tags) gets collapsed into a wall of text
 
 ## Solution
-Apply the same reading experience from the book reader to blog posts -- reuse the paragraph extraction logic, punctuation fixing, drop cap styling, and white text.
+Rewrite the paragraph extraction logic to intelligently group content into readable paragraphs regardless of how it was pasted:
 
-### 1. BlogPost.tsx -- Rewrite content rendering
-- Import and reuse the same `extractParagraphs` and `fixPunctuation` logic from the book reader (or extract it into a shared utility)
-- Skip the first paragraph if it just repeats the post title
-- Render with drop cap on the first paragraph
-- Use white text color instead of the muted prose styling
+### Changes to `src/lib/textFormat.ts`
 
-### 2. CSS (index.css) -- Add blog content typography
-- Add a `.blog-post-prose` class mirroring the book reader prose style but adapted for the dark background
-- White text color (#ffffff) instead of dark (#1a1a1a)
-- Drop cap styled in gold (matching the site's primary color) instead of burgundy
-- Same Georgia serif font, proper line-height and text-indent
+1. **HTML path**: Instead of merging all `<p>` tags into one block, collect each `<p>` as its own text unit. Then apply smart grouping -- if most paragraphs are just single sentences (a sign of line-by-line paste), merge them into proper paragraphs of 3-5 sentences each.
 
-### 3. Title deduplication
-- If the first extracted paragraph matches the blog post title, skip it (same logic as book reader)
+2. **Sentence grouping logic**: When a block of text is one continuous run (no paragraph breaks), split it into paragraphs of approximately 4-5 sentences for comfortable reading. This matches the "Preacher's Wife" post formatting.
 
-## Technical Details
+3. **Detection heuristic**: If the average paragraph length is under ~80 characters (indicating single-sentence lines), apply automatic sentence grouping. If paragraphs are already substantial (author intended those breaks), preserve them.
 
-### New shared utility: `src/lib/textFormat.ts`
-Extract `fixPunctuation`, `extractParagraphs`, and `formatPlainText` from `ReaderChapterContent.tsx` into a shared module so both the book reader and blog post can use them.
+### Technical Details
 
-### BlogPost.tsx changes
-- Import `extractParagraphs` from the shared utility
-- Replace the current `prose` div with a custom `.blog-post-prose` container
-- Map paragraphs with drop cap on the first one and proper `<p>` tags
-- Skip title-duplicate first paragraph
+```text
+BEFORE (current logic):
+  HTML input -> collect <p> tags -> merge ALL into one string (split only on empty <p>) -> return
 
-### index.css additions
-```css
-.blog-post-prose {
-  font-family: Georgia, "Times New Roman", serif;
-  line-height: 1.9;
-  max-width: 720px;
-  margin: 0 auto;
-}
-
-.blog-post-prose p {
-  text-indent: 1.5em;
-  margin: 1.1em 0;
-  text-align: left;
-  font-size: 1.08rem;
-  color: #ffffff;
-}
-
-.blog-post-prose p:first-of-type {
-  text-indent: 0;
-}
-
-.blog-post-prose p.blog-drop-cap::first-letter {
-  float: left;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 3.8em;
-  line-height: 0.8;
-  padding-right: 0.08em;
-  padding-top: 0.05em;
-  color: hsl(40 72% 52%);
-  font-weight: bold;
-}
+AFTER (new logic):
+  HTML input -> collect <p> tags as individual text units
+    -> if most are short (single sentences): group every 4-5 sentences into paragraphs
+    -> if already substantial paragraphs: keep them as-is
+    -> apply fixPunctuation to each result
+  
+  Plain text input -> split by double newlines
+    -> if only 1 block and it's long: split by sentences, group 4-5 per paragraph
+    -> apply fixPunctuation to each result
 ```
 
-### ReaderChapterContent.tsx update
-- Import `extractParagraphs` from the shared utility instead of defining it inline
-- Remove the duplicated function definitions
+### Files Modified
+- `src/lib/textFormat.ts` -- rewrite `extractParagraphs` with smart paragraph grouping
 
-### Files to create
-- `src/lib/textFormat.ts` -- shared paragraph extraction and punctuation logic
-
-### Files to modify
-- `src/pages/BlogPost.tsx` -- new content rendering with drop cap and white text
-- `src/index.css` -- blog post prose styles
-- `src/components/reader/ReaderChapterContent.tsx` -- import from shared utility
+No other files need changes. The `BlogPost.tsx` and `ReaderChapterContent.tsx` already import from this shared utility, so they will automatically benefit from the improved logic.
