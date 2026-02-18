@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import RichTextEditor from "@/components/admin/RichTextEditor";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, PenLine, Upload, Eye, EyeOff } from "lucide-react";
+import { Plus, Pencil, Trash2, PenLine, Upload, Eye, EyeOff, Facebook } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 
@@ -131,6 +131,12 @@ export default function AdminBlogManager() {
     toast({ title: "Post deleted" });
   };
 
+  const shareToFacebook = (post: BlogPost) => {
+    const url = `https://theislandofone.lovable.app/blog/${post.slug}`;
+    const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(post.excerpt || post.title)}`;
+    window.open(shareUrl, '_blank', 'width=600,height=400');
+  };
+
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>;
 
   return (
@@ -223,6 +229,9 @@ export default function AdminBlogManager() {
             </Badge>
             <div className="flex gap-1 shrink-0">
               <Button variant="ghost" size="icon" onClick={() => openEdit(post)}><Pencil className="h-4 w-4" /></Button>
+              {post.is_published && (
+                <Button variant="ghost" size="icon" onClick={() => shareToFacebook(post)} title="Share to Facebook"><Facebook className="h-4 w-4 text-blue-500" /></Button>
+              )}
               <Button variant="ghost" size="icon" onClick={() => handleDelete(post.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
             </div>
           </div>

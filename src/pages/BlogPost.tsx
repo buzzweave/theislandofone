@@ -1,5 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { api } from "@/lib/api";
 import { ArrowLeft, Calendar, User } from "lucide-react";
 import { format } from "date-fns";
@@ -16,6 +17,22 @@ export default function BlogPost() {
     queryFn: () => api.get(`/api/blog-posts/by-slug/${slug}`),
     enabled: !!slug,
   });
+
+  useEffect(() => {
+    if (!post) return;
+    const setMeta = (property: string, content: string) => {
+      let el = document.querySelector(`meta[property="${property}"]`);
+      if (!el) { el = document.createElement('meta'); el.setAttribute('property', property); document.head.appendChild(el); }
+      el.setAttribute('content', content);
+    };
+    const url = `https://theislandofone.lovable.app/blog/${slug}`;
+    setMeta('og:title', post.title);
+    setMeta('og:description', post.excerpt || '');
+    setMeta('og:image', post.image_url || '');
+    setMeta('og:url', url);
+    setMeta('og:type', 'article');
+    document.title = `${post.title} | The Island of One`;
+  }, [post, slug]);
 
   if (isLoading) {
     return (
