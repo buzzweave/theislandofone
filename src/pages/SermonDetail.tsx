@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import SocialShareLinks from "@/components/SocialShareLinks";
 import AudioPlayer from "@/components/AudioPlayer";
+import FacebookComments from "@/components/FacebookComments";
 import DOMPurify from "dompurify";
 import { exportSermonToPdf, exportSermonToEpub, exportSermonToWord, exportSermonToGoodNotesPdf } from "@/lib/sermonExport";
 
@@ -293,6 +294,9 @@ export default function SermonDetail() {
               </CardContent>
             </Card>
           </div>
+        </div>
+        <div className="max-w-3xl mx-auto mt-8 pt-6 border-t border-border">
+          <FacebookComments slug={`sermons/${id}`} />
         </div>
       </div>
     </div>

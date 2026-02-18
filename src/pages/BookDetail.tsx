@@ -4,6 +4,7 @@ import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, Download, FileText, Loc
 import { exportBookToPdf, exportBookToEpub, exportBookToWord } from "@/lib/bookExport";
 import { useBook } from "@/hooks/useBooks";
 import SocialShareLinks from "@/components/SocialShareLinks";
+import FacebookComments from "@/components/FacebookComments";
 import AudioPlayer from "@/components/AudioPlayer";
 import DOMPurify from "dompurify";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -279,6 +280,9 @@ export default function BookDetail() {
               </a>
             </div>
           )}
+        </div>
+        <div className="max-w-3xl mx-auto mt-8 pt-6 border-t border-border">
+          <FacebookComments slug={`books/${id}`} />
         </div>
       </section>
     </div>
