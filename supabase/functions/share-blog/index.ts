@@ -34,7 +34,7 @@ Deno.serve(async (req: Request) => {
   const site = "https://theislandofone.lovable.app";
   const link = site + "/blog/" + post.slug;
   const img = post.image_url || site + "/logo.png";
-  const desc = post.excerpt || (post.content || "").replace(/<[^>]*>/g, "").substring(0, 300);
+  const desc = post.excerpt || "Faith, healing, and belonging for the ones who felt alone.";
   const t = post.title;
   const a = post.author || "";
 
