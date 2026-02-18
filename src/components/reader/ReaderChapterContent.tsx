@@ -10,36 +10,59 @@ interface ReaderChapterContentProps {
 }
 
 function fixPunctuation(text: string): string {
-  // Ensure space after period, exclamation, question mark when followed by a letter
   let fixed = text.replace(/([.!?])([A-Za-z])/g, "$1 $2");
-  // Ensure space after comma when followed by a letter (not inside numbers)
   fixed = fixed.replace(/,([A-Za-z])/g, ", $1");
-  // Collapse multiple spaces into one
   fixed = fixed.replace(/ {2,}/g, " ");
   return fixed;
 }
 
-function formatManuscriptText(rawText: string): string[] {
-  // Fix punctuation spacing first
+function extractParagraphs(content: string): string[] {
+  const isHtml = content?.includes("<") && content?.includes(">");
+  
+  if (isHtml) {
+    // Parse HTML and extract text from each <p> tag as a separate paragraph
+    const clean = DOMPurify.sanitize(content, { ALLOWED_TAGS: ["p", "br", "span", "strong", "em", "b", "i"] });
+    const doc = new DOMParser().parseFromString(clean, "text/html");
+    const pElements = doc.querySelectorAll("p");
+    
+    if (pElements.length > 0) {
+      const paragraphs: string[] = [];
+      pElements.forEach((p) => {
+        const text = (p.textContent || "").trim();
+        if (text.length > 0) {
+          paragraphs.push(fixPunctuation(text));
+        }
+      });
+      return paragraphs;
+    }
+    
+    // Fallback: no <p> tags, get all text
+    const plainText = doc.body.textContent || "";
+    return formatPlainText(plainText);
+  }
+  
+  return formatPlainText(content);
+}
+
+function formatPlainText(rawText: string): string[] {
   const cleaned = fixPunctuation(rawText);
   const normalized = cleaned.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   
-  // Split on double newlines (true paragraph breaks)
+  // Split on double newlines first
   let paragraphs = normalized.split(/\n{2,}/);
   
-  // If no double-newline breaks found, try splitting on single newlines
+  // If only one block, try single newlines
   if (paragraphs.length <= 1) {
     paragraphs = normalized.split(/\n/);
   }
   
-  // If still one big block, split on sentence boundaries where a new thought begins
+  // If still one big block, split every ~3 sentences
   if (paragraphs.length <= 1 && normalized.length > 500) {
     const sentences = normalized.match(/[^.!?]*[.!?]+\s*/g) || [normalized];
     paragraphs = [];
     let current = "";
     for (let i = 0; i < sentences.length; i++) {
       current += sentences[i];
-      // Group ~3-4 sentences per paragraph for natural book flow
       if ((i + 1) % 3 === 0 || i === sentences.length - 1) {
         paragraphs.push(current.trim());
         current = "";
@@ -47,15 +70,7 @@ function formatManuscriptText(rawText: string): string[] {
     }
   }
   
-  return paragraphs
-    .map((p) => p.trim())
-    .filter((p) => p.length > 0);
-}
-
-function stripHtml(html: string): string {
-  const clean = DOMPurify.sanitize(html, { ALLOWED_TAGS: [] });
-  const doc = new DOMParser().parseFromString(clean, "text/html");
-  return doc.body.textContent || "";
+  return paragraphs.map((p) => p.trim()).filter((p) => p.length > 0);
 }
 
 export const ReaderChapterContent = ({
@@ -64,9 +79,16 @@ export const ReaderChapterContent = ({
   chapterNumber,
   isPreface = false,
 }: ReaderChapterContentProps) => {
-  const isHtml = content?.includes("<") && content?.includes(">");
-  const plainText = isHtml ? stripHtml(content) : content;
-  const paragraphs = formatManuscriptText(plainText);
+  let paragraphs = extractParagraphs(content || "");
+  
+  // Skip first paragraph if it just repeats the chapter title (e.g. "Introduction", "Dedication")
+  if (paragraphs.length > 1) {
+    const first = paragraphs[0].toLowerCase().replace(/[^a-z]/g, "");
+    const chTitle = title.toLowerCase().replace(/[^a-z]/g, "");
+    if (first === chTitle || first.length <= 2) {
+      paragraphs = paragraphs.slice(1);
+    }
+  }
 
   return (
     <article className="book-reader-page">
