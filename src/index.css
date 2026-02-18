@@ -122,6 +122,37 @@
   color: hsl(var(--foreground));
 }
 
+/* ── Blog Post Typography (dark background) ── */
+.blog-post-prose {
+  font-family: Georgia, "Times New Roman", serif;
+  line-height: 1.9;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.blog-post-prose p {
+  text-indent: 1.5em;
+  margin: 1.1em 0;
+  text-align: left;
+  font-size: 1.08rem;
+  color: hsl(var(--foreground));
+}
+
+.blog-post-prose p:first-of-type {
+  text-indent: 0;
+}
+
+.blog-post-prose p.blog-drop-cap::first-letter {
+  float: left;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 3.8em;
+  line-height: 0.8;
+  padding-right: 0.08em;
+  padding-top: 0.05em;
+  color: hsl(var(--primary));
+  font-weight: bold;
+}
+
 /* ── Book Chapter Drop Cap (books section only) ── */
 .book-chapter-content p:first-of-type::first-letter {
   float: left;

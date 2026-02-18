@@ -3,8 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { ArrowLeft, Calendar, User } from "lucide-react";
 import { format } from "date-fns";
-import DOMPurify from "dompurify";
+import { extractParagraphs } from "@/lib/textFormat";
 import SocialShareLinks from "@/components/SocialShareLinks";
+import { cn } from "@/lib/utils";
 
 export default function BlogPost() {
   const { slug } = useParams<{ slug: string }>();
@@ -34,7 +35,16 @@ export default function BlogPost() {
     );
   }
 
-  const isHtml = post.content?.includes("<") && post.content?.includes(">");
+  let paragraphs = extractParagraphs(post.content || "");
+
+  // Skip first paragraph if it just repeats the post title
+  if (paragraphs.length > 1) {
+    const first = paragraphs[0].toLowerCase().replace(/[^a-z]/g, "");
+    const postTitle = post.title.toLowerCase().replace(/[^a-z]/g, "");
+    if (first === postTitle || first.length <= 2) {
+      paragraphs = paragraphs.slice(1);
+    }
+  }
 
   return (
     <div className="min-h-screen">
@@ -63,29 +73,13 @@ export default function BlogPost() {
             {format(new Date(post.published_at || post.created_at), "MMMM d, yyyy")}
           </span>
         </div>
-        {isHtml ? (
-          <div
-            className="prose prose-sm sm:prose-base prose-neutral dark:prose-invert max-w-none
-              prose-headings:font-display prose-headings:font-bold
-              prose-p:leading-relaxed prose-p:mb-4
-              prose-li:leading-relaxed
-              prose-blockquote:border-primary prose-blockquote:italic"
-            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(post.content, {
-              ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'a', 'span', 'div'],
-              ALLOWED_ATTR: ['href', 'target', 'rel', 'style', 'class'],
-            }) }}
-          />
-        ) : (
-          <div
-            className="prose prose-sm sm:prose-base prose-neutral dark:prose-invert max-w-none
-              prose-headings:font-display prose-headings:font-bold
-              prose-p:leading-relaxed prose-p:mb-4"
-          >
-            {post.content.split(/\n\n+/).map((paragraph: string, i: number) => (
-              <p key={i}>{paragraph.trim()}</p>
-            ))}
-          </div>
-        )}
+        <div className="blog-post-prose">
+          {paragraphs.map((text, index) => (
+            <p key={index} className={cn(index === 0 && "blog-drop-cap")}>
+              {text}
+            </p>
+          ))}
+        </div>
         <div className="mt-10 pt-6 border-t border-border">
           <SocialShareLinks title={post.title} />
         </div>

@@ -1,90 +1,12 @@
 import { BookParagraph } from "./BookParagraph";
 import { ChapterHeader } from "./ChapterHeader";
-import DOMPurify from "dompurify";
+import { extractParagraphs } from "@/lib/textFormat";
 
 interface ReaderChapterContentProps {
   title: string;
   content: string;
   chapterNumber?: number;
   isPreface?: boolean;
-}
-
-function fixPunctuation(text: string): string {
-  let fixed = text.replace(/([.!?])([A-Za-z])/g, "$1 $2");
-  fixed = fixed.replace(/,([A-Za-z])/g, ", $1");
-  fixed = fixed.replace(/ {2,}/g, " ");
-  return fixed;
-}
-function extractParagraphs(content: string): string[] {
-  const isHtml = content?.includes("<") && content?.includes(">");
-  
-  if (isHtml) {
-    // Use empty <p> tags as true paragraph separators
-    // Adjacent <p> tags (no empty <p> between them) are part of the same paragraph
-    const clean = DOMPurify.sanitize(content, { ALLOWED_TAGS: ["p", "br", "span", "strong", "em", "b", "i"] });
-    const doc = new DOMParser().parseFromString(clean, "text/html");
-    const pElements = Array.from(doc.querySelectorAll("p"));
-    
-    if (pElements.length > 0) {
-      const paragraphs: string[] = [];
-      let current = "";
-      
-      for (const p of pElements) {
-        const text = (p.textContent || "").trim();
-        if (text.length === 0) {
-          // Empty <p> = paragraph break
-          if (current.length > 0) {
-            paragraphs.push(fixPunctuation(current));
-            current = "";
-          }
-        } else {
-          // Append to current paragraph (with space if needed)
-          current = current ? current + " " + text : text;
-        }
-      }
-      // Push last paragraph
-      if (current.length > 0) {
-        paragraphs.push(fixPunctuation(current));
-      }
-      
-      return paragraphs;
-    }
-    
-    // Fallback: no <p> tags, get all text
-    const plainText = doc.body.textContent || "";
-    return formatPlainText(plainText);
-  }
-  
-  return formatPlainText(content);
-}
-
-function formatPlainText(rawText: string): string[] {
-  const cleaned = fixPunctuation(rawText);
-  const normalized = cleaned.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-  
-  // Split on double newlines first
-  let paragraphs = normalized.split(/\n{2,}/);
-  
-  // If only one block, try single newlines
-  if (paragraphs.length <= 1) {
-    paragraphs = normalized.split(/\n/);
-  }
-  
-  // If still one big block, split every ~3 sentences
-  if (paragraphs.length <= 1 && normalized.length > 500) {
-    const sentences = normalized.match(/[^.!?]*[.!?]+\s*/g) || [normalized];
-    paragraphs = [];
-    let current = "";
-    for (let i = 0; i < sentences.length; i++) {
-      current += sentences[i];
-      if ((i + 1) % 3 === 0 || i === sentences.length - 1) {
-        paragraphs.push(current.trim());
-        current = "";
-      }
-    }
-  }
-  
-  return paragraphs.map((p) => p.trim()).filter((p) => p.length > 0);
 }
 
 export const ReaderChapterContent = ({
@@ -95,7 +17,7 @@ export const ReaderChapterContent = ({
 }: ReaderChapterContentProps) => {
   let paragraphs = extractParagraphs(content || "");
   
-  // Skip first paragraph if it just repeats the chapter title (e.g. "Introduction", "Dedication")
+  // Skip first paragraph if it just repeats the chapter title
   if (paragraphs.length > 1) {
     const first = paragraphs[0].toLowerCase().replace(/[^a-z]/g, "");
     const chTitle = title.toLowerCase().replace(/[^a-z]/g, "");
