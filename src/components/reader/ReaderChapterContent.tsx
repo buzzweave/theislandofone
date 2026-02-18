@@ -15,41 +15,39 @@ function fixPunctuation(text: string): string {
   fixed = fixed.replace(/ {2,}/g, " ");
   return fixed;
 }
-// Merge short fragments (< ~80 chars) into the previous paragraph
-function mergeShortParagraphs(paragraphs: string[]): string[] {
-  if (paragraphs.length <= 1) return paragraphs;
-  
-  const merged: string[] = [];
-  for (let i = 0; i < paragraphs.length; i++) {
-    const text = paragraphs[i];
-    // If this paragraph is short and there's a previous one, append to it
-    if (text.length < 80 && merged.length > 0) {
-      merged[merged.length - 1] += " " + text;
-    } else {
-      merged.push(text);
-    }
-  }
-  return merged;
-}
-
 function extractParagraphs(content: string): string[] {
   const isHtml = content?.includes("<") && content?.includes(">");
   
   if (isHtml) {
-    // Parse HTML and extract text from each <p> tag as a separate paragraph
+    // Use empty <p> tags as true paragraph separators
+    // Adjacent <p> tags (no empty <p> between them) are part of the same paragraph
     const clean = DOMPurify.sanitize(content, { ALLOWED_TAGS: ["p", "br", "span", "strong", "em", "b", "i"] });
     const doc = new DOMParser().parseFromString(clean, "text/html");
-    const pElements = doc.querySelectorAll("p");
+    const pElements = Array.from(doc.querySelectorAll("p"));
     
     if (pElements.length > 0) {
-      const rawParagraphs: string[] = [];
-      pElements.forEach((p) => {
+      const paragraphs: string[] = [];
+      let current = "";
+      
+      for (const p of pElements) {
         const text = (p.textContent || "").trim();
-        if (text.length > 0) {
-          rawParagraphs.push(fixPunctuation(text));
+        if (text.length === 0) {
+          // Empty <p> = paragraph break
+          if (current.length > 0) {
+            paragraphs.push(fixPunctuation(current));
+            current = "";
+          }
+        } else {
+          // Append to current paragraph (with space if needed)
+          current = current ? current + " " + text : text;
         }
-      });
-      return mergeShortParagraphs(rawParagraphs);
+      }
+      // Push last paragraph
+      if (current.length > 0) {
+        paragraphs.push(fixPunctuation(current));
+      }
+      
+      return paragraphs;
     }
     
     // Fallback: no <p> tags, get all text
