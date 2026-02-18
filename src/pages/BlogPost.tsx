@@ -39,11 +39,11 @@ export default function BlogPost() {
   return (
     <div className="min-h-screen">
       {post.image_url && (
-        <div className="w-full aspect-[16/9] max-h-[500px] overflow-hidden">
+        <div className="w-full bg-black/40">
           <img
             src={post.image_url}
             alt={post.title}
-            className="w-full h-full object-cover object-center"
+            className="w-full h-auto object-contain max-h-[600px] mx-auto"
           />
         </div>
       )}
