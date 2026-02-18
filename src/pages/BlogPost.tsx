@@ -25,7 +25,7 @@ export default function BlogPost() {
       if (!el) { el = document.createElement('meta'); el.setAttribute('property', property); document.head.appendChild(el); }
       el.setAttribute('content', content);
     };
-    const url = `https://theislandofone.lovable.app/blog/${slug}`;
+    const url = `https://theislandofone.com/blog/${slug}`;
     setMeta('og:title', post.title);
     setMeta('og:description', post.excerpt || 'Faith, healing, and belonging for the ones who felt alone.');
     setMeta('og:image', post.image_url || 'https://theislandofone.lovable.app/logo.png');
