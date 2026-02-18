@@ -1,3 +1,5 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 Deno.serve(async (req: Request) => {
@@ -16,11 +18,21 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const res = await fetch(`https://api.theislandofone.com/api/blog-posts/by-slug/${encodeURIComponent(slug)}`);
-    if (!res.ok) {
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    const { data: post, error } = await supabase
+      .from("blog_posts")
+      .select("*")
+      .eq("slug", slug)
+      .eq("is_published", true)
+      .single();
+
+    if (error || !post) {
       return new Response("Not found", { status: 404, headers });
     }
-    const post = await res.json();
 
     const site = "https://theislandofone.com";
     const link = site + "/blog/" + post.slug;

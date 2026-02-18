@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.share-blog]
 verify_jwt = false
+
+[functions.sync-blog-posts]
+verify_jwt = false

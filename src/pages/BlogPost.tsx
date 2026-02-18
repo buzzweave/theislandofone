@@ -1,7 +1,7 @@
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { api } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 import { ArrowLeft, Calendar, User } from "lucide-react";
 import { format } from "date-fns";
 import { extractParagraphs } from "@/lib/textFormat";
@@ -14,7 +14,16 @@ export default function BlogPost() {
 
   const { data: post, isLoading } = useQuery({
     queryKey: ["blog_post", slug],
-    queryFn: () => api.get(`/api/blog-posts/by-slug/${slug}`),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("blog_posts")
+        .select("*")
+        .eq("slug", slug!)
+        .eq("is_published", true)
+        .single();
+      if (error) throw error;
+      return data;
+    },
     enabled: !!slug,
   });
 
