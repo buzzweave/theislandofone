@@ -1,44 +1,82 @@
 
-# Fix Blog Content Formatting for Any Pasted Input
 
-## Problem
-When content is pasted into the blog editor (from Word, Notes, web, etc.), it publishes as one giant unreadable block instead of well-formed paragraphs. The text formatting utility merges all `<p>` tags into a single paragraph and only splits by sentences as a last resort.
+# Add Copyright Protection to Website Content
 
-## Root Cause
-The `extractParagraphs` function in `src/lib/textFormat.ts` has flawed merging logic:
-- In the HTML path, it joins ALL consecutive non-empty `<p>` elements into one block, only breaking on empty `<p>` tags
-- The sentence-grouping fallback (3 sentences per paragraph) only activates for plain text over 500 characters with zero line breaks
-- This means pasted content (which TipTap wraps in `<p>` tags) gets collapsed into a wall of text
+## What This Does
+1. Adds a visible copyright notice at the bottom of every blog post
+2. Disables text copying (select, copy, right-click) across all content pages -- blogs, books, and sermons
 
-## Solution
-Rewrite the paragraph extraction logic to intelligently group content into readable paragraphs regardless of how it was pasted:
+## Changes
 
-### Changes to `src/lib/textFormat.ts`
+### 1. Global Copy Protection (src/index.css)
+Add CSS rules to disable text selection on content areas site-wide:
+- `user-select: none` on blog prose, sermon content, and book chapter content
+- Disable right-click context menu on these areas
+- Keep navigation and UI elements selectable (only protect the written content)
 
-1. **HTML path**: Instead of merging all `<p>` tags into one block, collect each `<p>` as its own text unit. Then apply smart grouping -- if most paragraphs are just single sentences (a sign of line-by-line paste), merge them into proper paragraphs of 3-5 sentences each.
+### 2. Copy Protection Script (src/components/Layout.tsx)
+Add a `useEffect` that prevents:
+- Right-click context menu on the page
+- Ctrl+C / Cmd+C keyboard shortcuts
+- Ctrl+A / Cmd+A select-all shortcuts
+This makes it significantly harder to copy text from the site.
 
-2. **Sentence grouping logic**: When a block of text is one continuous run (no paragraph breaks), split it into paragraphs of approximately 4-5 sentences for comfortable reading. This matches the "Preacher's Wife" post formatting.
+### 3. Copyright Notice on Blog Posts (src/pages/BlogPost.tsx)
+Add a visible copyright line at the bottom of every blog post, above the social share links:
 
-3. **Detection heuristic**: If the average paragraph length is under ~80 characters (indicating single-sentence lines), apply automatic sentence grouping. If paragraphs are already substantial (author intended those breaks), preserve them.
+> (c) 2026 The Island of One Ministries. All rights reserved. For personal use only.
 
-### Technical Details
+Styled in small muted text matching the site design.
 
-```text
-BEFORE (current logic):
-  HTML input -> collect <p> tags -> merge ALL into one string (split only on empty <p>) -> return
+### 4. Copyright Notice on Sermon Detail (src/pages/SermonDetail.tsx)
+Add the same copyright notice at the end of the sermon manuscript content.
 
-AFTER (new logic):
-  HTML input -> collect <p> tags as individual text units
-    -> if most are short (single sentences): group every 4-5 sentences into paragraphs
-    -> if already substantial paragraphs: keep them as-is
-    -> apply fixPunctuation to each result
-  
-  Plain text input -> split by double newlines
-    -> if only 1 block and it's long: split by sentences, group 4-5 per paragraph
-    -> apply fixPunctuation to each result
+### 5. Copyright Notice on Book Detail (src/pages/BookDetail.tsx)
+Add the copyright notice at the bottom of the chapter content area.
+
+## Technical Details
+
+### CSS additions (index.css)
+```css
+.blog-post-prose,
+.sermon-content,
+.book-chapter-content,
+.book-reader-shell {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+```
+
+### Layout.tsx -- global keyboard/right-click protection
+```typescript
+useEffect(() => {
+  const handleContextMenu = (e: MouseEvent) => e.preventDefault();
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'a' || e.key === 'u')) {
+      e.preventDefault();
+    }
+  };
+  document.addEventListener('contextmenu', handleContextMenu);
+  document.addEventListener('keydown', handleKeyDown);
+  return () => {
+    document.removeEventListener('contextmenu', handleContextMenu);
+    document.removeEventListener('keydown', handleKeyDown);
+  };
+}, []);
+```
+
+### Copyright component text
+A small reusable line added to BlogPost.tsx, SermonDetail.tsx, and BookDetail.tsx:
+```
+(c) {year} The Island of One Ministries. All rights reserved. For personal use only.
 ```
 
 ### Files Modified
-- `src/lib/textFormat.ts` -- rewrite `extractParagraphs` with smart paragraph grouping
+- `src/index.css` -- CSS user-select rules
+- `src/components/Layout.tsx` -- global copy/right-click prevention
+- `src/pages/BlogPost.tsx` -- copyright notice
+- `src/pages/SermonDetail.tsx` -- copyright notice
+- `src/pages/BookDetail.tsx` -- copyright notice
 
-No other files need changes. The `BlogPost.tsx` and `ReaderChapterContent.tsx` already import from this shared utility, so they will automatically benefit from the improved logic.
