@@ -1,3 +1,5 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 const corsHeaders = {
@@ -16,11 +18,21 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const res = await fetch(`https://api.theislandofone.com/api/sermons/${id}`);
-    if (!res.ok) {
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    const [apiRes, settingResult] = await Promise.all([
+      fetch(`https://api.theislandofone.com/api/sermons/${id}`),
+      supabase.from("site_settings").select("value").eq("key", "fb_app_id").single(),
+    ]);
+
+    if (!apiRes.ok) {
       return new Response("Not found", { status: 404, headers: corsHeaders });
     }
-    const sermon = await res.json();
+    const sermon = await apiRes.json();
+    const fbAppId = settingResult.data?.value || "1169014871775113";
 
     const site = "https://theislandofone.com";
     const link = `${site}/sermons/${id}`;
@@ -43,7 +55,7 @@ Deno.serve(async (req: Request) => {
 <meta property="og:image:height" content="630" />
 <meta property="og:url" content="${esc(link)}" />
 <meta property="og:type" content="article" />
-<meta property="fb:app_id" content="1169014871775113" />
+<meta property="fb:app_id" content="${esc(fbAppId)}" />
 <meta property="og:site_name" content="The Island of One" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="${esc(t)}" />
