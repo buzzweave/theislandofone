@@ -143,6 +143,9 @@ export default function SermonDetail() {
                 </div>
               ))}
             </article>
+            <p className="mt-8 text-xs text-muted-foreground text-center">
+              © {new Date().getFullYear()} The Island of One Ministries. All rights reserved. For personal use only.
+            </p>
 
             {!isFullAccess && (
               <div className="relative mt-0">

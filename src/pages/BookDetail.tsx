@@ -233,6 +233,10 @@ export default function BookDetail() {
                           {renderContent(chapter.content)}
                         </div>
 
+                        <p className="mt-6 text-xs text-muted-foreground text-center">
+                          © {new Date().getFullYear()} The Island of One Ministries. All rights reserved. For personal use only.
+                        </p>
+
                         {!canRead && isPreview && (
                           <div className="mt-6 p-5 rounded-lg border border-primary/20 bg-primary/5 text-center">
                             <Lock className="h-5 w-5 text-primary mx-auto mb-2" />
