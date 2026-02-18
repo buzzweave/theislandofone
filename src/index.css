@@ -134,6 +134,42 @@
   font-weight: bold;
 }
 
+/* ── Inline Book Reader Typography ── */
+.book-reader-page {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.book-reader-prose {
+  line-height: 1.75;
+}
+
+.book-reader-prose p {
+  text-indent: 1.5em;
+  margin: 0.6em 0;
+  text-align: justify;
+  font-size: 1.05rem;
+  color: hsl(var(--foreground));
+}
+
+.book-reader-prose p.reader-first-paragraph {
+  text-indent: 0;
+}
+
+.book-reader-prose p.reader-drop-cap {
+  text-indent: 0;
+}
+
+.book-reader-prose p.reader-drop-cap::first-letter {
+  float: left;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 3.8em;
+  line-height: 0.8;
+  padding-right: 0.08em;
+  padding-top: 0.05em;
+  color: hsl(0 45% 35%);
+  font-weight: bold;
+}
+
 /* ── Sermon Content Typography (sermon pages only) ── */
 .sermon-content {
   font-family: Georgia, "Times New Roman", serif;

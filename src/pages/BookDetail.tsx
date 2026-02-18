@@ -6,6 +6,8 @@ import { useBook } from "@/hooks/useBooks";
 import SocialShareLinks from "@/components/SocialShareLinks";
 import AudioPlayer from "@/components/AudioPlayer";
 import DOMPurify from "dompurify";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { InlineBookReader } from "@/components/reader/InlineBookReader";
 
 export default function BookDetail() {
   const { id } = useParams<{ id: string }>();
@@ -104,48 +106,69 @@ export default function BookDetail() {
                 {renderContent(book.description)}
               </div>
 
-              <div className="flex flex-wrap items-center gap-3 mb-4">
-                {book.is_free ? (
-                  <>
-                    {(book as any).pdf_url ? (
-                      <a
-                        href={(book as any).pdf_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-gold"
-                      >
-                        <Download className="h-4 w-4" /> Download PDF
-                      </a>
+              <Tabs defaultValue="download" className="w-full mb-4">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="download" className="gap-2">
+                    <Download className="h-4 w-4" /> Download
+                  </TabsTrigger>
+                  {canRead && (
+                    <TabsTrigger value="read" className="gap-2">
+                      <BookOpen className="h-4 w-4" /> Read Online
+                    </TabsTrigger>
+                  )}
+                </TabsList>
+
+                <TabsContent value="download">
+                  <div className="flex flex-wrap items-center gap-3">
+                    {book.is_free ? (
+                      <>
+                        {(book as any).pdf_url ? (
+                          <a
+                            href={(book as any).pdf_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-gold"
+                          >
+                            <Download className="h-4 w-4" /> Download PDF
+                          </a>
+                        ) : (
+                          <button
+                            onClick={() => exportBookToPdf(book)}
+                            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-gold"
+                          >
+                            <Download className="h-4 w-4" /> Download PDF
+                          </button>
+                        )}
+                        <button
+                          onClick={() => exportBookToEpub(book)}
+                          className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-primary/30 text-primary text-sm font-semibold hover:bg-primary/10 transition-colors"
+                        >
+                          <FileText className="h-4 w-4" /> Download EPUB
+                        </button>
+                        <button
+                          onClick={() => exportBookToWord(book)}
+                          className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-primary/30 text-primary text-sm font-semibold hover:bg-primary/10 transition-colors"
+                        >
+                          <FileText className="h-4 w-4" /> Download Word
+                        </button>
+                      </>
                     ) : (
-                      <button
-                        onClick={() => exportBookToPdf(book)}
-                        className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-gold"
+                      <a
+                        href="/speaking"
+                        className="inline-flex items-center gap-2 px-8 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-gold"
                       >
-                        <Download className="h-4 w-4" /> Download PDF
-                      </button>
+                        <Mail className="h-4 w-4" /> Contact to Purchase — ${book.price}
+                      </a>
                     )}
-                    <button
-                      onClick={() => exportBookToEpub(book)}
-                      className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-primary/30 text-primary text-sm font-semibold hover:bg-primary/10 transition-colors"
-                    >
-                      <FileText className="h-4 w-4" /> Download EPUB
-                    </button>
-                    <button
-                      onClick={() => exportBookToWord(book)}
-                      className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-primary/30 text-primary text-sm font-semibold hover:bg-primary/10 transition-colors"
-                    >
-                      <FileText className="h-4 w-4" /> Download Word
-                    </button>
-                  </>
-                ) : (
-                  <a
-                    href="/speaking"
-                    className="inline-flex items-center gap-2 px-8 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-gold"
-                  >
-                    <Mail className="h-4 w-4" /> Contact to Purchase — ${book.price}
-                  </a>
+                  </div>
+                </TabsContent>
+
+                {canRead && (
+                  <TabsContent value="read">
+                    <InlineBookReader book={book} />
+                  </TabsContent>
                 )}
-              </div>
+              </Tabs>
 
               <p className="text-xs text-muted-foreground mb-4">
                 {book.chapters.length} chapter{book.chapters.length !== 1 ? "s" : ""}
