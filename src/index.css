@@ -122,6 +122,18 @@
   color: hsl(var(--foreground));
 }
 
+/* ── Copy Protection ── */
+.blog-post-prose,
+.sermon-content,
+.book-chapter-content,
+.book-reader-prose,
+.book-reader-shell {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
 /* ── Blog Post Typography (dark background) ── */
 .blog-post-prose {
   font-family: Georgia, "Times New Roman", serif;

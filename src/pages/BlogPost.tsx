@@ -80,7 +80,10 @@ export default function BlogPost() {
             </p>
           ))}
         </div>
-        <div className="mt-10 pt-6 border-t border-border">
+        <p className="mt-10 text-xs text-muted-foreground text-center">
+          © {new Date().getFullYear()} The Island of One Ministries. All rights reserved. For personal use only.
+        </p>
+        <div className="mt-4 pt-6 border-t border-border">
           <SocialShareLinks title={post.title} />
         </div>
       </article>
