@@ -34,11 +34,11 @@ export default function Blog() {
                 className="group rounded-xl border border-border bg-card overflow-hidden hover:shadow-lg transition-all"
               >
                 {post.image_url && (
-                  <div className="aspect-video overflow-hidden">
+                <div className="aspect-[16/9] overflow-hidden">
                     <img
                       src={post.image_url}
                       alt={post.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
                     />
                   </div>
                 )}
