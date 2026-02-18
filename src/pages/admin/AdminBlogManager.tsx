@@ -82,6 +82,27 @@ export default function AdminBlogManager() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<PostForm>(emptyForm);
   const [syncing, setSyncing] = useState(false);
+  const [fbAppId, setFbAppId] = useState("");
+  const [fbSaving, setFbSaving] = useState(false);
+  const [fbOpen, setFbOpen] = useState(false);
+
+  useEffect(() => {
+    supabase.from("site_settings").select("value").eq("key", "fb_app_id").single().then(({ data }) => {
+      if (data?.value) setFbAppId(data.value);
+    });
+  }, []);
+
+  const saveFbAppId = async () => {
+    setFbSaving(true);
+    try {
+      const { error } = await supabase.from("site_settings").upsert({ key: "fb_app_id", value: fbAppId }, { onConflict: "key" });
+      if (error) throw error;
+      toast({ title: "Facebook App ID saved" });
+    } catch (err: any) {
+      toast({ title: "Save failed", description: err.message, variant: "destructive" });
+    }
+    setFbSaving(false);
+  };
 
   const handleSync = async () => {
     setSyncing(true);
@@ -176,6 +197,33 @@ export default function AdminBlogManager() {
           </Button>
         </div>
       </div>
+
+      <Collapsible open={fbOpen} onOpenChange={setFbOpen} className="mb-6">
+        <CollapsibleTrigger asChild>
+          <Button variant="outline" size="sm" className="w-full justify-start gap-2 mb-2">
+            <Settings className="h-4 w-4" />
+            Facebook Settings
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+            <div className="space-y-2">
+              <Label>Facebook App ID</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={fbAppId}
+                  onChange={(e) => setFbAppId(e.target.value)}
+                  placeholder="e.g. 1169014871775113"
+                />
+                <Button onClick={saveFbAppId} disabled={fbSaving} size="sm" className="shrink-0">
+                  <Save className="h-4 w-4 mr-1" /> {fbSaving ? "Saving…" : "Save"}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Used in blog, book, and sermon share links for Facebook previews.</p>
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       {showForm && (
         <div className="rounded-xl border border-border bg-card p-6 mb-8 space-y-4">
