@@ -23,16 +23,17 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const { data: post, error } = await supabase
-      .from("blog_posts")
-      .select("*")
-      .eq("slug", slug)
-      .eq("is_published", true)
-      .single();
+    const [postResult, settingResult] = await Promise.all([
+      supabase.from("blog_posts").select("*").eq("slug", slug).eq("is_published", true).single(),
+      supabase.from("site_settings").select("value").eq("key", "fb_app_id").single(),
+    ]);
 
-    if (error || !post) {
+    if (postResult.error || !postResult.data) {
       return new Response("Not found", { status: 404, headers });
     }
+
+    const post = postResult.data;
+    const fbAppId = settingResult.data?.value || "1169014871775113";
 
     const site = "https://theislandofone.com";
     const link = site + "/blog/" + post.slug;
@@ -53,7 +54,7 @@ Deno.serve(async (req: Request) => {
 <meta property="og:image:height" content="630" />
 <meta property="og:url" content="${esc(link)}" />
 <meta property="og:type" content="article" />
-<meta property="fb:app_id" content="1169014871775113" />
+<meta property="fb:app_id" content="${esc(fbAppId)}" />
 <meta property="og:site_name" content="The Island of One" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="${esc(t)}" />
