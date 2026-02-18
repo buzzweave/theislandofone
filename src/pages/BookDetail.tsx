@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, Download, FileText, Lock, Mail } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, Crown, Download, FileText, Lock, Mail, ShoppingCart, CheckCircle2 } from "lucide-react";
 import { exportBookToPdf, exportBookToEpub, exportBookToWord } from "@/lib/bookExport";
 import { useBook } from "@/hooks/useBooks";
 import SocialShareLinks from "@/components/SocialShareLinks";
@@ -9,18 +9,22 @@ import AudioPlayer from "@/components/AudioPlayer";
 import DOMPurify from "dompurify";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InlineBookReader } from "@/components/reader/InlineBookReader";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { membershipPlans } from "@/data/content";
 
 export default function BookDetail() {
   const { id } = useParams<{ id: string }>();
   const { data: book, isLoading } = useBook(id);
   const [openChapter, setOpenChapter] = useState<string | null>(null);
+  const [purchased, setPurchased] = useState(false);
+  const [showCheckout, setShowCheckout] = useState(false);
 
   useEffect(() => {
     if (book?.chapters[0]?.id && !openChapter) {
       setOpenChapter(book.chapters[0].id);
     }
   }, [book]);
-  
 
   if (isLoading) {
     return (
@@ -41,11 +45,16 @@ export default function BookDetail() {
     );
   }
 
-  const canRead = true; // Read Online available for all books
+  const canRead = book.is_free || purchased;
   const previewChapterCount = book.is_free ? book.chapters.length : 1;
 
   const toggleChapter = (chapterId: string) => {
     setOpenChapter(openChapter === chapterId ? null : chapterId);
+  };
+
+  const handleMockPurchase = () => {
+    setPurchased(true);
+    setShowCheckout(false);
   };
 
   const renderContent = (content: string) => {
@@ -95,9 +104,21 @@ export default function BookDetail() {
 
             {/* Info */}
             <div className="md:w-2/3">
-              <span className="text-xs text-primary uppercase tracking-[0.2em] mb-2 block">
-                {book.category}
-              </span>
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-xs text-primary uppercase tracking-[0.2em]">
+                  {book.category}
+                </span>
+                {!book.is_free && !purchased && (
+                  <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                    <Lock className="h-2.5 w-2.5" /> Premium
+                  </span>
+                )}
+                {book.is_free && (
+                  <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/5 text-primary/70 border border-primary/10">
+                    Free
+                  </span>
+                )}
+              </div>
               <h1 className="font-display text-4xl md:text-5xl font-bold mb-2">{book.title}</h1>
               {book.subtitle && (
                 <p className="text-muted-foreground text-lg mb-1">{book.subtitle}</p>
@@ -107,60 +128,53 @@ export default function BookDetail() {
                 {renderContent(book.description)}
               </div>
 
-              <Tabs defaultValue="download" className="w-full mb-4">
+              <Tabs defaultValue={canRead ? "download" : "read"} className="w-full mb-4">
                 <TabsList className="mb-4">
-                  <TabsTrigger value="download" className="gap-2">
-                    <Download className="h-4 w-4" /> Download
-                  </TabsTrigger>
+                  {canRead && (
+                    <TabsTrigger value="download" className="gap-2">
+                      <Download className="h-4 w-4" /> Download
+                    </TabsTrigger>
+                  )}
                   <TabsTrigger value="read" className="gap-2">
                     <BookOpen className="h-4 w-4" /> Read Online
                   </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="download">
-                  <div className="flex flex-wrap items-center gap-3">
-                    {book.is_free ? (
-                      <>
-                        {(book as any).pdf_url ? (
-                          <a
-                            href={(book as any).pdf_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-gold"
-                          >
-                            <Download className="h-4 w-4" /> Download PDF
-                          </a>
-                        ) : (
-                          <button
-                            onClick={() => exportBookToPdf(book)}
-                            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-gold"
-                          >
-                            <Download className="h-4 w-4" /> Download PDF
-                          </button>
-                        )}
-                        <button
-                          onClick={() => exportBookToEpub(book)}
-                          className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-primary/30 text-primary text-sm font-semibold hover:bg-primary/10 transition-colors"
+                {canRead && (
+                  <TabsContent value="download">
+                    <div className="flex flex-wrap items-center gap-3">
+                      {(book as any).pdf_url ? (
+                        <a
+                          href={(book as any).pdf_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-gold"
                         >
-                          <FileText className="h-4 w-4" /> Download EPUB
-                        </button>
+                          <Download className="h-4 w-4" /> Download PDF
+                        </a>
+                      ) : (
                         <button
-                          onClick={() => exportBookToWord(book)}
-                          className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-primary/30 text-primary text-sm font-semibold hover:bg-primary/10 transition-colors"
+                          onClick={() => exportBookToPdf(book)}
+                          className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-gold"
                         >
-                          <FileText className="h-4 w-4" /> Download Word
+                          <Download className="h-4 w-4" /> Download PDF
                         </button>
-                      </>
-                    ) : (
-                      <a
-                        href="/speaking"
-                        className="inline-flex items-center gap-2 px-8 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-gold"
+                      )}
+                      <button
+                        onClick={() => exportBookToEpub(book)}
+                        className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-primary/30 text-primary text-sm font-semibold hover:bg-primary/10 transition-colors"
                       >
-                        <Mail className="h-4 w-4" /> Contact to Purchase — ${book.price}
-                      </a>
-                    )}
-                  </div>
-                </TabsContent>
+                        <FileText className="h-4 w-4" /> Download EPUB
+                      </button>
+                      <button
+                        onClick={() => exportBookToWord(book)}
+                        className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-primary/30 text-primary text-sm font-semibold hover:bg-primary/10 transition-colors"
+                      >
+                        <FileText className="h-4 w-4" /> Download Word
+                      </button>
+                    </div>
+                  </TabsContent>
+                )}
 
                 <TabsContent value="read">
                   <InlineBookReader book={book} />
@@ -169,7 +183,7 @@ export default function BookDetail() {
 
               <p className="text-xs text-muted-foreground mb-4">
                 {book.chapters.length} chapter{book.chapters.length !== 1 ? "s" : ""}
-                {!book.is_free && ` · Preview first chapter free`}
+                {!book.is_free && !purchased && ` · Preview first chapter free`}
               </p>
 
               <SocialShareLinks title={book.title} url={`https://zovakngafdwzbqhwvssf.supabase.co/functions/v1/share-book?id=${id}`} />
@@ -184,105 +198,206 @@ export default function BookDetail() {
         </div>
       </section>
 
-      {/* Chapters */}
+      {/* Chapters + Sidebar */}
       <section className="py-16">
-        <div className="container mx-auto px-4 max-w-3xl">
-          <h2 className="font-display text-2xl font-bold mb-8 flex items-center gap-3">
-            <BookOpen className="h-5 w-5 text-primary" /> Chapters
-          </h2>
+        <div className="container mx-auto px-4">
+          <div className="max-w-5xl mx-auto grid lg:grid-cols-[1fr_300px] gap-8">
+            {/* Chapters */}
+            <div>
+              <h2 className="font-display text-2xl font-bold mb-8 flex items-center gap-3">
+                <BookOpen className="h-5 w-5 text-primary" /> Chapters
+              </h2>
 
-          <div className="space-y-3">
-            {book.chapters.map((chapter, index) => {
-              const isPreview = index < previewChapterCount;
-              const isLocked = !canRead && !isPreview;
-              const isOpen = openChapter === chapter.id;
+              <div className="space-y-3">
+                {book.chapters.map((chapter, index) => {
+                  const isPreview = index < previewChapterCount;
+                  const isLocked = !canRead && !isPreview;
+                  const isOpen = openChapter === chapter.id;
 
-              return (
-                <div
-                  key={chapter.id}
-                  className={`rounded-xl border transition-all ${
-                    isOpen
-                      ? "border-primary/30 bg-card shadow-gold"
-                      : "border-border bg-card hover:border-primary/20"
-                  }`}
-                >
-                  <button
-                    onClick={() => !isLocked && toggleChapter(chapter.id)}
-                    className={`w-full text-left px-5 py-4 flex items-center gap-4 ${
-                      isLocked ? "cursor-not-allowed opacity-60" : "cursor-pointer"
-                    }`}
-                  >
-                    <span className="text-primary font-display font-bold text-lg w-8 shrink-0">
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                    <span className="flex-1 font-medium text-foreground">
-                      {chapter.title}
-                    </span>
-                    {isLocked ? (
-                      <Lock className="h-4 w-4 text-muted-foreground shrink-0" />
-                    ) : isOpen ? (
-                      <ChevronDown className="h-4 w-4 text-primary shrink-0" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                    )}
-                  </button>
-
-                  {isOpen && !isLocked && (
-                    <div className="px-5 pb-5 animate-fade-up">
-                      <div className="border-t border-border pt-4 ml-12">
-                        <div className="book-chapter-content prose prose-invert prose-sm max-w-none [&_*]:!text-white">
-                          {renderContent(chapter.content)}
-                        </div>
-
-                        <p className="mt-6 text-xs text-muted-foreground text-center">
-                          © {new Date().getFullYear()} The Island of One Ministries. All rights reserved. For personal use only.
-                        </p>
-
-                        {!canRead && isPreview && (
-                          <div className="mt-6 p-5 rounded-lg border border-primary/20 bg-primary/5 text-center">
-                            <Lock className="h-5 w-5 text-primary mx-auto mb-2" />
-                            <p className="font-display font-semibold text-sm mb-1">
-                              Enjoying the preview?
-                            </p>
-                            <p className="text-xs text-muted-foreground mb-3">
-                              Contact us to purchase this book and unlock all {book.chapters.length} chapters.
-                            </p>
-                            <a
-                              href="/speaking"
-                              className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors shadow-gold"
-                            >
-                              <Mail className="h-3.5 w-3.5" /> Contact to Purchase
-                            </a>
-                          </div>
+                  return (
+                    <div
+                      key={chapter.id}
+                      className={`rounded-xl border transition-all ${
+                        isOpen
+                          ? "border-primary/30 bg-card shadow-gold"
+                          : "border-border bg-card hover:border-primary/20"
+                      }`}
+                    >
+                      <button
+                        onClick={() => !isLocked && toggleChapter(chapter.id)}
+                        className={`w-full text-left px-5 py-4 flex items-center gap-4 ${
+                          isLocked ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+                        }`}
+                      >
+                        <span className="text-primary font-display font-bold text-lg w-8 shrink-0">
+                          {String(index + 1).padStart(2, "0")}
+                        </span>
+                        <span className="flex-1 font-medium text-foreground">
+                          {chapter.title}
+                        </span>
+                        {isLocked ? (
+                          <Lock className="h-4 w-4 text-muted-foreground shrink-0" />
+                        ) : isOpen ? (
+                          <ChevronDown className="h-4 w-4 text-primary shrink-0" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                         )}
-                      </div>
+                      </button>
+
+                      {isOpen && !isLocked && (
+                        <div className="px-5 pb-5 animate-fade-up">
+                          <div className="border-t border-border pt-4 ml-12">
+                            <div className="book-chapter-content prose prose-invert prose-sm max-w-none [&_*]:!text-white">
+                              {renderContent(chapter.content)}
+                            </div>
+
+                            <p className="mt-6 text-xs text-muted-foreground text-center">
+                              © {new Date().getFullYear()} The Island of One Ministries. All rights reserved. For personal use only.
+                            </p>
+
+                            {!canRead && isPreview && (
+                              <div className="mt-6 p-5 rounded-lg border border-primary/20 bg-primary/5 text-center">
+                                <Lock className="h-5 w-5 text-primary mx-auto mb-2" />
+                                <p className="font-display font-semibold text-sm mb-1">
+                                  Enjoying the preview?
+                                </p>
+                                <p className="text-xs text-muted-foreground mb-3">
+                                  Purchase this book to unlock all {book.chapters.length} chapters.
+                                </p>
+                                <Button size="sm" onClick={() => setShowCheckout(true)}>
+                                  <ShoppingCart className="h-3.5 w-3.5 mr-1" /> Buy for ${book.price?.toFixed(2)}
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
+                  );
+                })}
+              </div>
+
+              {!canRead && (
+                <div className="mt-12 p-8 rounded-2xl border border-primary/20 bg-card text-center">
+                  <Lock className="h-8 w-8 text-primary mx-auto mb-3" />
+                  <h3 className="font-display text-xl font-bold mb-2">
+                    Unlock the Full Book
+                  </h3>
+                  <p className="text-muted-foreground text-sm mb-5 max-w-md mx-auto">
+                    Get access to all {book.chapters.length} chapters of "{book.title}" by {book.author}.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                    <Button size="lg" onClick={() => setShowCheckout(true)}>
+                      <ShoppingCart className="h-4 w-4 mr-2" />
+                      Buy for ${book.price?.toFixed(2)}
+                    </Button>
+                    <Button variant="outline" size="lg" asChild>
+                      <Link to="/membership">
+                        <Crown className="h-4 w-4 mr-2" />
+                        Subscribe & Get All
+                      </Link>
+                    </Button>
+                  </div>
                 </div>
-              );
-            })}
+              )}
+            </div>
+
+            {/* Sidebar */}
+            <div className="space-y-4">
+              {!canRead && !showCheckout && (
+                <Card className="border-primary/20">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="font-display text-lg">Get This Book</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="text-3xl font-bold text-primary">${book.price?.toFixed(2)}</div>
+                    <p className="text-xs text-muted-foreground">One-time purchase. Download in PDF, EPUB, and Word.</p>
+                    <Button className="w-full" onClick={() => setShowCheckout(true)}>
+                      <ShoppingCart className="h-4 w-4 mr-2" /> Purchase
+                    </Button>
+                    <div className="text-center">
+                      <span className="text-xs text-muted-foreground">or</span>
+                    </div>
+                    <Button variant="outline" className="w-full" asChild>
+                      <Link to="/membership">
+                        <Crown className="h-4 w-4 mr-2" /> Subscribe from $9.99/mo
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              {showCheckout && !purchased && (
+                <Card className="border-primary/30 shadow-gold">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="font-display text-lg">Checkout</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="p-3 rounded-lg bg-secondary/50 space-y-1">
+                      <p className="text-sm font-medium">{book.title}</p>
+                      {book.subtitle && <p className="text-xs text-muted-foreground">{book.subtitle}</p>}
+                      <p className="text-lg font-bold text-primary mt-2">${book.price?.toFixed(2)}</p>
+                    </div>
+                    <div className="space-y-2 text-xs text-muted-foreground">
+                      <p>✓ Full book access</p>
+                      <p>✓ PDF, EPUB & Word download</p>
+                      <p>✓ Lifetime access</p>
+                    </div>
+                    <Button className="w-full" size="lg" onClick={handleMockPurchase}>
+                      <CheckCircle2 className="h-4 w-4 mr-2" /> Complete Purchase (Demo)
+                    </Button>
+                    <button
+                      onClick={() => setShowCheckout(false)}
+                      className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <p className="text-[10px] text-muted-foreground text-center">
+                      This is a demo checkout. Stripe integration coming soon.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {purchased && (
+                <Card className="border-primary/30">
+                  <CardContent className="pt-6 text-center space-y-3">
+                    <CheckCircle2 className="h-10 w-10 text-primary mx-auto" />
+                    <p className="font-display text-lg font-semibold">Purchased!</p>
+                    <p className="text-xs text-muted-foreground">Full book unlocked. Download above.</p>
+                  </CardContent>
+                </Card>
+              )}
+
+              <Card>
+                <CardContent className="pt-6 space-y-3">
+                  <Crown className="h-6 w-6 text-primary" />
+                  <p className="font-display text-sm font-semibold">Unlock All Books</p>
+                  <p className="text-xs text-muted-foreground">
+                    Subscribe to get unlimited access to our entire book library plus exclusive resources.
+                  </p>
+                  <div className="space-y-1.5">
+                    {membershipPlans.slice(0, 2).map((plan) => (
+                      <div
+                        key={plan.id}
+                        className="flex items-center justify-between text-xs p-2 rounded bg-secondary/30"
+                      >
+                        <span className="font-medium">{plan.name}</span>
+                        <span className="text-primary font-semibold">${plan.price}/mo</span>
+                      </div>
+                    ))}
+                  </div>
+                  <Button variant="outline" size="sm" className="w-full" asChild>
+                    <Link to="/membership">View Plans</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
-          {!canRead && (
-            <div className="mt-12 p-8 rounded-2xl border border-primary/20 bg-card text-center">
-              <Lock className="h-8 w-8 text-primary mx-auto mb-3" />
-              <h3 className="font-display text-xl font-bold mb-2">
-                Unlock the Full Book
-              </h3>
-              <p className="text-muted-foreground text-sm mb-5 max-w-md mx-auto">
-                Get access to all {book.chapters.length} chapters of "{book.title}" by {book.author}. Contact us to purchase.
-              </p>
-              <a
-                href="/speaking"
-                className="inline-flex items-center gap-2 px-8 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-gold"
-              >
-                <Mail className="h-4 w-4" /> Contact to Purchase
-              </a>
-            </div>
-          )}
-        </div>
-        <div className="max-w-3xl mx-auto mt-8 pt-6 border-t border-border">
-          <FacebookComments slug={`books/${id}`} />
+          <div className="max-w-3xl mx-auto mt-8 pt-6 border-t border-border">
+            <FacebookComments slug={`books/${id}`} />
+          </div>
         </div>
       </section>
     </div>

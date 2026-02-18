@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { BookOpen } from "lucide-react";
+import { BookOpen, Lock } from "lucide-react";
 import { useBooks } from "@/hooks/useBooks";
 
 export default function Books() {
@@ -70,8 +70,12 @@ export default function Books() {
                 <span className="text-xs text-primary uppercase tracking-wider">{book.category}</span>
                 <h3 className="font-display text-lg font-semibold mt-1 mb-1 group-hover:text-primary transition-colors">{book.title}</h3>
                 <p className="text-muted-foreground text-sm line-clamp-2 mb-3">{book.subtitle}</p>
-                <span className="text-primary text-sm font-semibold">
-                  {book.is_free ? "Free" : `$${book.price}`}
+                <span className="text-primary text-sm font-semibold inline-flex items-center gap-1.5">
+                  {book.is_free ? "Free" : (
+                    <>
+                      <Lock className="h-3 w-3" /> ${book.price}
+                    </>
+                  )}
                 </span>
               </div>
             </Link>
