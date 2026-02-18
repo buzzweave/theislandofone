@@ -265,7 +265,7 @@ export default function BookDetail() {
                                   Purchase this book to unlock all {book.chapters.length} chapters.
                                 </p>
                                 <Button size="sm" onClick={() => setShowCheckout(true)}>
-                                  <ShoppingCart className="h-3.5 w-3.5 mr-1" /> Buy for ${book.price?.toFixed(2)}
+                                  <ShoppingCart className="h-3.5 w-3.5 mr-1" /> Buy for ${Number(book.price || 0).toFixed(2)}
                                 </Button>
                               </div>
                             )}
@@ -289,7 +289,7 @@ export default function BookDetail() {
                   <div className="flex flex-col sm:flex-row gap-3 justify-center">
                     <Button size="lg" onClick={() => setShowCheckout(true)}>
                       <ShoppingCart className="h-4 w-4 mr-2" />
-                      Buy for ${book.price?.toFixed(2)}
+Buy for ${Number(book.price || 0).toFixed(2)}
                     </Button>
                     <Button variant="outline" size="lg" asChild>
                       <Link to="/membership">
@@ -310,7 +310,7 @@ export default function BookDetail() {
                     <CardTitle className="font-display text-lg">Get This Book</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="text-3xl font-bold text-primary">${book.price?.toFixed(2)}</div>
+                    <div className="text-3xl font-bold text-primary">${Number(book.price || 0).toFixed(2)}</div>
                     <p className="text-xs text-muted-foreground">One-time purchase. Download in PDF, EPUB, and Word.</p>
                     <Button className="w-full" onClick={() => setShowCheckout(true)}>
                       <ShoppingCart className="h-4 w-4 mr-2" /> Purchase
@@ -336,7 +336,7 @@ export default function BookDetail() {
                     <div className="p-3 rounded-lg bg-secondary/50 space-y-1">
                       <p className="text-sm font-medium">{book.title}</p>
                       {book.subtitle && <p className="text-xs text-muted-foreground">{book.subtitle}</p>}
-                      <p className="text-lg font-bold text-primary mt-2">${book.price?.toFixed(2)}</p>
+                      <p className="text-lg font-bold text-primary mt-2">${Number(book.price || 0).toFixed(2)}</p>
                     </div>
                     <div className="space-y-2 text-xs text-muted-foreground">
                       <p>✓ Full book access</p>
