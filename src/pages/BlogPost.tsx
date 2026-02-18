@@ -5,6 +5,7 @@ import { ArrowLeft, Calendar, User } from "lucide-react";
 import { format } from "date-fns";
 import { extractParagraphs } from "@/lib/textFormat";
 import SocialShareLinks from "@/components/SocialShareLinks";
+import FacebookComments from "@/components/FacebookComments";
 import { cn } from "@/lib/utils";
 
 export default function BlogPost() {
@@ -85,6 +86,9 @@ export default function BlogPost() {
         </p>
         <div className="mt-4 pt-6 border-t border-border">
           <SocialShareLinks title={post.title} />
+        </div>
+        <div className="mt-6 pt-6 border-t border-border">
+          <FacebookComments slug={slug!} />
         </div>
       </article>
     </div>
