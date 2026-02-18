@@ -9,8 +9,20 @@ interface ReaderChapterContentProps {
   isPreface?: boolean;
 }
 
+function fixPunctuation(text: string): string {
+  // Ensure space after period, exclamation, question mark when followed by a letter
+  let fixed = text.replace(/([.!?])([A-Za-z])/g, "$1 $2");
+  // Ensure space after comma when followed by a letter (not inside numbers)
+  fixed = fixed.replace(/,([A-Za-z])/g, ", $1");
+  // Collapse multiple spaces into one
+  fixed = fixed.replace(/ {2,}/g, " ");
+  return fixed;
+}
+
 function formatManuscriptText(rawText: string): string[] {
-  const normalized = rawText.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  // Fix punctuation spacing first
+  const cleaned = fixPunctuation(rawText);
+  const normalized = cleaned.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   
   // Split on double newlines (true paragraph breaks)
   let paragraphs = normalized.split(/\n{2,}/);
@@ -20,20 +32,15 @@ function formatManuscriptText(rawText: string): string[] {
     paragraphs = normalized.split(/\n/);
   }
   
-  // If still one big block, split on sentence-ending patterns followed by a capital letter
-  // This catches content pasted without any line breaks
-  if (paragraphs.length <= 1 && normalized.length > 600) {
-    paragraphs = normalized.split(/(?<=[.!?])\s{2,}(?=[A-Z])/);
-  }
-  
-  // If still one block and very long, split roughly every 3-5 sentences
-  if (paragraphs.length <= 1 && normalized.length > 800) {
-    const sentences = normalized.match(/[^.!?]+[.!?]+\s*/g) || [normalized];
+  // If still one big block, split on sentence boundaries where a new thought begins
+  if (paragraphs.length <= 1 && normalized.length > 500) {
+    const sentences = normalized.match(/[^.!?]*[.!?]+\s*/g) || [normalized];
     paragraphs = [];
     let current = "";
     for (let i = 0; i < sentences.length; i++) {
       current += sentences[i];
-      if ((i + 1) % 4 === 0 || i === sentences.length - 1) {
+      // Group ~3-4 sentences per paragraph for natural book flow
+      if ((i + 1) % 3 === 0 || i === sentences.length - 1) {
         paragraphs.push(current.trim());
         current = "";
       }
