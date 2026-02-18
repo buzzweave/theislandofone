@@ -142,12 +142,12 @@
 }
 
 .book-reader-prose {
-  line-height: 1.85;
+  line-height: 1.9;
 }
 
 .book-reader-prose p {
   text-indent: 1.5em;
-  margin: 0.75em 0;
+  margin: 1.1em 0;
   text-align: justify;
   font-size: 1.08rem;
   color: #1a1a1a;
