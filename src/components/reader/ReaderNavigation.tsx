@@ -24,31 +24,33 @@ export const ReaderNavigation = ({
   return (
     <>
       {/* Top bar */}
-      <nav className="sticky top-0 z-40 bg-background/80 backdrop-blur-sm border-b border-border/50">
+      <nav className="sticky top-0 z-40 border-b" style={{ background: "#f5f2ed", borderColor: "#e0dcd5" }}>
         <div className="flex items-center justify-between px-4 py-3">
           <button
             onClick={onOpenToc}
-            className="text-muted-foreground hover:text-foreground transition-colors text-sm font-display"
+            className="reader-nav-btn transition-colors text-sm font-display"
+            style={{ color: "#666" }}
           >
             Contents
           </button>
-          <span className="text-sm text-muted-foreground truncate max-w-[50%]">{chapterTitle}</span>
-          <span className="text-sm text-muted-foreground">
+          <span className="text-sm truncate max-w-[50%]" style={{ color: "#888" }}>{chapterTitle}</span>
+          <span className="text-sm" style={{ color: "#888" }}>
             {currentIndex + 1}/{totalChapters}
           </span>
         </div>
       </nav>
 
       {/* Bottom navigation */}
-      <nav className="sticky bottom-0 z-40 bg-background/80 backdrop-blur-sm border-t border-border/50">
+      <nav className="sticky bottom-0 z-40 border-t" style={{ background: "#f5f2ed", borderColor: "#e0dcd5" }}>
         <div className="flex items-center justify-between px-4 py-4">
           <button
             onClick={onPrevious}
             disabled={!hasPrevious}
             className={cn(
               "flex items-center gap-1 text-sm transition-colors",
-              hasPrevious ? "text-primary hover:text-primary/80" : "text-muted-foreground/30 cursor-not-allowed"
+              hasPrevious ? "hover:opacity-70" : "cursor-not-allowed"
             )}
+            style={{ color: hasPrevious ? "hsl(0 45% 35%)" : "#ccc" }}
           >
             <ChevronLeft className="w-4 h-4" />
             <span className="hidden sm:inline">Previous</span>
@@ -58,10 +60,8 @@ export const ReaderNavigation = ({
             {Array.from({ length: totalChapters }).map((_, i) => (
               <div
                 key={i}
-                className={cn(
-                  "w-1.5 h-1.5 rounded-full transition-colors",
-                  i === currentIndex ? "bg-primary" : "bg-muted-foreground/30"
-                )}
+                className="w-1.5 h-1.5 rounded-full transition-colors"
+                style={{ background: i === currentIndex ? "hsl(0 45% 35%)" : "#d0ccc5" }}
               />
             ))}
           </div>
@@ -71,8 +71,9 @@ export const ReaderNavigation = ({
             disabled={!hasNext}
             className={cn(
               "flex items-center gap-1 text-sm transition-colors",
-              hasNext ? "text-primary hover:text-primary/80" : "text-muted-foreground/30 cursor-not-allowed"
+              hasNext ? "hover:opacity-70" : "cursor-not-allowed"
             )}
+            style={{ color: hasNext ? "hsl(0 45% 35%)" : "#ccc" }}
           >
             <span className="hidden sm:inline">Next</span>
             <ChevronRight className="w-4 h-4" />

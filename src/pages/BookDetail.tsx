@@ -40,7 +40,7 @@ export default function BookDetail() {
     );
   }
 
-  const canRead = book.is_free;
+  const canRead = true; // Read Online available for all books
   const previewChapterCount = book.is_free ? book.chapters.length : 1;
 
   const toggleChapter = (chapterId: string) => {
@@ -111,11 +111,9 @@ export default function BookDetail() {
                   <TabsTrigger value="download" className="gap-2">
                     <Download className="h-4 w-4" /> Download
                   </TabsTrigger>
-                  {canRead && (
-                    <TabsTrigger value="read" className="gap-2">
-                      <BookOpen className="h-4 w-4" /> Read Online
-                    </TabsTrigger>
-                  )}
+                  <TabsTrigger value="read" className="gap-2">
+                    <BookOpen className="h-4 w-4" /> Read Online
+                  </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="download">
@@ -163,11 +161,9 @@ export default function BookDetail() {
                   </div>
                 </TabsContent>
 
-                {canRead && (
-                  <TabsContent value="read">
-                    <InlineBookReader book={book} />
-                  </TabsContent>
-                )}
+                <TabsContent value="read">
+                  <InlineBookReader book={book} />
+                </TabsContent>
               </Tabs>
 
               <p className="text-xs text-muted-foreground mb-4">
