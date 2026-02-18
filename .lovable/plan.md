@@ -1,40 +1,47 @@
 
-
-# Fix: Sermon List Inaccessible on iPhone
+# Fix Blog Image Display
 
 ## Problem
+The blog featured image (e.g., "Bruised But Not Broken") is being heavily cropped because the container uses a 16:9 aspect ratio with `object-cover`, which cuts off the bottom portion of images that are more square or portrait-oriented. The title, lamp, and logo are all hidden.
 
-When existing sermons are loaded, a `useEffect` automatically selects the first sermon whenever `activeId` is `null`. On mobile, the list and editor are shown exclusively (not side-by-side), so this auto-selection immediately forces the user into the editor view. Tapping "Back to list" sets `activeId` to `null`, but the effect fires again and re-selects, creating an inescapable loop. The user can never reach the list view to tap the "+" (new sermon) button.
+## Solution
+Change both the blog post detail page and blog listing cards to display the full image without cropping:
 
-## Fix
+### 1. Blog Post Detail Page (`src/pages/BlogPost.tsx`)
+- Remove the forced `aspect-[16/9]` and `max-h-[500px]` constraints
+- Switch from `object-cover` to `object-contain` so the entire image is visible
+- Use a dark background behind the image so any letterboxing blends with the site theme
 
-**File: `src/pages/admin/AdminSermonEditor.tsx`**
+### 2. Blog Listing Cards (`src/pages/Blog.tsx`)
+- Keep `aspect-[16/9]` on the card thumbnails for a uniform grid layout
+- Change to `object-contain` with a dark background so images are fully visible within the card without cropping
 
-Change the auto-select `useEffect` so it only runs on desktop (not mobile). On mobile, the user should land on the list view and manually tap a sermon to open it.
+## Technical Details
 
-```text
-Before:
-  useEffect(() => {
-    if (!activeId && sermonList.length > 0) {
-      setActiveId(sermonList[0].id);
-    }
-  }, [sermonList, activeId]);
-
-After:
-  useEffect(() => {
-    if (!activeId && sermonList.length > 0 && !isMobile) {
-      setActiveId(sermonList[0].id);
-    }
-  }, [sermonList, activeId, isMobile]);
+**BlogPost.tsx** -- the featured image container changes from:
+```
+<div className="w-full aspect-[16/9] max-h-[500px] overflow-hidden">
+  <img ... className="w-full h-full object-cover object-center" />
+</div>
+```
+to:
+```
+<div className="w-full bg-black/40">
+  <img ... className="w-full h-auto object-contain max-h-[600px] mx-auto" />
+</div>
 ```
 
-This single-line change (`&& !isMobile`) ensures:
-- **Desktop**: First sermon is auto-selected as before (split-pane layout shows both list and editor).
-- **Mobile/iPhone**: User lands on the sermon list, can tap "+" to create, or tap any sermon to edit. "Back to list" works correctly.
+**Blog.tsx** -- the card image container changes from:
+```
+<div className="aspect-[16/9] overflow-hidden">
+  <img ... className="w-full h-full object-cover object-center ..." />
+</div>
+```
+to:
+```
+<div className="aspect-[16/9] overflow-hidden bg-black/40 flex items-center justify-center">
+  <img ... className="w-full h-full object-contain ..." />
+</div>
+```
 
-## Files Changed
-
-| File | Change |
-|------|--------|
-| `src/pages/admin/AdminSermonEditor.tsx` | Add `&& !isMobile` guard to auto-select useEffect |
-
+This ensures the full image is always visible -- no cropping of titles, logos, or key artwork -- while maintaining a clean layout.
