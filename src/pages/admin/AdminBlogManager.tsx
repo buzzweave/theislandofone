@@ -7,9 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import RichTextEditor from "@/components/admin/RichTextEditor";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, PenLine, Upload, Eye, EyeOff, Facebook, RefreshCw } from "lucide-react";
+import { Plus, Pencil, Trash2, PenLine, Upload, Eye, EyeOff, Facebook, RefreshCw, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { api } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 
 type PostForm = {
   title: string;
@@ -43,8 +43,12 @@ function ImageUploader({ currentUrl, onUploaded }: { currentUrl: string; onUploa
     if (!file) return;
     setUploading(true);
     try {
-      const data = await api.upload<{ url: string }>("/api/upload", file);
-      onUploaded(data.url);
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("blog-images").upload(path, file);
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from("blog-images").getPublicUrl(path);
+      onUploaded(urlData.publicUrl);
     } catch (err: any) {
       toast({ title: "Upload failed", description: err.message, variant: "destructive" });
     }
@@ -76,6 +80,19 @@ export default function AdminBlogManager() {
   const [editing, setEditing] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<PostForm>(emptyForm);
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-blog-posts");
+      if (error) throw error;
+      toast({ title: "Sync complete", description: `${data.synced} of ${data.total} posts synced.` });
+    } catch (err: any) {
+      toast({ title: "Sync failed", description: err.message, variant: "destructive" });
+    }
+    setSyncing(false);
+  };
 
   const generateSlug = (title: string) =>
     title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -149,9 +166,14 @@ export default function AdminBlogManager() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="font-display text-2xl font-bold">Blog Manager</h2>
-        <Button onClick={openNew} size="sm">
-          <Plus className="h-4 w-4 mr-2" /> New Post
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={handleSync} size="sm" variant="outline" disabled={syncing}>
+            <Download className="h-4 w-4 mr-2" /> {syncing ? "Syncing…" : "Sync from VPS"}
+          </Button>
+          <Button onClick={openNew} size="sm">
+            <Plus className="h-4 w-4 mr-2" /> New Post
+          </Button>
+        </div>
       </div>
 
       {showForm && (
