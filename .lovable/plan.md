@@ -1,43 +1,60 @@
 
 
-# Import Blog Posts into Lovable Cloud Database
+# Fix Blog Delete, Facebook Image Sharing, and Admin Blog Visibility
 
-## Will Images and Previews Work?
+## Issues Found
 
-**Yes.** The `image_url` column stores a full URL pointing to where the image lives on your VPS. Moving the post metadata into the Lovable Cloud database does not move the images -- they stay hosted on your VPS and will continue to display correctly everywhere (blog page, cards, and Facebook previews).
+### 1. Cannot Delete Blog Posts
+The admin uses a custom VPS-based authentication (not Lovable Cloud auth). The RLS DELETE policy requires `has_role(auth.uid(), 'admin')`, but since the admin is not signed in via Lovable Cloud auth, `auth.uid()` is null. The delete silently fails.
 
-## What Changes
+Additionally, the SELECT policy only returns rows where `is_published = true`, which means draft posts are invisible in the admin too.
 
-### 1. Create an Import Edge Function (`sync-blog-posts`)
-A new backend function that fetches all blog posts from `https://api.theislandofone.com/api/blog-posts` and upserts them into the existing `blog_posts` table in Lovable Cloud. You can trigger this from the Admin Blog Manager with a "Sync from VPS" button.
+**Fix:** Add permissive RLS policies for anon access on SELECT (all rows), DELETE, and UPDATE on `blog_posts`. Since this is an admin-managed CMS table (not user-generated content), and the admin panel itself is protected by VPS auth, this is acceptable.
 
-### 2. Update Frontend Hooks to Read from Lovable Cloud
-Switch `useBlogPosts.ts` and the `BlogPost` page query from calling the VPS API to querying the local database directly using the database client. This will make page loads faster since there's no external API call.
+### 2. Facebook Shows Logo Instead of Blog Images
+The VPS-synced blog posts have `http://` image URLs (not `https://`). Facebook requires HTTPS for OG images. When Facebook can't load the image, the `share-blog` function's fallback logo shows instead.
 
-### 3. Update `share-blog` Edge Function
-Switch it back to querying the local `blog_posts` table instead of calling the VPS API. Since the data is now local, this is faster and more reliable for Facebook crawlers.
+**Fix:** In the `share-blog` Edge Function, convert `http://` image URLs to `https://` before outputting them in OG tags. Also update the `sync-blog-posts` function to store HTTPS URLs during import.
 
-### 4. Admin Blog Manager Gets a Sync Button
-Add a "Sync from VPS" button in the Blog Manager so you can pull the latest posts from your VPS whenever needed. New posts created in the admin panel will save directly to the Lovable Cloud database.
+### 3. Books and Sermons Don't Show Images on Facebook
+The `SocialShareLinks` component on book and sermon pages shares the SPA URL (e.g., `theislandofone.com/books/123`). Facebook's crawler can't execute JavaScript, so it sees no OG tags and no image.
 
-## Flow After Implementation
+The blog already solves this with the `share-blog` Edge Function that serves server-rendered HTML with OG tags. Books and sermons need the same approach.
 
-```text
-VPS API (source of truth for existing posts)
-    |
-    v  [Sync button in Admin]
-Lovable Cloud Database (blog_posts table)
-    |
-    +---> Blog page (reads from local DB)
-    +---> BlogPost detail page (reads from local DB)
-    +---> share-blog Edge Function (reads from local DB)
-    +---> Facebook crawler gets correct OG tags + image
-```
+**Fix:** Create two new Edge Functions (`share-book` and `share-sermon`) that query the VPS API for book/sermon data and serve server-rendered HTML with proper OG tags. Update the share URLs on those pages to point to these functions.
 
-## Important Notes
+---
 
-- **Images stay on VPS** -- only the post text/metadata is copied into the local database
-- **Image URLs must be HTTPS** for Facebook to load them reliably. If your VPS serves images over HTTP only, Facebook may not display them
-- The existing `blog_posts` table already has the right schema -- no database changes needed
-- After the initial sync, you can manage posts directly in the Lovable Cloud admin or re-sync from VPS anytime
+## Technical Changes
+
+### Database Migration
+- Drop the existing restrictive RLS policies on `blog_posts`
+- Add new policies allowing full anon access (SELECT all rows, INSERT, UPDATE, DELETE) since admin auth is handled at the application layer via VPS
+
+### `supabase/functions/share-blog/index.ts`
+- Convert `http://` to `https://` in `image_url` before outputting OG tags
+
+### `supabase/functions/sync-blog-posts/index.ts`
+- Convert `http://` to `https://` in `image_url` during upsert
+
+### New: `supabase/functions/share-book/index.ts`
+- Accept `?id=BOOK_ID` query param
+- Fetch book data from `https://api.theislandofone.com/api/books/BOOK_ID`
+- Serve server-rendered HTML with OG tags (title, description, cover image, fb:app_id)
+- Redirect to `https://theislandofone.com/books/BOOK_ID`
+
+### New: `supabase/functions/share-sermon/index.ts`
+- Accept `?id=SERMON_ID` query param
+- Fetch sermon data from `https://api.theislandofone.com/api/sermons/SERMON_ID`
+- Serve server-rendered HTML with OG tags (title, scripture/excerpt, image if available, fb:app_id)
+- Redirect to `https://theislandofone.com/sermons/SERMON_ID`
+
+### `src/pages/BookDetail.tsx`
+- Pass the share-book Edge Function URL to `SocialShareLinks` instead of `window.location.href`
+
+### `src/pages/SermonDetail.tsx`
+- Pass the share-sermon Edge Function URL to `SocialShareLinks` instead of `window.location.href`
+
+### `supabase/config.toml`
+- Register `share-book` and `share-sermon` functions with `verify_jwt = false`
 
