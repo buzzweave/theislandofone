@@ -32,7 +32,7 @@ Deno.serve(async (req: Request) => {
           author: post.author || "",
           excerpt: post.excerpt || "",
           content: post.content || "",
-          image_url: post.image_url || "",
+          image_url: (post.image_url || "").replace(/^http:\/\//i, "https://"),
           is_published: post.is_published ?? true,
           published_at: post.published_at || post.created_at || new Date().toISOString(),
         },

@@ -20,3 +20,9 @@ verify_jwt = false
 
 [functions.sync-blog-posts]
 verify_jwt = false
+
+[functions.share-book]
+verify_jwt = false
+
+[functions.share-sermon]
+verify_jwt = false

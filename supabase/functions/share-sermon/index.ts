@@ -1,46 +1,36 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-Deno.serve(async (req: Request) => {
-  const headers = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  };
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers });
+    return new Response(null, { headers: corsHeaders });
   }
 
-  const slug = new URL(req.url).searchParams.get("slug");
-  if (!slug) {
-    return new Response("Missing slug", { status: 400, headers });
+  const id = new URL(req.url).searchParams.get("id");
+  if (!id) {
+    return new Response("Missing id", { status: 400, headers: corsHeaders });
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-
-    const { data: post, error } = await supabase
-      .from("blog_posts")
-      .select("*")
-      .eq("slug", slug)
-      .eq("is_published", true)
-      .single();
-
-    if (error || !post) {
-      return new Response("Not found", { status: 404, headers });
+    const res = await fetch(`https://api.theislandofone.com/api/sermons/${id}`);
+    if (!res.ok) {
+      return new Response("Not found", { status: 404, headers: corsHeaders });
     }
+    const sermon = await res.json();
 
     const site = "https://theislandofone.com";
-    const link = site + "/blog/" + post.slug;
-    const fallbackImg = site + "/logo.png";
-    const rawImg = post.image_url || fallbackImg;
+    const link = `${site}/sermons/${id}`;
+    const fallbackImg = `${site}/logo.png`;
+    const rawImg = sermon.image_url || sermon.cover_image || fallbackImg;
     const img = rawImg.replace(/^http:\/\//i, "https://");
-    const desc = post.excerpt || "Faith, healing, and belonging for the ones who felt alone.";
-    const t = post.title;
+    const t = sermon.title || "Sermon";
+    const desc = sermon.scripture
+      ? `${sermon.scripture} — ${sermon.excerpt || "A sermon from The Island of One Ministries."}`
+      : sermon.excerpt || "A sermon from The Island of One Ministries.";
 
     const page = `<!DOCTYPE html><html><head>
 <meta charset="UTF-8">
@@ -66,10 +56,10 @@ Deno.serve(async (req: Request) => {
 </body></html>`;
 
     return new Response(page, {
-      headers: { ...headers, "Content-Type": "text/html; charset=utf-8" },
+      headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" },
     });
   } catch (err) {
-    console.error("share-blog error:", err);
-    return new Response("Internal error", { status: 500, headers });
+    console.error("share-sermon error:", err);
+    return new Response("Internal error", { status: 500, headers: corsHeaders });
   }
 });
