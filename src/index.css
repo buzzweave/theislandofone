@@ -137,18 +137,20 @@
 /* ── Inline Book Reader Typography ── */
 .book-reader-page {
   font-family: Georgia, "Times New Roman", serif;
+  background: #faf8f5;
+  color: #1a1a1a;
 }
 
 .book-reader-prose {
-  line-height: 1.75;
+  line-height: 1.85;
 }
 
 .book-reader-prose p {
   text-indent: 1.5em;
-  margin: 0.6em 0;
+  margin: 0.75em 0;
   text-align: justify;
-  font-size: 1.05rem;
-  color: hsl(var(--foreground));
+  font-size: 1.08rem;
+  color: #1a1a1a;
 }
 
 .book-reader-prose p.reader-first-paragraph {
@@ -168,6 +170,25 @@
   padding-top: 0.05em;
   color: hsl(0 45% 35%);
   font-weight: bold;
+}
+
+/* Reader shell (nav bars, TOC) */
+.book-reader-shell {
+  background: #faf8f5;
+  color: #1a1a1a;
+}
+
+.book-reader-shell .reader-nav-btn {
+  color: #666;
+}
+.book-reader-shell .reader-nav-btn:hover {
+  color: #1a1a1a;
+}
+.book-reader-shell .reader-nav-btn[disabled] {
+  color: #ccc;
+}
+.book-reader-shell .reader-nav-active {
+  color: hsl(0 45% 35%);
 }
 
 /* ── Sermon Content Typography (sermon pages only) ── */
