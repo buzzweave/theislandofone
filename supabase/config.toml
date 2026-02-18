@@ -15,5 +15,5 @@ verify_jwt = false
 [functions.generate-goodnotes-pdf]
 verify_jwt = false
 
-[functions.blogshare]
+[functions.share-blog]
 verify_jwt = false

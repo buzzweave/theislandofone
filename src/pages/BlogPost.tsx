@@ -102,7 +102,10 @@ export default function BlogPost() {
           © {new Date().getFullYear()} The Island of One Ministries. All rights reserved. For personal use only.
         </p>
         <div className="mt-4 pt-6 border-t border-border">
-          <SocialShareLinks title={post.title} />
+          <SocialShareLinks
+            title={post.title}
+            url={`https://zovakngafdwzbqhwvssf.supabase.co/functions/v1/share-blog?slug=${slug}`}
+          />
         </div>
         <div className="mt-6 pt-6 border-t border-border">
           <FacebookComments slug={slug!} />

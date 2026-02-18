@@ -24,7 +24,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: post } = await supabase
     .from("blog_posts")
-    .select("title, excerpt, image_url, slug, content, author")
+    .select("title, excerpt, image_url, slug, author")
     .eq("slug", slug)
     .eq("is_published", true)
     .single();
@@ -39,11 +39,11 @@ Deno.serve(async (req: Request) => {
   const img = post.image_url || fallbackImg;
   const desc = post.excerpt || "Faith, healing, and belonging for the ones who felt alone.";
   const t = post.title;
-  const a = post.author || "";
 
   const page = `<!DOCTYPE html><html><head>
 <meta charset="UTF-8">
 <title>${esc(t)}</title>
+<link rel="canonical" href="${esc(link)}" />
 <meta property="og:title" content="${esc(t)}" />
 <meta property="og:description" content="${esc(desc)}" />
 <meta property="og:image" content="${esc(img)}" />
@@ -57,14 +57,9 @@ Deno.serve(async (req: Request) => {
 <meta name="twitter:description" content="${esc(desc)}" />
 <meta name="twitter:image" content="${esc(img)}" />
 <meta http-equiv="refresh" content="2;url=${esc(link)}" />
-<style>*{user-select:none}body{font:17px/1.8 Georgia,serif;max-width:700px;margin:40px auto;padding:0 20px}</style>
-</head><body oncontextmenu="return false" oncopy="return false">
-${img !== fallbackImg ? `<img src="${esc(img)}" style="width:100%;border-radius:8px">` : ""}
-<h1>${esc(t)}</h1>
-${a ? `<p style="color:#888;font-size:14px">By ${esc(a)}</p>` : ""}
-<div>${post.content || ""}</div>
-<p style="font-size:12px;color:#999;text-align:center;margin-top:40px">&copy; 2026 The Island of One Ministries</p>
-<script>document.onkeydown=function(e){if((e.ctrlKey||e.metaKey)&&'caups'.includes(e.key))e.preventDefault()}</script>
+<style>body{font:17px/1.8 Georgia,serif;max-width:700px;margin:80px auto;padding:0 20px;text-align:center;color:#666}</style>
+</head><body>
+<p>Redirecting to The Island of One&hellip;</p>
 </body></html>`;
 
   return new Response(page, {
