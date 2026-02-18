@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import RichTextEditor from "@/components/admin/RichTextEditor";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, PenLine, Upload, Eye, EyeOff, Facebook } from "lucide-react";
+import { Plus, Pencil, Trash2, PenLine, Upload, Eye, EyeOff, Facebook, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 
@@ -131,10 +131,16 @@ export default function AdminBlogManager() {
     toast({ title: "Post deleted" });
   };
 
+  const getShareUrl = (post: BlogPost) =>
+    `https://zovakngafdwzbqhwvssf.supabase.co/functions/v1/share-blog?slug=${post.slug}`;
+
   const shareToFacebook = (post: BlogPost) => {
-    const sharePageUrl = `https://zovakngafdwzbqhwvssf.supabase.co/functions/v1/blogshare?slug=${post.slug}`;
-    const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(sharePageUrl)}&quote=${encodeURIComponent(post.excerpt || post.title)}`;
+    const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(getShareUrl(post))}&quote=${encodeURIComponent(post.excerpt || post.title)}`;
     window.open(shareUrl, '_blank', 'width=600,height=400');
+  };
+
+  const openDebugger = (post: BlogPost) => {
+    window.open(`https://developers.facebook.com/tools/debug/?q=${encodeURIComponent(getShareUrl(post))}`, '_blank');
   };
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -230,7 +236,10 @@ export default function AdminBlogManager() {
             <div className="flex gap-1 shrink-0">
               <Button variant="ghost" size="icon" onClick={() => openEdit(post)}><Pencil className="h-4 w-4" /></Button>
               {post.is_published && (
-                <Button variant="ghost" size="icon" onClick={() => shareToFacebook(post)} title="Share to Facebook"><Facebook className="h-4 w-4 text-blue-500" /></Button>
+                <>
+                  <Button variant="ghost" size="icon" onClick={() => shareToFacebook(post)} title="Share to Facebook"><Facebook className="h-4 w-4 text-primary" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => openDebugger(post)} title="Refresh Facebook Cache"><RefreshCw className="h-4 w-4" /></Button>
+                </>
               )}
               <Button variant="ghost" size="icon" onClick={() => handleDelete(post.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
             </div>
