@@ -53,8 +53,9 @@ export function useAddVideo() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (video: Partial<Video>) => {
+      const { sort_order, ...rest } = video as any;
       return api.post<Video>("/api/videos", {
-        ...video,
+        ...rest,
         featured: video.featured ? 1 : 0,
         is_active: (video as any).is_active ? 1 : 0,
         is_free: video.is_free ? 1 : 0,
@@ -67,7 +68,7 @@ export function useAddVideo() {
 export function useUpdateVideo() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<Video> & { id: string }) => {
+    mutationFn: async ({ id, sort_order, ...updates }: Partial<Video> & { id: string }) => {
       const payload: any = { ...updates };
       if ("featured" in updates) payload.featured = updates.featured ? 1 : 0;
       if ("is_active" in updates) payload.is_active = updates.is_active ? 1 : 0;
