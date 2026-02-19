@@ -1,31 +1,36 @@
 
-# Fix Sermon, Book, and Blog Creation via VPS API
 
-## Problem
-Creating new sermons and books fails because the VPS API expects integer values (`1`/`0`) for boolean fields, but the frontend sends JavaScript booleans (`true`/`false`). Books also need `chapters: []` in the creation payload.
+# Fix: Sermon and Book Creation — MySQL Syntax Error
 
-## Changes (5 files)
+## Root Cause
+The VPS uses **MySQL**, not PostgreSQL. The error `"near '' at line 1"` means the VPS backend is failing to build a valid SQL INSERT when it receives:
+- `access_tiers: []` — MySQL has no array type; the VPS likely converts this to a comma-separated string, and an empty array becomes `''` which breaks the query
+- `chapters: []` — same problem, or the VPS doesn't expect this field on create
+- `audio_url: null` — may cause `NULL` handling issues in the VPS query builder
+
+## Changes (2 files)
 
 ### 1. `src/pages/admin/AdminSermonEditor.tsx`
-- In `addNew` (line 93-112): Change `is_free: true` to `is_free: 1`, `featured: false` to `featured: 0`
-- Add `console.error` in catch block for debugging
-- In `handleSave` (line 140-142): Convert `is_free` and `featured` to `1`/`0` before sending
+In the `addNew` function (~line 93):
+- Change `access_tiers: []` to `access_tiers: ""` (empty string, which MySQL can handle)
+- Change `audio_url: null` to `audio_url: ""` (empty string instead of null)
+
+In `handleSave` (~line 137):
+- Ensure `access_tiers` is sent as a comma-separated string if it's an array: `access_tiers: Array.isArray(draft.access_tiers) ? draft.access_tiers.join(",") : draft.access_tiers`
+- Ensure `audio_url` sends `""` instead of `null`
 
 ### 2. `src/pages/admin/AdminBookEditor.tsx`
-- In `addNew` (line 124-138): Change `is_free: true` to `is_free: 1`, `featured: false` to `featured: 0`, add `chapters: []`
-- In `handleSave` (line 188): Ensure `is_free` and `featured` are sent as `1`/`0`
+In the `addNew` function (~line 124):
+- Change `access_tiers: []` to `access_tiers: ""`
+- Change `audio_url: null` to `audio_url: ""`
+- Remove `chapters: []` from the create payload (VPS creates the book first, chapters are added separately via update)
 
-### 3. `src/pages/admin/AdminBlogManager.tsx`
-- In `handleSave` (line 148-151): Convert `is_published` to `1`/`0` before sending to VPS
-
-### 4. `src/hooks/useSermons.ts`
-- Update `Sermon` interface: `is_free` and `featured` typed as `number | boolean`
-
-### 5. `src/hooks/useBooks.ts`
-- Update `Book` interface: `is_free` and `featured` typed as `number | boolean`
+In `handleSave` (~line 186):
+- Ensure `access_tiers` is sent as comma-separated string if array
+- Ensure `audio_url` sends `""` instead of `null`
 
 ## What This Fixes
-- New sermon creation via the "+" button
-- New book creation via the "+" button
-- Blog post creation and updates
-- Saving existing sermons and books with correct data format
+- "Error creating book" with MySQL syntax error
+- "Failed to create sermon" with MySQL syntax error
+- Both create flows will send MySQL-compatible values to the VPS
+
