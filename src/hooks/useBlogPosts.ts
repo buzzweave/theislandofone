@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 
 export interface BlogPost {
   id: string;
@@ -19,13 +19,9 @@ export function useBlogPosts(publishedOnly = false) {
   return useQuery({
     queryKey: ["blog_posts", publishedOnly],
     queryFn: async () => {
-      let query = supabase.from("blog_posts").select("*").order("published_at", { ascending: false });
-      if (publishedOnly) {
-        query = query.eq("is_published", true);
-      }
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as BlogPost[];
+      const posts = await api.get<BlogPost[]>("/api/blog");
+      if (publishedOnly) return posts.filter((p) => p.is_published);
+      return posts;
     },
   });
 }
@@ -33,11 +29,7 @@ export function useBlogPosts(publishedOnly = false) {
 export function useAddBlogPost() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (post: Omit<BlogPost, "id" | "created_at" | "updated_at">) => {
-      const { data, error } = await supabase.from("blog_posts").insert(post).select().single();
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: (post: Partial<BlogPost>) => api.post<BlogPost>("/api/blog", post),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["blog_posts"] }),
   });
 }
@@ -45,11 +37,8 @@ export function useAddBlogPost() {
 export function useUpdateBlogPost() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<BlogPost> & { id: string }) => {
-      const { data, error } = await supabase.from("blog_posts").update(updates).eq("id", id).select().single();
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: ({ id, ...updates }: Partial<BlogPost> & { id: string }) =>
+      api.put<BlogPost>(`/api/blog/${id}`, updates),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["blog_posts"] }),
   });
 }
@@ -57,10 +46,7 @@ export function useUpdateBlogPost() {
 export function useDeleteBlogPost() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("blog_posts").delete().eq("id", id);
-      if (error) throw error;
-    },
+    mutationFn: (id: string) => api.delete(`/api/blog/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["blog_posts"] }),
   });
 }

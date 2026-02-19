@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useGraphics, Graphic } from "@/hooks/useGraphics";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { Plus, Trash2, Eye, EyeOff, Image, Maximize2, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,31 +21,6 @@ const RESIZE_PRESETS = [
   { label: "Twitter/X Post", w: 1600, h: 900, platform: "Twitter/X" },
   { label: "Twitter/X Header", w: 1500, h: 500, platform: "Twitter/X" },
 ];
-
-function getAdminToken(): string {
-  return localStorage.getItem("admin_token") || "";
-}
-
-async function adminApi(method: "GET" | "POST" | "PUT" | "DELETE", body?: Record<string, unknown>) {
-  const { data, error } = await supabase.functions.invoke("graphics-admin", {
-    method: method as "GET" | "POST" | "PUT" | "DELETE" | "PATCH",
-    headers: {
-      "x-admin-token": getAdminToken(),
-    },
-    body: body ?? undefined,
-  });
-  if (error) throw error;
-  return data;
-}
-
-async function uploadToStorage(file: File, folder: string): Promise<string> {
-  const ext = file.name.split(".").pop();
-  const path = `${folder}/${crypto.randomUUID()}.${ext}`;
-  const { error } = await supabase.storage.from("graphics").upload(path, file);
-  if (error) throw error;
-  const { data } = supabase.storage.from("graphics").getPublicUrl(path);
-  return data.publicUrl;
-}
 
 function ResizeDialog({ graphic, open, onClose }: { graphic: Graphic | null; open: boolean; onClose: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -120,11 +95,11 @@ export default function AdminGraphics() {
   const [allGraphics, setAllGraphics] = useState<Graphic[]>([]);
   const [loadingAll, setLoadingAll] = useState(true);
 
-  // Fetch all graphics (including inactive) via admin edge function
+  // Fetch all graphics (including inactive) via VPS admin endpoint
   const fetchAll = useCallback(async () => {
     setLoadingAll(true);
     try {
-      const data = await adminApi("GET");
+      const data = await api.get<Graphic[]>("/api/graphics/admin");
       setAllGraphics(data);
     } catch {
       setAllGraphics(graphics);
@@ -140,22 +115,18 @@ export default function AdminGraphics() {
   };
 
   const addGraphicSimple = async (file: File) => {
-    const [previewUrl, fileUrl] = await Promise.all([
-      uploadToStorage(file, "previews"),
-      uploadToStorage(file, "files"),
-    ]);
-    await adminApi("POST", {
-      title: file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "),
-      preview_url: previewUrl,
-      file_url: fileUrl,
-      sort_order: allGraphics.length,
-      price: 4.99,
-    });
+    const form = new FormData();
+    form.append("preview", file);
+    form.append("file", file);
+    form.append("title", file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "));
+    form.append("sort_order", String(allGraphics.length));
+    form.append("price", "4.99");
+    await api.post("/api/graphics", form);
   };
 
   const updateGraphic = async (id: string, updates: Partial<Graphic>) => {
     try {
-      await adminApi("PUT", { id, ...updates });
+      await api.put(`/api/graphics/${id}`, updates);
       invalidate();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -164,7 +135,7 @@ export default function AdminGraphics() {
 
   const deleteGraphic = async (id: string) => {
     try {
-      await adminApi("DELETE", { id });
+      await api.delete(`/api/graphics/${id}`);
       toast({ title: "Graphic deleted" });
       invalidate();
     } catch (err: any) {
@@ -266,7 +237,7 @@ export default function AdminGraphics() {
                       <Label className="text-xs">Membership Access</Label>
                       <div className="flex flex-wrap gap-2">
                         {(["reader", "pastor", "inner-circle"] as const).map((tier) => {
-                          const tiers = (graphic as any).access_tiers || [];
+                          const tiers = graphic.access_tiers || [];
                           const checked = tiers.includes(tier);
                           const label = tier === "inner-circle" ? "Inner Circle" : tier.charAt(0).toUpperCase() + tier.slice(1);
                           return (
@@ -274,7 +245,7 @@ export default function AdminGraphics() {
                               key={tier}
                               onClick={() => {
                                 const next = checked ? tiers.filter((t: string) => t !== tier) : [...tiers, tier];
-                                updateGraphic(graphic.id, { access_tiers: next } as any);
+                                updateGraphic(graphic.id, { access_tiers: next });
                               }}
                               className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
                                 checked

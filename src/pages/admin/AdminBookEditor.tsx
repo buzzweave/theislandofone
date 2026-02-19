@@ -24,7 +24,7 @@ import {
   ArrowLeft,
   Crown,
 } from "lucide-react";
-import { useBooks, useAddBook, useUpdateBook, useDeleteBook, useUpsertChapters, type Book, type BookChapterInput } from "@/hooks/useBooks";
+import { useBooks, useAddBook, useUpdateBook, useDeleteBook, type Book, type BookChapterInput } from "@/hooks/useBooks";
 import SortableChapterList from "@/components/admin/SortableChapterList";
 import { useAIContent } from "@/contexts/AIContentContext";
 import AudioGenerator from "@/components/admin/AudioGenerator";
@@ -43,7 +43,7 @@ export default function AdminBookEditor() {
   const addBookMut = useAddBook();
   const updateBookMut = useUpdateBook();
   const deleteBookMut = useDeleteBook();
-  const upsertChaptersMut = useUpsertChapters();
+  // Chapters are saved as part of the book body via VPS
   const isMobile = useIsMobile();
   const aiContent = useAIContent();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -185,9 +185,7 @@ export default function AdminBookEditor() {
     savingRef.current = true;
 
     try {
-      const { chapters, ...bookData } = local;
-      await updateBookMut.mutateAsync({ id: local.id, ...bookData });
-      await upsertChaptersMut.mutateAsync({ bookId: local.id, chapters });
+      await updateBookMut.mutateAsync({ id: local.id, ...local });
 
       setDirty(false);
       setLastSavedAt(new Date());
