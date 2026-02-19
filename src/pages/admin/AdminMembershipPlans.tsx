@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { api } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 import { useMembershipPlans, MembershipPlan } from "@/hooks/useMembershipPlans";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -21,7 +21,11 @@ export default function AdminMembershipPlans() {
 
   const updatePlan = async (id: string, updates: Partial<MembershipPlan>) => {
     try {
-      await api.put(`/api/membership-plans/${id}`, updates);
+      const { error } = await supabase
+        .from("membership_plans")
+        .update(updates)
+        .eq("id", id);
+      if (error) throw error;
       toast({ title: "Plan updated" });
       invalidate();
     } catch (err: any) {
