@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useVideos, useAddVideo, useUpdateVideo, useDeleteVideo, type Video } from "@/hooks/useVideos";
+import { useAdminVideos, useAddVideo, useUpdateVideo, useDeleteVideo, type Video } from "@/hooks/useVideos";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,9 +8,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, Video as VideoIcon, ExternalLink, Upload, ImageIcon, Eye, EyeOff } from "lucide-react";
+import { Plus, Pencil, Trash2, Video as VideoIcon, ExternalLink, Upload, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { api } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 
 function ThumbnailUploader({ currentUrl, onUploaded }: { currentUrl: string; onUploaded: (url: string) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -22,8 +22,12 @@ function ThumbnailUploader({ currentUrl, onUploaded }: { currentUrl: string; onU
     if (!file) return;
     setUploading(true);
     try {
-      const data = await api.upload<{ url: string }>("/api/upload", file);
-      onUploaded(data.url);
+      const ext = file.name.split(".").pop();
+      const path = `${crypto.randomUUID()}.${ext}`;
+      const { error } = await supabase.storage.from("video-thumbnails").upload(path, file);
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from("video-thumbnails").getPublicUrl(path);
+      onUploaded(urlData.publicUrl);
     } catch (err: any) {
       toast({ title: "Upload failed", description: err.message, variant: "destructive" });
     }
@@ -61,7 +65,7 @@ type VideoForm = {
 const emptyForm: VideoForm = { title: "", thumbnail: "", duration: "", category: "Ministry", featured: false, youtube_url: "", price: 0, is_free: true };
 
 export default function AdminVideoManager() {
-  const { data: videoList = [], isLoading } = useVideos();
+  const { data: videoList = [], isLoading } = useAdminVideos();
   const addVideo = useAddVideo();
   const updateVideo = useUpdateVideo();
   const deleteVideo = useDeleteVideo();
@@ -86,8 +90,8 @@ export default function AdminVideoManager() {
       category: video.category,
       featured: video.featured,
       youtube_url: video.youtube_url,
-      price: (video as any).price ?? 0,
-      is_free: (video as any).is_free ?? true,
+      price: video.price ?? 0,
+      is_free: video.is_free ?? true,
     });
     setDialogOpen(true);
   };
@@ -199,7 +203,6 @@ export default function AdminVideoManager() {
         <div className="grid gap-4">
           {videoList.map((video) => (
             <Card key={video.id} className="overflow-hidden">
-              {/* Status badge */}
               <div className={`px-4 py-1.5 text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 ${video.is_active ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>
                 {video.is_active ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
                 {video.is_active ? "Published — Live on site" : "Draft — Hidden from public"}
@@ -226,7 +229,6 @@ export default function AdminVideoManager() {
                     {video.featured && <Badge className="text-xs">Featured</Badge>}
                     {!video.is_free && <Badge variant="outline" className="text-xs">${video.price}</Badge>}
                   </div>
-                  {/* Action buttons */}
                   <div className="flex flex-wrap items-center gap-2 mt-3">
                     <Button
                       variant={video.is_active ? "outline" : "default"}
