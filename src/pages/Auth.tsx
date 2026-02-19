@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -158,6 +159,27 @@ export default function Auth() {
                   </div>
                   <Button type="submit" className="w-full" disabled={isSubmitting}>
                     {isSubmitting ? "Signing in…" : "Sign In"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="w-full text-sm text-muted-foreground"
+                    onClick={async () => {
+                      if (!loginEmail) {
+                        toast.error("Enter your email above first.");
+                        return;
+                      }
+                      const { error } = await supabase.auth.resetPasswordForEmail(loginEmail, {
+                        redirectTo: window.location.origin + "/reset-password",
+                      });
+                      if (error) {
+                        toast.error(error.message);
+                      } else {
+                        toast.success("Check your email for a password reset link.");
+                      }
+                    }}
+                  >
+                    Forgot your password?
                   </Button>
                 </form>
               </TabsContent>
