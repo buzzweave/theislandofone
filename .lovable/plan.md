@@ -1,59 +1,52 @@
 
 
-# Fix: Admin Graphics, Public Graphics Pricing, and Admin Videos
+# Fix: Admin Graphics, Admin Videos, and Public Graphics Pricing
 
-## Issue 1: Admin Graphics -- Cannot Upload or Publish/Unpublish
+## Root Cause
 
-**Root Cause**: The `graphics` table is missing an admin SELECT policy. The only SELECT policy is `is_active = true`, so admins can only see published graphics. When they unpublish a graphic or upload a new one (which defaults to `is_active = true` but may not be readable after insert due to timing), the data disappears from the admin view.
+The admin panel authenticates via an external VPS API (`api.theislandofone.com`), storing a JWT in localStorage. However, the recent code changes made admin graphics and videos use the Supabase client directly (`supabase.from("graphics")`, `supabase.from("videos")`). Since the admin is NOT signed into Supabase Auth, `auth.uid()` is null, and all RLS policies requiring `has_role(auth.uid(), 'admin')` reject the operations.
 
-**Fix**: Add a single RLS policy:
-```sql
-CREATE POLICY "Admins can view all graphics"
-ON public.graphics FOR SELECT
-TO authenticated
-USING (public.has_role(auth.uid(), 'admin'));
-```
+The postgres logs confirm this with repeated errors: `"new row violates row-level security policy for table 'graphics'"` and `"new row violates row-level security policy for table 'videos'"`.
 
-No code changes needed -- the `AdminGraphics.tsx` and `useAdminGraphics` hook already query via Supabase correctly.
+## Fix Strategy
+
+Use edge functions with the service role key for all admin CRUD operations. The `graphics-admin` edge function already exists and validates the VPS admin token before using the service role key to bypass RLS. We need to apply this same pattern for videos, and update the hooks/pages to call these edge functions instead of the Supabase client directly.
 
 ---
 
-## Issue 2: Public Graphics Page -- Pricing and Buy Button Not Working
+## Changes
 
-**Root Cause**: The public `Graphics.tsx` page hardcodes the word "Free" and renders a plain download link for every graphic, completely ignoring the `price` field from the database. There is no buy/purchase button.
+### 1. Create `videos-admin` Edge Function
+A new edge function mirroring `graphics-admin` that handles GET/POST/PUT/DELETE for videos using the service role key after validating the VPS admin token.
 
-**Fix**: Update `src/pages/Graphics.tsx` to:
-- Show the actual price from the database (e.g., "$2.99") instead of hardcoded "Free"
-- If `price > 0`, show a "Buy" button that triggers the existing Stripe checkout flow (via the `create-checkout` edge function)
-- If `price` is 0 or the user has already purchased, show the "Download" button
+**File**: `supabase/functions/videos-admin/index.ts`
+
+### 2. Rewrite `useGraphics.ts` Admin Hook
+Change `useAdminGraphics` to call the `graphics-admin` edge function (with `x-admin-token` header) instead of `supabase.from("graphics")`.
+
+### 3. Rewrite `useVideos.ts` Admin Hooks
+Change `useAdminVideos`, `useAddVideo`, `useUpdateVideo`, `useDeleteVideo` to call the `videos-admin` edge function instead of `supabase.from("videos")`.
+
+### 4. Update `AdminGraphics.tsx`
+Replace all direct `supabase.from("graphics").insert/update/delete` calls with fetch calls to the `graphics-admin` edge function, passing `x-admin-token` from localStorage.
+
+### 5. Update `AdminVideoManager.tsx`
+Replace the `supabase.from("videos")` mutation hooks with the new edge-function-based hooks. Keep the thumbnail upload via Supabase storage (public bucket, no RLS needed for uploads to public buckets).
+
+### 6. Public Graphics Page -- Already Working
+The `Graphics.tsx` page code is already correct -- it shows dynamic pricing and a Buy Now button that calls the `create-checkout` edge function, which supports `type: "graphic"`. No changes needed here.
 
 ---
 
-## Issue 3: Admin Videos -- Cannot Post Videos
-
-**Root Cause**: The `AdminVideoManager.tsx` and `useVideos.ts` hook use the external VPS API (`api.get("/api/videos")`, `api.post`, etc.) via `src/lib/api.ts`. The VPS at `api.theislandofone.com` is unreachable or rejecting requests, so all CRUD operations fail.
-
-The database already has a `videos` table with proper admin RLS policies. However, the videos table is also missing an admin SELECT policy (same pattern as graphics -- only `is_active = true` is visible).
-
-**Fix**:
-1. Add admin SELECT policy for videos table
-2. Rewrite `useVideos.ts` to use the Supabase client directly (same pattern as `useGraphics.ts`)
-3. Update `AdminVideoManager.tsx` to remove the VPS `api.upload` call for thumbnails and use Supabase storage (`video-thumbnails` bucket) instead
-
----
-
-## Summary of Changes
-
-### Database Migration (1 migration)
-- Add `Admins can view all graphics` SELECT policy on `public.graphics`
-- Add `Admins can view all videos` SELECT policy on `public.videos`
-- Add storage policy for admin uploads to `video-thumbnails` bucket
-
-### Code Changes
+## Summary
 
 | File | Change |
 |------|--------|
-| `src/pages/Graphics.tsx` | Show real price, add buy button with Stripe checkout |
-| `src/hooks/useVideos.ts` | Replace VPS API calls with Supabase client queries and mutations |
-| `src/pages/admin/AdminVideoManager.tsx` | Replace VPS thumbnail upload with Supabase storage upload |
+| `supabase/functions/videos-admin/index.ts` | New edge function for admin video CRUD |
+| `src/hooks/useGraphics.ts` | Admin hook calls `graphics-admin` edge function |
+| `src/hooks/useVideos.ts` | All admin hooks call `videos-admin` edge function |
+| `src/pages/admin/AdminGraphics.tsx` | Replace direct Supabase calls with edge function calls |
+| `src/pages/admin/AdminVideoManager.tsx` | Use new edge-function-based hooks |
+
+No database migrations needed -- the RLS policies are correctly configured.
 
