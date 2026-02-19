@@ -134,7 +134,6 @@ export default function AdminBookEditor() {
         audio_url: "",
         pdf_url: "",
         sort_order: 0,
-        access_tiers: "",
       });
       setActiveId(result.id);
     } catch (err: any) {
@@ -185,13 +184,13 @@ export default function AdminBookEditor() {
     savingRef.current = true;
 
     try {
+      const { access_tiers, chapters, ...bookData } = local as any;
       await updateBookMut.mutateAsync({
         id: local.id,
-        ...local,
+        ...bookData,
         is_free: local.is_free ? 1 : 0,
         featured: local.featured ? 1 : 0,
         audio_url: local.audio_url || "",
-        access_tiers: Array.isArray(local.access_tiers) ? local.access_tiers.join(",") : (local.access_tiers || ""),
       });
 
       setDirty(false);

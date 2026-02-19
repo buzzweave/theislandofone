@@ -103,8 +103,6 @@ export default function AdminSermonEditor() {
         preview_cutoff: 2,
         featured: 0,
         audio_url: "",
-        sort_order: 0,
-        access_tiers: "",
       });
       setActiveId(result.id);
     } catch (err) {
@@ -142,7 +140,6 @@ export default function AdminSermonEditor() {
         preview_cutoff: draft.preview_cutoff,
         featured: draft.featured ? 1 : 0,
         audio_url: draft.audio_url || "",
-        access_tiers: Array.isArray(draft.access_tiers) ? draft.access_tiers.join(",") : (draft.access_tiers || ""),
       });
       setDirty(false);
       toast.success("Sermon saved!");
