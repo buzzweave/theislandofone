@@ -1,33 +1,47 @@
 
-# Add Forgot Password Flow
 
-## What This Does
-Adds a "Forgot your password?" link on the sign-in form and a dedicated `/reset-password` page where users can set a new password after clicking the email link.
+# Upgrade Members Area -- Real Data, Add/Delete Members, Email Action
 
-## Changes
+## Overview
+Replace the mock-data members page with a real database-backed system. You will be able to add members (assigning them to any membership tier, including free), delete members, and click the email icon to open your email client.
 
-### 1. Update Auth page (`src/pages/Auth.tsx`)
-- Add a "Forgot your password?" button/link below the Sign In button
-- Clicking it shows inline UI (or toggles state) with an email input and "Send Reset Link" button
-- Calls `supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/reset-password' })`
-- Shows a success toast confirming the email was sent
+## What Changes
 
-### 2. Create Reset Password page (`src/pages/ResetPassword.tsx`)
-- New page at `/reset-password`
-- Detects `type=recovery` in the URL hash (set automatically by the email link)
-- Shows a form with "New Password" and "Confirm Password" fields
-- Calls `supabase.auth.updateUser({ password })` to save the new password
-- On success, redirects to home page with a success toast
+### 1. Create a `members` database table
+A new table to store manually-added members with their name, email, assigned plan, and status.
 
-### 3. Add route in `src/App.tsx`
-- Add `<Route path="/reset-password" element={<Layout><ResetPassword /></Layout>} />` alongside the other public routes
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid | Primary key |
+| name | text | Member's name |
+| email | text | Member's email |
+| plan | text | Tier name (Reader, Pastor, Inner Circle, or Free) |
+| status | text | active, paused, or cancelled |
+| created_at | timestamp | When added |
+
+RLS policies: Admin-only for all operations (SELECT, INSERT, UPDATE, DELETE) using the existing `has_role` function.
+
+### 2. Fix the email button
+The mail icon button currently does nothing. It will be changed to open your default email app with the member's email pre-filled (`mailto:` link).
+
+### 3. Add "Add Member" button and dialog
+- An "Add Member" button at the top of the page
+- Opens a dialog form with fields: Name, Email, Plan (dropdown including "Free" option), Status
+- Saves the new member to the database
+
+### 4. Add "Delete" button per member row
+- A trash icon button next to the email button in each row
+- Shows a confirmation dialog before deleting
+- Removes the member from the database
+
+### 5. Load members from database
+- Replace the hardcoded mock data with a real database query
+- Plan summary cards will reflect actual member counts
 
 ## Technical Details
 
 | File | Change |
 |------|--------|
-| `src/pages/Auth.tsx` | Add "Forgot your password?" link with inline reset email form |
-| `src/pages/ResetPassword.tsx` | New page -- password reset form that reads recovery token from URL hash |
-| `src/App.tsx` | Add `/reset-password` route |
+| Database migration | Create `members` table with admin-only RLS policies |
+| `src/pages/admin/AdminMembers.tsx` | Full rewrite: fetch from DB, add member dialog, delete confirmation, `mailto:` on email button |
 
-No database changes required. Uses the built-in authentication password reset flow.
