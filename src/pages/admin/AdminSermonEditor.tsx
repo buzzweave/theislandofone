@@ -102,9 +102,9 @@ export default function AdminSermonEditor() {
         is_free: 1,
         preview_cutoff: 2,
         featured: 0,
-        audio_url: null,
+        audio_url: "",
         sort_order: 0,
-        access_tiers: [],
+        access_tiers: "",
       });
       setActiveId(result.id);
     } catch (err) {
@@ -141,8 +141,8 @@ export default function AdminSermonEditor() {
         is_free: draft.is_free ? 1 : 0,
         preview_cutoff: draft.preview_cutoff,
         featured: draft.featured ? 1 : 0,
-        audio_url: draft.audio_url,
-        access_tiers: draft.access_tiers,
+        audio_url: draft.audio_url || "",
+        access_tiers: Array.isArray(draft.access_tiers) ? draft.access_tiers.join(",") : (draft.access_tiers || ""),
       });
       setDirty(false);
       toast.success("Sermon saved!");
@@ -371,7 +371,7 @@ export default function AdminSermonEditor() {
                 <p className="text-xs text-muted-foreground mb-3">Select which membership tiers can access this sermon for free.</p>
                 <div className="flex flex-wrap gap-3">
                   {(["reader", "pastor", "inner-circle"] as const).map((tier) => {
-                    const tiers = draft.access_tiers || [];
+                    const tiers = Array.isArray(draft.access_tiers) ? draft.access_tiers : (draft.access_tiers ? String(draft.access_tiers).split(",").filter(Boolean) : []);
                     const checked = tiers.includes(tier);
                     return (
                       <label key={tier} className="flex items-center gap-2 text-sm cursor-pointer">

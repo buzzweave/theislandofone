@@ -15,7 +15,7 @@ export interface Sermon {
   price: number;
   sort_order: number;
   access_level: string;
-  access_tiers: string[];
+  access_tiers: string[] | string;
   preview_cutoff: number;
   created_at: string;
   updated_at: string;

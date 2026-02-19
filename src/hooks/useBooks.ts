@@ -23,7 +23,7 @@ export interface Book {
   audio_url: string | null;
   pdf_url: string;
   sort_order: number;
-  access_tiers: string[];
+  access_tiers: string[] | string;
   chapters: BookChapterInput[];
   created_at: string;
   updated_at: string;

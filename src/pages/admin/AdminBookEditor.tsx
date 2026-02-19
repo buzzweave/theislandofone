@@ -131,11 +131,10 @@ export default function AdminBookEditor() {
         category: "Faith",
         cover_image: "",
         featured: 0,
-        audio_url: null,
+        audio_url: "",
         pdf_url: "",
         sort_order: 0,
-        access_tiers: [],
-        chapters: [],
+        access_tiers: "",
       });
       setActiveId(result.id);
     } catch (err: any) {
@@ -186,7 +185,14 @@ export default function AdminBookEditor() {
     savingRef.current = true;
 
     try {
-      await updateBookMut.mutateAsync({ id: local.id, ...local, is_free: local.is_free ? 1 : 0, featured: local.featured ? 1 : 0 });
+      await updateBookMut.mutateAsync({
+        id: local.id,
+        ...local,
+        is_free: local.is_free ? 1 : 0,
+        featured: local.featured ? 1 : 0,
+        audio_url: local.audio_url || "",
+        access_tiers: Array.isArray(local.access_tiers) ? local.access_tiers.join(",") : (local.access_tiers || ""),
+      });
 
       setDirty(false);
       setLastSavedAt(new Date());
