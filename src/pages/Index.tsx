@@ -7,6 +7,8 @@ import { useSermons } from "@/hooks/useSermons";
 import { useVideos } from "@/hooks/useVideos";
 import { useGraphics } from "@/hooks/useGraphics";
 import HeroCarousel from "@/components/HeroCarousel";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 
 function getYouTubeId(url: string) {
@@ -23,6 +25,20 @@ export default function Index() {
   const featuredSermons = sermons.filter((s) => s.featured);
   const featuredVideos = videos.filter((v) => v.featured);
   const [playingId, setPlayingId] = useState<string | null>(null);
+
+  const { data: blogPosts = [] } = useQuery({
+    queryKey: ["blog_posts_homepage"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("blog_posts")
+        .select("*")
+        .eq("is_published", true)
+        .order("published_at", { ascending: false })
+        .limit(3);
+      if (error) throw error;
+      return data;
+    },
+  });
 
   return (
     <div>
@@ -116,6 +132,43 @@ export default function Index() {
           </div>
         </div>
       </section>
+
+      {/* LATEST BLOG POSTS */}
+      {blogPosts.length > 0 && (
+        <section className="bg-gradient-section py-16 sm:py-24">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-10 sm:mb-16">
+              <p className="text-primary text-sm tracking-[0.2em] uppercase mb-3">Blog</p>
+              <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold">Latest Blog Posts</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+              {blogPosts.map((post) => (
+                <Link
+                  key={post.id}
+                  to={`/blog/${post.slug}`}
+                  className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300"
+                >
+                  {post.image_url && (
+                    <div className="aspect-video overflow-hidden bg-muted">
+                      <img src={post.image_url} alt={post.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+                    </div>
+                  )}
+                  <div className="p-4 sm:p-5">
+                    <p className="text-xs text-muted-foreground mb-1">{post.author} · {post.published_at ? new Date(post.published_at).toLocaleDateString() : ""}</p>
+                    <h3 className="font-display text-lg font-semibold mb-2 group-hover:text-primary transition-colors">{post.title}</h3>
+                    <p className="text-sm text-muted-foreground line-clamp-2">{post.excerpt}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+            <div className="text-center mt-10 sm:mt-12">
+              <Link to="/blog" className="text-primary text-sm font-semibold hover:underline inline-flex items-center gap-1">
+                View All Posts <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* FEATURED VIDEOS */}
       {featuredVideos.length > 0 && (

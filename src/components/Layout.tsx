@@ -14,7 +14,7 @@ const navLinks = [
   { to: "/graphics", label: "Graphics" },
   { to: "/speaking", label: "Speaking" },
   { to: "/blog", label: "Blog" },
-  { to: "/community", label: "Community" },
+  
   { to: "/contact", label: "Contact" },
   { to: "/about", label: "About" },
 ];
