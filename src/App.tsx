@@ -45,6 +45,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import AdminNotifications from "./pages/admin/AdminNotifications";
 import Auth from "./pages/Auth";
 import PaymentSuccess from "./pages/PaymentSuccess";
+import ResetPassword from "./pages/ResetPassword";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -80,6 +81,7 @@ const App = () => (
             <Route path="/speaking" element={<Layout><Speaking /></Layout>} />
             <Route path="/membership" element={<Layout><Membership /></Layout>} />
             <Route path="/auth" element={<Layout><Auth /></Layout>} />
+            <Route path="/reset-password" element={<Layout><ResetPassword /></Layout>} />
             <Route path="/payment-success" element={<Layout><PaymentSuccess /></Layout>} />
             <Route path="/contact" element={<Layout><Contact /></Layout>} />
             <Route path="/copyright" element={<Layout><Copyright /></Layout>} />
