@@ -46,6 +46,9 @@ import AdminNotifications from "./pages/admin/AdminNotifications";
 import Auth from "./pages/Auth";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import ResetPassword from "./pages/ResetPassword";
+import Community from "./pages/Community";
+import ForumCategory from "./pages/ForumCategory";
+import ForumThread from "./pages/ForumThread";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -87,6 +90,9 @@ const App = () => (
             <Route path="/copyright" element={<Layout><Copyright /></Layout>} />
             <Route path="/terms" element={<Layout><TermsOfService /></Layout>} />
             <Route path="/privacy" element={<Layout><PrivacyPolicy /></Layout>} />
+            <Route path="/community" element={<Layout><Community /></Layout>} />
+            <Route path="/community/:slug" element={<Layout><ForumCategory /></Layout>} />
+            <Route path="/community/:slug/:postId" element={<Layout><ForumThread /></Layout>} />
 
             {/* Admin login (public) */}
             <Route path="/admin/login" element={<AdminLogin />} />
