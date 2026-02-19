@@ -1,58 +1,32 @@
 
 
-# Fix: Membership Access for Graphics
+# Fix: Unknown Column Error When Adding Video
 
 ## Problem
 
-The admin panel allows setting `access_tiers` (Reader, Pastor, Inner Circle) on each graphic, but the public **Graphics page completely ignores this field**. Every paid graphic only shows "Buy Now" — even if the logged-in user has a qualifying membership tier that should grant them free access/download.
+When you click "Add Video", the `useAddVideo` hook sends a `sort_order` field to the VPS API (`POST /api/videos`). Your VPS MySQL `videos` table does not have a `sort_order` column, causing the "unknown column" error.
 
-## How It Should Work (Same Pattern as Books)
+This is the same issue that was previously fixed for books and sermons.
 
-The existing `BookDetail.tsx` already implements this correctly:
+## Root Cause
 
-```text
-1. Get user's tier from subscription product_id
-2. Check if user's tier meets the graphic's access_tiers
-3. If yes -> show "Download" (no purchase needed)
-4. If no  -> show "Buy Now" (Stripe checkout)
+In `src/pages/admin/AdminVideoManager.tsx` line 102:
+```
+await addVideo.mutateAsync({ ...form, is_active: true, sort_order: videoList.length });
 ```
 
-## Changes
+This passes `sort_order` into the payload. Then in `src/hooks/useVideos.ts` line 56-61, `useAddVideo` spreads the entire object (including `sort_order`) into the POST body sent to VPS.
 
-### Update `src/pages/Graphics.tsx` — Add Tier Access Check
+## Fix
 
-- Import `useAuth` context and `getTierByProductId` / `tierHasAccess` from `src/lib/stripe`
-- For each graphic card, check if the user's membership tier grants access via `access_tiers`
-- If user has tier access OR the graphic is free: show **Download** button
-- If user has purchased the graphic (via `checkPurchase`): show **Download** button
-- Otherwise: show **Buy Now** button (existing Stripe checkout flow)
-- Add a small badge or label showing "Included with [Tier] membership" when tier access applies
+**File: `src/hooks/useVideos.ts`** -- Strip `sort_order` from the payload in both `useAddVideo` and `useUpdateVideo` before sending to VPS:
 
-### Logic per graphic card (pseudocode)
+- In `useAddVideo` (lines 55-61): destructure out `sort_order` before spreading into the API payload
+- In `useUpdateVideo` (lines 70-75): destructure out `sort_order` before spreading into the API payload
 
-```text
-isFree         = price is 0 or null
-hasTierAccess  = tierHasAccess(userTier, graphic.access_tiers)
-hasPurchased   = check purchase record for this graphic
-canDownload    = isFree OR hasTierAccess OR hasPurchased
+This is a 2-line surgical fix. No UI changes.
 
-if canDownload -> Download button (links to file_url)
-else           -> Buy Now button (Stripe checkout)
-```
+## Acceptance Test
 
-### No other files change
-
-The hook (`useGraphics.ts`) already returns `access_tiers` from the VPS. The admin panel already lets you set tiers. Only the public display logic is missing.
-
-## Files Modified
-
-| File | Change |
-|------|--------|
-| `src/pages/Graphics.tsx` | Add `useAuth`, tier check, and purchase check per graphic; conditionally render Download vs Buy Now |
-
-## What Does NOT Change
-
-- No UI redesign — same card layout, same styles
-- No admin panel changes
-- No hook or API changes
-- No new routes or components
+- Add a new video in admin -- should save without error
+- Edit an existing video -- should save without error
