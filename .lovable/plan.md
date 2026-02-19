@@ -1,32 +1,34 @@
 
 
-# Fix Facebook Share Images -- Deployment and Configuration
+# Fix: Admin Graphics Not Showing
 
 ## Problem
-When sharing blog posts or books to Facebook, no images appear because:
-1. The `share-blog` and `share-book` backend functions are not deployed -- Facebook's crawler gets a 404
-2. The Facebook App ID is missing from the database settings
 
-## Fix Steps
+The `AdminGraphics` page has a race condition bug:
 
-### Step 1 -- Deploy the share functions
-Deploy `share-blog` and `share-book` so Facebook's crawler can reach the Open Graph metadata pages. No code changes needed -- these functions already exist and are correct.
+1. On mount, it calls `fetchAll()` which tries `/api/graphics/admin` on the VPS
+2. If that endpoint fails (auth issue, network error, etc.), it falls back to `graphics` from `useGraphics()`
+3. But at mount time, `graphics` is still `[]` (loading)
+4. The `useEffect` has an empty dependency array `[]`, so it never re-runs when the public graphics data arrives later
 
-### Step 2 -- Save your Facebook App ID
-Insert your Facebook App ID (`1169014871775113` based on the default in your code) into the `site_settings` table so the share pages include it in the `fb:app_id` meta tag.
+This means the admin page always shows "No graphics yet."
 
-This will be done via a small database migration:
-```sql
-INSERT INTO site_settings (key, value)
-VALUES ('fb_app_id', '1169014871775113')
-ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+## Fix
+
+Update the `useEffect` in `AdminGraphics.tsx` to include `fetchAll` in its dependency array. Since `fetchAll` is wrapped in `useCallback` with `[graphics]` as a dependency, it will automatically re-run when the public graphics data finishes loading -- providing a working fallback.
+
+### Technical Change (single file)
+
+**File: `src/pages/admin/AdminGraphics.tsx`**
+
+Change line ~109:
+```
+// Before
+useEffect(() => { fetchAll(); }, []);
+
+// After
+useEffect(() => { fetchAll(); }, [fetchAll]);
 ```
 
-### Step 3 -- Verify
-After deployment, test by pasting a share URL into Facebook's Sharing Debugger to confirm the image, title, and description appear correctly.
-
-## What stays the same
-- No changes to `share-blog/index.ts` or `share-book/index.ts` -- the code is already correct
-- No changes to `BlogPost.tsx`, `BookDetail.tsx`, or `SocialShareLinks.tsx`
-- The share URLs in the frontend already point to the correct function endpoints
+This ensures that when the VPS admin endpoint fails, the fallback to public graphics data actually works because `fetchAll` is re-created (and thus re-invoked) once the public data loads.
 
