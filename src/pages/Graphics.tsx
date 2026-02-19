@@ -1,15 +1,35 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useGraphics } from "@/hooks/useGraphics";
+import { useAuth } from "@/contexts/AuthContext";
+import { getTierByProductId, tierHasAccess, MEMBERSHIP_TIERS } from "@/lib/stripe";
 import { Image, Search, Download, ShoppingCart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 
 export default function Graphics() {
   const { graphics, isLoading } = useGraphics();
+  const { subscription, user, checkPurchase } = useAuth();
   const [activeCategory, setActiveCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [buyingId, setBuyingId] = useState<string | null>(null);
+  const [purchasedIds, setPurchasedIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+
+  const userTier = getTierByProductId(subscription.product_id);
+
+  // Check purchases for all paid graphics
+  useEffect(() => {
+    if (!user) { setPurchasedIds(new Set()); return; }
+    const paidGraphics = graphics.filter((g) => g.price && g.price > 0);
+    if (paidGraphics.length === 0) return;
+
+    Promise.all(
+      paidGraphics.map((g) => checkPurchase("graphic", g.id).then((ok) => (ok ? g.id : null)))
+    ).then((results) => {
+      setPurchasedIds(new Set(results.filter(Boolean) as string[]));
+    });
+  }, [user, graphics, checkPurchase]);
 
   const categories = ["All", ...Array.from(new Set(graphics.map((g) => g.category)))];
   const filtered = graphics.filter((g) => {
@@ -37,6 +57,16 @@ export default function Graphics() {
       toast({ title: "Checkout failed", description: err.message, variant: "destructive" });
     }
     setBuyingId(null);
+  };
+
+  // Helper to get the minimum tier label for a graphic
+  const getTierLabel = (accessTiers: string[]) => {
+    if (!accessTiers || accessTiers.length === 0) return null;
+    const tierRank: Record<string, number> = { reader: 1, pastor: 2, "inner-circle": 3 };
+    const sorted = [...accessTiers].sort((a, b) => (tierRank[a] || 99) - (tierRank[b] || 99));
+    const slug = sorted[0];
+    const tier = MEMBERSHIP_TIERS[slug as keyof typeof MEMBERSHIP_TIERS];
+    return tier ? tier.name : slug;
   };
 
   return (
@@ -91,6 +121,11 @@ export default function Graphics() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto pb-24">
             {filtered.map((graphic) => {
               const isFree = !graphic.price || graphic.price === 0;
+              const hasTierAccess = tierHasAccess(userTier, graphic.access_tiers);
+              const hasPurchased = purchasedIds.has(graphic.id);
+              const canDownload = isFree || hasTierAccess || hasPurchased;
+              const tierLabel = !isFree && hasTierAccess ? getTierLabel(graphic.access_tiers) : null;
+
               return (
                 <div
                   key={graphic.id}
@@ -114,10 +149,17 @@ export default function Graphics() {
                       )}
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-lg font-bold text-primary">
-                        {isFree ? "Free" : `$${Number(graphic.price).toFixed(2)}`}
-                      </span>
-                      {isFree ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg font-bold text-primary">
+                          {isFree ? "Free" : `$${Number(graphic.price).toFixed(2)}`}
+                        </span>
+                        {tierLabel && (
+                          <Badge variant="secondary" className="text-[10px]">
+                            Included with {tierLabel}
+                          </Badge>
+                        )}
+                      </div>
+                      {canDownload ? (
                         <a
                           href={graphic.file_url}
                           target="_blank"
