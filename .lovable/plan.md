@@ -1,32 +1,38 @@
 
 
-# Fix: Unknown Column Error When Adding Video
-
-## Problem
-
-When you click "Add Video", the `useAddVideo` hook sends a `sort_order` field to the VPS API (`POST /api/videos`). Your VPS MySQL `videos` table does not have a `sort_order` column, causing the "unknown column" error.
-
-This is the same issue that was previously fixed for books and sermons.
+# Fix: Membership Plans Not Showing in Admin
 
 ## Root Cause
 
-In `src/pages/admin/AdminVideoManager.tsx` line 102:
-```
-await addVideo.mutateAsync({ ...form, is_active: true, sort_order: videoList.length });
-```
+The VPS endpoint `GET /api/plans` does **not exist** -- it returns `Cannot GET /api/plans`. The `useMembershipPlans` hook tries to fetch from this endpoint, fails, and falls back to an empty array. That is why plans don't render.
 
-This passes `sort_order` into the payload. Then in `src/hooks/useVideos.ts` line 56-61, `useAddVideo` spreads the entire object (including `sort_order`) into the POST body sent to VPS.
+The original plan data lives in `src/data/content.ts` as a static `membershipPlans` export, and several other pages (Index, BookDetail, SermonDetail, AdminAnalytics) still import from there successfully.
 
-## Fix
+## Fix Strategy
 
-**File: `src/hooks/useVideos.ts`** -- Strip `sort_order` from the payload in both `useAddVideo` and `useUpdateVideo` before sending to VPS:
+Rewrite `useMembershipPlans` to use the static `membershipPlans` data from `src/data/content.ts` as the source, since the VPS plans endpoint does not exist. This restores plans in both the admin editor and the public Membership page.
 
-- In `useAddVideo` (lines 55-61): destructure out `sort_order` before spreading into the API payload
-- In `useUpdateVideo` (lines 70-75): destructure out `sort_order` before spreading into the API payload
+## Changes
 
-This is a 2-line surgical fix. No UI changes.
+### 1. `src/hooks/useMembershipPlans.ts`
 
-## Acceptance Test
+- Remove the VPS API call to `/api/plans`
+- Import `membershipPlans` from `src/data/content`
+- Return the static data directly (mapped to the `MembershipPlan` interface with `is_featured` and `sort_order` defaults)
+- Keep the `useQuery` wrapper so the rest of the app works unchanged
 
-- Add a new video in admin -- should save without error
-- Edit an existing video -- should save without error
+### 2. `src/pages/admin/AdminMembershipPlans.tsx`
+
+- Remove the `api.put` call to `/api/plans/:id` (endpoint doesn't exist)
+- Change the save logic to show a toast explaining that plan changes must be updated in the static content file or on the VPS once the endpoint is created
+- Alternatively, keep the edit UI functional for preview but disable the save network call
+
+## What Does Not Change
+
+- No routing changes
+- No other pages change (they already import from `src/data/content.ts`)
+- No new dependencies
+
+## Result
+
+Plans will show immediately in the admin panel and on the public Membership page using the existing static data.
