@@ -1,39 +1,88 @@
 
 
-# Fix: Sermon and Book Creation — Remove Unknown Fields from Payloads
+# Community Forum and Ministry Support Group - Implementation Plan
 
-## Root Cause
+## Overview
 
-The MySQL schema on the VPS does **not** have an `access_tiers` column on the `books` or `sermons` tables. When the frontend sends `access_tiers` in the POST body, the VPS query builder tries to build an INSERT with a column that doesn't exist, producing the MySQL syntax error `"near '' at line 1"`.
+Build two membership-gated discussion areas under `/community`:
+- **Community Forum** -- accessible to Reader tier and above
+- **Ministry Support Group** -- accessible to Pastor tier and above
 
-The `audio_url` column is defined as `TEXT NULL` in MySQL, so sending `null` should be fine, but sending an empty string is also safe.
+## Database Changes (1 migration)
 
-## Changes (2 files)
+### New Tables
 
-### 1. `src/pages/admin/AdminSermonEditor.tsx`
+**forum_categories**
+- `id` (uuid, PK, default gen_random_uuid())
+- `name` (text, not null)
+- `description` (text, default '')
+- `slug` (text, unique, not null)
+- `tier_required` (text, default 'reader')
+- `sort_order` (int, default 0)
+- `created_at` (timestamptz, default now())
 
-**In `addNew` (~line 91-114):**
-- Remove `access_tiers` from the create payload entirely (the MySQL table has no such column)
-- Remove `sort_order` (also not needed for creation, MySQL defaults to 0)
+**forum_posts**
+- `id` (uuid, PK, default gen_random_uuid())
+- `category_id` (uuid, FK -> forum_categories, on delete cascade)
+- `user_id` (uuid, not null)
+- `author_name` (text, not null)
+- `title` (text, not null)
+- `content` (text, not null)
+- `is_pinned` (boolean, default false)
+- `is_locked` (boolean, default false)
+- `created_at` (timestamptz, default now())
+- `updated_at` (timestamptz, default now())
 
-**In `handleSave` (~line 130-151):**
-- Remove `access_tiers` from the save payload
-- Keep `audio_url` as-is (nullable TEXT column handles both null and empty string)
+**forum_replies**
+- `id` (uuid, PK, default gen_random_uuid())
+- `post_id` (uuid, FK -> forum_posts, on delete cascade)
+- `user_id` (uuid, not null)
+- `author_name` (text, not null)
+- `content` (text, not null)
+- `created_at` (timestamptz, default now())
+- `updated_at` (timestamptz, default now())
 
-### 2. `src/pages/admin/AdminBookEditor.tsx`
+### RLS Policies
+- Categories: SELECT for all authenticated users
+- Posts/Replies: SELECT for authenticated, INSERT where auth.uid() = user_id, UPDATE/DELETE where auth.uid() = user_id
+- Admins get full access on all three tables
 
-**In `addNew` (~line 122-143):**
-- Remove `access_tiers` from the create payload
+### Seed Data (6 categories)
+- General Discussion (reader)
+- Prayer Requests (reader)
+- Bible Study (reader)
+- Ministry Questions (pastor)
+- Pastor Resources (pastor)
+- Leadership Support (pastor)
 
-**In `handleSave` (~line 182-200):**
-- Remove `access_tiers` from the save payload
-- Remove `chapters` from the spread (chapters are saved via a separate `PUT /api/books/:id/chapters` endpoint per the API spec)
+## New Files
 
-## What This Fixes
-- "Failed to create sermon" -- MySQL syntax error caused by unknown `access_tiers` column
-- "Error creating book" -- same root cause
-- Both creation flows will now send only columns that exist in the MySQL schema
+| File | Purpose |
+|------|---------|
+| `src/pages/Community.tsx` | Main forum landing -- shows categories grouped by tier |
+| `src/pages/ForumCategory.tsx` | Thread listing for a single category |
+| `src/pages/ForumThread.tsx` | Single thread with replies |
+| `src/hooks/useForum.ts` | React Query hooks for all forum CRUD |
+| `src/components/forum/TierGate.tsx` | Membership gate -- shows upgrade prompt if tier insufficient |
 
-## Technical Note
-The `access_tiers` feature shown in the UI (checkboxes for Reader/Pastor/Inner Circle) will have no backend effect until the VPS MySQL schema is updated to include an `access_tiers` column. The UI controls can remain for now but will be non-functional. A future VPS schema migration would add: `ALTER TABLE sermons ADD COLUMN access_tiers TEXT DEFAULT '';` and similarly for books.
+## Modified Files
+
+| File | Change |
+|------|--------|
+| `src/App.tsx` | Add 3 routes: `/community`, `/community/:slug`, `/community/:slug/:postId` |
+| `src/components/Layout.tsx` | Add "Community" to navLinks array |
+
+## User Flow
+
+1. Click "Community" in navigation
+2. If not logged in, redirected to `/auth`
+3. See categories split into Community Forum and Ministry Support Group sections
+4. Pastor-tier categories show lock/upgrade prompt for Reader-tier users
+5. Click a category to see threads (pinned first, then newest)
+6. Create new threads or reply to existing ones
+7. Edit or delete own posts/replies
+
+## Tier Gating Logic
+
+Uses existing `getTierByProductId` and `tierHasAccess` from `src/lib/stripe.ts` combined with the `check-subscription` edge function to determine user's active tier. Categories with `tier_required = 'pastor'` are locked for Reader-tier users.
 
