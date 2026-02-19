@@ -26,7 +26,7 @@ import {
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
-import { type BookChapter } from "@/hooks/useBooks";
+import { type BookChapterInput as BookChapter } from "@/hooks/useBooks";
 
 interface SortableChapterProps {
   chapter: BookChapter;

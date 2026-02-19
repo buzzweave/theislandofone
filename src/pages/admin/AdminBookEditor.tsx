@@ -24,7 +24,7 @@ import {
   ArrowLeft,
   Crown,
 } from "lucide-react";
-import { useBooks, useAddBook, useUpdateBook, useDeleteBook, useUpsertChapters, type Book, type BookChapter } from "@/hooks/useBooks";
+import { useBooks, useAddBook, useUpdateBook, useDeleteBook, useUpsertChapters, type Book, type BookChapterInput } from "@/hooks/useBooks";
 import SortableChapterList from "@/components/admin/SortableChapterList";
 import { useAIContent } from "@/contexts/AIContentContext";
 import AudioGenerator from "@/components/admin/AudioGenerator";
@@ -36,7 +36,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 const CATEGORIES = ["Devotional", "Faith", "Leadership", "Ministry", "Prayer", "Family"];
 
-type LocalBook = Omit<Book, "created_at" | "updated_at"> & { chapters: BookChapter[] };
+type LocalBook = Omit<Book, "created_at" | "updated_at">;
 
 export default function AdminBookEditor() {
   const { data: bookList = [], isLoading } = useBooks();
@@ -155,7 +155,7 @@ export default function AdminBookEditor() {
 
   const addChapter = () => {
     if (!local) return;
-    const newChapter: BookChapter = {
+    const newChapter: BookChapterInput = {
       id: crypto.randomUUID(),
       book_id: local.id,
       title: `Chapter ${local.chapters.length + 1}`,
@@ -165,7 +165,7 @@ export default function AdminBookEditor() {
     updateLocal({ chapters: [...local.chapters, newChapter] });
   };
 
-  const updateChapter = (chapterId: string, fields: Partial<BookChapter>) => {
+  const updateChapter = (chapterId: string, fields: Partial<BookChapterInput>) => {
     if (!local) return;
     updateLocal({
       chapters: local.chapters.map((ch) =>
