@@ -1,38 +1,58 @@
 
-# Fix: Admin Auth Must Use Database Authentication
 
-## Problem
-The database logs show repeated errors: **"new row violates row-level security policy"** for both `sermons` and `books` tables.
+# Revert All Content + Admin Auth to VPS API
 
-The hooks (useSermons, useBooks, useVideos) were correctly migrated to use the database in the last batch. However, the **admin login still authenticates against the old external VPS API** instead of the database authentication system. This means when an admin tries to create/edit/delete content, the database sees no authenticated user and blocks the operation.
+Restore sermons, books, graphics, blog, videos, and admin authentication to use your VPS API at `api.theislandofone.com` so all content creation and management works through your server.
 
-Your admin account (`support@buzzweave.com`) already exists in the database with the `admin` role -- it just needs the login flow to actually use it.
+## Changes Summary
 
-## Fix (1 file change)
+| # | File | Change |
+|---|------|--------|
+| 1 | `src/contexts/AdminAuthContext.tsx` | Revert auth from database auth back to VPS API (`api.post("/api/auth/login")`, token refresh, `api.get("/api/auth/me")`) |
+| 2 | `src/hooks/useSermons.ts` | Replace all database queries with VPS API calls (`api.get/post/put/delete("/api/sermons/...")`) |
+| 3 | `src/hooks/useBooks.ts` | Replace database queries with VPS API calls; remove `useUpsertChapters` (VPS handles chapters inside book object) |
+| 4 | `src/hooks/useBlogPosts.ts` | Replace database queries with VPS API calls (`api.get/post/put/delete("/api/blog/...")`) |
+| 5 | `src/hooks/useGraphics.ts` | Replace database query with VPS API call (`api.get("/api/graphics")`) |
+| 6 | `src/hooks/useVideos.ts` | Replace database queries with VPS API calls (`api.get/post/put/delete("/api/videos/...")`) |
+| 7 | `src/pages/admin/AdminGraphics.tsx` | Replace edge function calls with VPS API calls (`api.get/post/put/delete("/api/graphics/...")`) |
+| 8 | `src/pages/admin/AdminBookEditor.tsx` | Remove `useUpsertChapters`; save chapters as part of book body via VPS; keep `api.upload` for file uploads |
 
-Rewrite `src/contexts/AdminAuthContext.tsx` to use `supabase.auth.signInWithPassword()` instead of the VPS API calls. This is a surgical change to the authentication flow only -- no UI changes.
+## Technical Details
 
-### What changes:
-- **Login**: Use `supabase.auth.signInWithPassword({ email, password })` instead of `api.post("/api/auth/login")`
-- **Session check**: Use `supabase.auth.getSession()` and `supabase.auth.onAuthStateChange()` instead of `api.get("/api/auth/me")`
-- **Logout**: Use `supabase.auth.signOut()` instead of `api.clearToken()`
-- **Token refresh**: Remove manual refresh interval (Supabase handles this automatically)
-- **Admin verification**: After login, check that the user has the `admin` role in `user_roles` table. If not, sign them out and reject login.
+### Admin Auth (file 1)
+- Login: `api.post("/api/auth/login", { email, password })` stores token via `api.setToken()`
+- Session check on mount: `api.get("/api/auth/me")` with stored token
+- Token refresh: `api.post("/api/auth/refresh")` every 4 minutes while authenticated
+- Logout: `api.clearToken()`
+- Forgot password: `api.post("/api/auth/forgot-password", { email })`
+- Remove `checkAdminRole`, database auth imports, and `onAuthStateChange` listener
 
-### What stays the same:
-- All UI components (AdminLogin.tsx, AdminLayout.tsx, etc.) remain untouched
-- The `useAdminAuth()` hook interface stays identical
-- Failed attempts tracking and lockout logic preserved
-- CAPTCHA on login page preserved
-
-## Technical Detail
-
+### Content Hooks (files 2-6)
+All follow the same REST pattern using the `api` client from `src/lib/api.ts`:
 ```text
-Current flow (broken):
-  AdminLogin -> VPS API login -> VPS token stored -> hooks use Supabase client (no session) -> RLS BLOCKS
-
-Fixed flow:
-  AdminLogin -> Supabase auth login -> Supabase session active -> hooks use Supabase client (has session) -> RLS PASSES
+List:    api.get("/api/{resource}")
+Single:  api.get("/api/{resource}/{id}")
+Create:  api.post("/api/{resource}", body)
+Update:  api.put("/api/{resource}/{id}", body)
+Delete:  api.delete("/api/{resource}/{id}")
 ```
 
-## Estimated credits: 1
+### Books (file 3 + 8)
+- VPS returns chapters embedded in the book object (no separate `book_chapters` table queries)
+- `useUpsertChapters` is removed entirely
+- `AdminBookEditor.tsx` save sends `{ ...bookData, chapters }` to `api.put("/api/books/{id}", body)`
+
+### Graphics Admin (file 7)
+- Remove `adminApi()` helper and `getAdminToken()` functions
+- Fetch all (including inactive): `api.get("/api/graphics/admin")`
+- Create with file upload: `api.uploadMultiple("/api/graphics", { preview, file })`
+- Update: `api.put("/api/graphics/{id}", body)`
+- Delete: `api.delete("/api/graphics/{id}")`
+
+### What Stays the Same
+- `src/lib/api.ts` -- already correct, pointing to `VITE_API_URL`
+- All admin UI layouts -- no visual changes
+- Blog image uploads via storage bucket (ImageUploader in AdminBlogManager stays as-is)
+- Blog sync from VPS feature stays as-is
+- Database tables remain in place
+
