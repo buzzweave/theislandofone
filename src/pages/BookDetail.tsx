@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, Crown, Download, FileText, Lock, Mail, ShoppingCart, CheckCircle2 } from "lucide-react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, Crown, Download, FileText, Lock, Mail, ShoppingCart, CheckCircle2, Loader2 } from "lucide-react";
 import { exportBookToPdf, exportBookToEpub, exportBookToWord } from "@/lib/bookExport";
 import { useBook } from "@/hooks/useBooks";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import SocialShareLinks from "@/components/SocialShareLinks";
 import FacebookComments from "@/components/FacebookComments";
 import AudioPlayer from "@/components/AudioPlayer";
@@ -12,13 +14,22 @@ import { InlineBookReader } from "@/components/reader/InlineBookReader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { membershipPlans } from "@/data/content";
+import { toast } from "sonner";
 
 export default function BookDetail() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { data: book, isLoading } = useBook(id);
+  const { user, isSubscribed, checkPurchase } = useAuth();
   const [openChapter, setOpenChapter] = useState<string | null>(null);
   const [purchased, setPurchased] = useState(false);
-  const [showCheckout, setShowCheckout] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+
+  // Check purchase status
+  useEffect(() => {
+    if (!user || !id || !book || book.is_free) return;
+    checkPurchase("book", id).then((result) => setPurchased(result));
+  }, [user, id, book, checkPurchase]);
 
   useEffect(() => {
     if (book?.chapters[0]?.id && !openChapter) {
@@ -45,16 +56,34 @@ export default function BookDetail() {
     );
   }
 
-  const canRead = book.is_free || purchased;
-  const previewChapterCount = book.is_free ? book.chapters.length : 1;
+  const canRead = book.is_free || purchased || isSubscribed;
 
   const toggleChapter = (chapterId: string) => {
     setOpenChapter(openChapter === chapterId ? null : chapterId);
   };
 
-  const handleMockPurchase = () => {
-    setPurchased(true);
-    setShowCheckout(false);
+  const handlePurchase = async () => {
+    if (!user) {
+      navigate("/auth", { state: { from: `/books/${id}` } });
+      return;
+    }
+    setCheckoutLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-checkout", {
+        body: {
+          type: "book",
+          itemId: id,
+          priceAmount: book.price,
+          itemTitle: book.title,
+        },
+      });
+      if (error) throw error;
+      if (data?.url) window.open(data.url, "_blank");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to start checkout");
+    } finally {
+      setCheckoutLoading(false);
+    }
   };
 
   const renderContent = (content: string) => {
@@ -210,6 +239,7 @@ export default function BookDetail() {
 
               <div className="space-y-3">
                 {book.chapters.map((chapter, index) => {
+                  const previewChapterCount = book.is_free ? book.chapters.length : 1;
                   const isPreview = index < previewChapterCount;
                   const isLocked = !canRead && !isPreview;
                   const isOpen = openChapter === chapter.id;
@@ -264,7 +294,8 @@ export default function BookDetail() {
                                 <p className="text-xs text-muted-foreground mb-3">
                                   Purchase this book to unlock all {book.chapters.length} chapters.
                                 </p>
-                                <Button size="sm" onClick={() => setShowCheckout(true)}>
+                                <Button size="sm" onClick={handlePurchase} disabled={checkoutLoading}>
+                                  {checkoutLoading ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <ShoppingCart className="h-3.5 w-3.5 mr-1" />} Buy for ${Number(book.price || 0).toFixed(2)}
                                   <ShoppingCart className="h-3.5 w-3.5 mr-1" /> Buy for ${Number(book.price || 0).toFixed(2)}
                                 </Button>
                               </div>
@@ -287,8 +318,8 @@ export default function BookDetail() {
                     Get access to all {book.chapters.length} chapters of "{book.title}" by {book.author}.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                    <Button size="lg" onClick={() => setShowCheckout(true)}>
-                      <ShoppingCart className="h-4 w-4 mr-2" />
+                    <Button size="lg" onClick={handlePurchase} disabled={checkoutLoading}>
+                      {checkoutLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShoppingCart className="h-4 w-4 mr-2" />}
 Buy for ${Number(book.price || 0).toFixed(2)}
                     </Button>
                     <Button variant="outline" size="lg" asChild>
@@ -304,7 +335,7 @@ Buy for ${Number(book.price || 0).toFixed(2)}
 
             {/* Sidebar */}
             <div className="space-y-4">
-              {!canRead && !showCheckout && (
+              {!canRead && (
                 <Card className="border-primary/20">
                   <CardHeader className="pb-3">
                     <CardTitle className="font-display text-lg">Get This Book</CardTitle>
@@ -312,8 +343,8 @@ Buy for ${Number(book.price || 0).toFixed(2)}
                   <CardContent className="space-y-4">
                     <div className="text-3xl font-bold text-primary">${Number(book.price || 0).toFixed(2)}</div>
                     <p className="text-xs text-muted-foreground">One-time purchase. Download in PDF, EPUB, and Word.</p>
-                    <Button className="w-full" onClick={() => setShowCheckout(true)}>
-                      <ShoppingCart className="h-4 w-4 mr-2" /> Purchase
+                    <Button className="w-full" onClick={handlePurchase} disabled={checkoutLoading}>
+                      {checkoutLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShoppingCart className="h-4 w-4 mr-2" />} Purchase
                     </Button>
                     <div className="text-center">
                       <span className="text-xs text-muted-foreground">or</span>
@@ -327,43 +358,13 @@ Buy for ${Number(book.price || 0).toFixed(2)}
                 </Card>
               )}
 
-              {showCheckout && !purchased && (
-                <Card className="border-primary/30 shadow-gold">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="font-display text-lg">Checkout</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="p-3 rounded-lg bg-secondary/50 space-y-1">
-                      <p className="text-sm font-medium">{book.title}</p>
-                      {book.subtitle && <p className="text-xs text-muted-foreground">{book.subtitle}</p>}
-                      <p className="text-lg font-bold text-primary mt-2">${Number(book.price || 0).toFixed(2)}</p>
-                    </div>
-                    <div className="space-y-2 text-xs text-muted-foreground">
-                      <p>✓ Full book access</p>
-                      <p>✓ PDF, EPUB & Word download</p>
-                      <p>✓ Lifetime access</p>
-                    </div>
-                    <Button className="w-full" size="lg" onClick={handleMockPurchase}>
-                      <CheckCircle2 className="h-4 w-4 mr-2" /> Complete Purchase (Demo)
-                    </Button>
-                    <button
-                      onClick={() => setShowCheckout(false)}
-                      className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <p className="text-[10px] text-muted-foreground text-center">
-                      This is a demo checkout. Stripe integration coming soon.
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-
-              {purchased && (
+              {canRead && !book.is_free && (
                 <Card className="border-primary/30">
                   <CardContent className="pt-6 text-center space-y-3">
                     <CheckCircle2 className="h-10 w-10 text-primary mx-auto" />
-                    <p className="font-display text-lg font-semibold">Purchased!</p>
+                    <p className="font-display text-lg font-semibold">
+                      {isSubscribed ? "Subscriber Access" : "Purchased!"}
+                    </p>
                     <p className="text-xs text-muted-foreground">Full book unlocked. Download above.</p>
                   </CardContent>
                 </Card>

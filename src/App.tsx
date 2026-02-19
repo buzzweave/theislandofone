@@ -7,6 +7,7 @@ import Layout from "./components/Layout";
 import AdminLayout from "./components/admin/AdminLayout";
 import AdminGuard from "./components/admin/AdminGuard";
 import { AdminAuthProvider } from "./contexts/AdminAuthContext";
+import { AuthProvider } from "./contexts/AuthContext";
 import Index from "./pages/Index";
 import Books from "./pages/Books";
 import BookDetail from "./pages/BookDetail";
@@ -42,6 +43,8 @@ import Copyright from "./pages/Copyright";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import AdminNotifications from "./pages/admin/AdminNotifications";
+import Auth from "./pages/Auth";
+import PaymentSuccess from "./pages/PaymentSuccess";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -59,9 +62,10 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <AdminAuthProvider>
-        <BrowserRouter>
-          <Routes>
+      <AuthProvider>
+        <AdminAuthProvider>
+          <BrowserRouter>
+            <Routes>
             {/* Public routes */}
             <Route path="/" element={<Layout><Index /></Layout>} />
             <Route path="/books" element={<Layout><Books /></Layout>} />
@@ -75,6 +79,8 @@ const App = () => (
             <Route path="/about" element={<Layout><About /></Layout>} />
             <Route path="/speaking" element={<Layout><Speaking /></Layout>} />
             <Route path="/membership" element={<Layout><Membership /></Layout>} />
+            <Route path="/auth" element={<Layout><Auth /></Layout>} />
+            <Route path="/payment-success" element={<Layout><PaymentSuccess /></Layout>} />
             <Route path="/contact" element={<Layout><Contact /></Layout>} />
             <Route path="/copyright" element={<Layout><Copyright /></Layout>} />
             <Route path="/terms" element={<Layout><TermsOfService /></Layout>} />
@@ -103,10 +109,11 @@ const App = () => (
               <Route path="settings" element={<AdminSettings />} />
             </Route>
 
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </AdminAuthProvider>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </AdminAuthProvider>
+      </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

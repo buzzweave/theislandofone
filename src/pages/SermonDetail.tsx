@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { membershipPlans } from "@/data/content";
 import { useSermon } from "@/hooks/useSermons";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import SocialShareLinks from "@/components/SocialShareLinks";
@@ -9,6 +11,7 @@ import AudioPlayer from "@/components/AudioPlayer";
 import FacebookComments from "@/components/FacebookComments";
 import DOMPurify from "dompurify";
 import { exportSermonToPdf, exportSermonToEpub, exportSermonToWord, exportSermonToGoodNotesPdf } from "@/lib/sermonExport";
+import { toast } from "sonner";
 
 import {
   ArrowLeft,
@@ -22,14 +25,27 @@ import {
   CheckCircle2,
   Crown,
   Tablet,
+  Loader2,
 } from "lucide-react";
 
 export default function SermonDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: sermon, isLoading } = useSermon(id);
+  const { user, isSubscribed, checkPurchase } = useAuth();
   const [purchased, setPurchased] = useState(false);
-  const [showCheckout, setShowCheckout] = useState(false);
+  const [checkingPurchase, setCheckingPurchase] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+
+  // Check purchase status on load
+  useEffect(() => {
+    if (!user || !id || !sermon || sermon.is_free) return;
+    setCheckingPurchase(true);
+    checkPurchase("sermon", id).then((result) => {
+      setPurchased(result);
+      setCheckingPurchase(false);
+    });
+  }, [user, id, sermon, checkPurchase]);
 
   if (isLoading) {
     return (
@@ -54,11 +70,30 @@ export default function SermonDetail() {
 
   const paragraphs = sermon.manuscript.split("\n\n");
   const previewParagraphs = paragraphs.slice(0, sermon.preview_cutoff + 1);
-  const isFullAccess = sermon.is_free || purchased;
+  const isFullAccess = sermon.is_free || purchased || isSubscribed;
 
-  const handleMockPurchase = () => {
-    setPurchased(true);
-    setShowCheckout(false);
+  const handlePurchase = async () => {
+    if (!user) {
+      navigate("/auth", { state: { from: `/sermons/${id}` } });
+      return;
+    }
+    setCheckoutLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-checkout", {
+        body: {
+          type: "sermon",
+          itemId: id,
+          priceAmount: sermon.price,
+          itemTitle: sermon.title,
+        },
+      });
+      if (error) throw error;
+      if (data?.url) window.open(data.url, "_blank");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to start checkout");
+    } finally {
+      setCheckoutLoading(false);
+    }
   };
 
   const handleDownload = (format: string) => {
@@ -96,7 +131,7 @@ export default function SermonDetail() {
           <div className="max-w-3xl">
             <div className="flex items-center gap-3 mb-3">
               <span className="text-xs font-semibold uppercase tracking-wider text-primary">{sermon.category}</span>
-              {!sermon.is_free && !purchased && (
+              {!sermon.is_free && !isFullAccess && (
                 <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
                   <Lock className="h-2.5 w-2.5" /> {sermon.access_level}
                 </span>
@@ -158,8 +193,12 @@ export default function SermonDetail() {
                     Purchase this sermon to read the full manuscript and download in PDF, EPUB, or Word format.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                    <Button size="lg" onClick={() => setShowCheckout(true)}>
-                      <ShoppingCart className="h-4 w-4 mr-2" />
+                    <Button size="lg" onClick={handlePurchase} disabled={checkoutLoading}>
+                      {checkoutLoading ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                      )}
                       Buy for ${sermon.price?.toFixed(2)}
                     </Button>
                     <Button variant="outline" size="lg" asChild>
@@ -205,7 +244,7 @@ export default function SermonDetail() {
 
           {/* Sidebar */}
           <div className="space-y-4">
-            {!isFullAccess && !showCheckout && (
+            {!isFullAccess && (
               <Card className="border-primary/20">
                 <CardHeader className="pb-3">
                   <CardTitle className="font-display text-lg">Get This Sermon</CardTitle>
@@ -213,8 +252,13 @@ export default function SermonDetail() {
                 <CardContent className="space-y-4">
                   <div className="text-3xl font-bold text-primary">${sermon.price?.toFixed(2)}</div>
                   <p className="text-xs text-muted-foreground">One-time purchase. Download in PDF, EPUB, and Word.</p>
-                  <Button className="w-full" onClick={() => setShowCheckout(true)}>
-                    <ShoppingCart className="h-4 w-4 mr-2" /> Purchase
+                  <Button className="w-full" onClick={handlePurchase} disabled={checkoutLoading}>
+                    {checkoutLoading ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <ShoppingCart className="h-4 w-4 mr-2" />
+                    )}
+                    Purchase
                   </Button>
                   <div className="text-center">
                     <span className="text-xs text-muted-foreground">or</span>
@@ -228,43 +272,13 @@ export default function SermonDetail() {
               </Card>
             )}
 
-            {showCheckout && !purchased && (
-              <Card className="border-primary/30 shadow-gold">
-                <CardHeader className="pb-3">
-                  <CardTitle className="font-display text-lg">Checkout</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="p-3 rounded-lg bg-secondary/50 space-y-1">
-                    <p className="text-sm font-medium">{sermon.title}</p>
-                    <p className="text-xs text-muted-foreground">{sermon.scripture}</p>
-                    <p className="text-lg font-bold text-primary mt-2">${sermon.price?.toFixed(2)}</p>
-                  </div>
-                  <div className="space-y-2 text-xs text-muted-foreground">
-                    <p>✓ Full manuscript access</p>
-                    <p>✓ PDF, EPUB & Word download</p>
-                    <p>✓ Lifetime access</p>
-                  </div>
-                  <Button className="w-full" size="lg" onClick={handleMockPurchase}>
-                    <CheckCircle2 className="h-4 w-4 mr-2" /> Complete Purchase (Demo)
-                  </Button>
-                  <button
-                    onClick={() => setShowCheckout(false)}
-                    className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <p className="text-[10px] text-muted-foreground text-center">
-                    This is a demo checkout. Stripe integration coming soon.
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-
-            {purchased && (
+            {isFullAccess && !sermon.is_free && (
               <Card className="border-primary/30">
                 <CardContent className="pt-6 text-center space-y-3">
                   <CheckCircle2 className="h-10 w-10 text-primary mx-auto" />
-                  <p className="font-display text-lg font-semibold">Purchased!</p>
+                  <p className="font-display text-lg font-semibold">
+                    {isSubscribed ? "Subscriber Access" : "Purchased!"}
+                  </p>
                   <p className="text-xs text-muted-foreground">Full manuscript unlocked. Download below.</p>
                 </CardContent>
               </Card>
