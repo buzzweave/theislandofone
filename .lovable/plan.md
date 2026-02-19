@@ -1,44 +1,95 @@
 
+# Backend Stabilization -- Surgical Fixes Only
 
-# Connect Members Table to Content Access
+**Estimated credits: 5-7 messages total**
 
-## Overview
-Right now, manually adding a member in the admin panel is just record-keeping -- it doesn't grant them any actual access. This plan bridges that gap so that when you assign a member a plan (Free, Reader, Pastor, Inner Circle), they can sign in and access the corresponding content.
+---
 
-## How It Will Work
+## Batch 1 (1 message): Migrate Content Hooks to Database
 
-1. A visitor signs up or signs in on the site (email/password, Google, or Apple)
-2. You add them as a member in the admin panel using their email and assign a tier
-3. When they view content, the system checks: "Does this email have a member record with a matching plan?" If yes, access is granted -- no Stripe payment needed
-
-## Changes
-
-### 1. Update the `check-subscription` edge function
-This function already runs every time a user views content. It currently only checks Stripe. We will add a fallback: if no Stripe subscription is found, look up the user's email in the `members` table. If an active member record exists with a paid plan, return that plan's access level.
-
-This means ALL existing content gates (books, sermons, graphics) will automatically respect admin-assigned memberships with zero frontend changes.
-
-### 2. Add a `user_id` column to the `members` table (optional link)
-Add an optional `user_id` column so that when a user signs up with the same email as a member record, the system can link them. This makes lookups faster and more reliable than email matching alone.
-
-### 3. Create a database trigger to auto-link members
-When a new user signs up (profile created), check if their email exists in the `members` table. If so, automatically set the `user_id` on that member record.
-
-### 4. Update the admin Members page
-- Show a status indicator: "Linked" (has signed up) vs "Invited" (hasn't signed up yet)
-- The admin can still add members by email before they sign up -- once they do sign up, the link happens automatically
-
-## What This Means for You
-- **Free tier members**: Add their email, assign "Free" plan. They sign up normally and get free-tier access
-- **Paid tier members**: Add their email, assign "Reader" / "Pastor" / "Inner Circle". They sign up and immediately get that tier's content without paying
-- **Stripe subscribers**: Continue to work exactly as before -- Stripe is checked first, member table is the fallback
-
-## Technical Details
+**The root cause of issues #1-5** is that `useSermons`, `useBooks`, and `useVideos` all call the external VPS API (`api.theislandofone.com`) via `src/lib/api.ts`. The database tables already exist with correct schemas, defaults, and RLS policies. The fix is to rewrite these three hooks to use the database client directly.
 
 | File | Change |
 |------|--------|
-| Database migration | Add optional `user_id` column to `members` table; add trigger to auto-link on profile creation |
-| `supabase/functions/check-subscription/index.ts` | Add fallback: if no Stripe sub, query `members` table for active record matching user email/id and return equivalent access |
-| `src/pages/admin/AdminMembers.tsx` | Show linked/invited badge per member row |
+| `src/hooks/useSermons.ts` | Replace all VPS `api.get/post/put/delete` calls with `supabase.from("sermons")` queries |
+| `src/hooks/useBooks.ts` | Replace VPS calls with `supabase.from("books")` and `supabase.from("book_chapters")` queries |
+| `src/hooks/useVideos.ts` | Replace VPS calls with `supabase.from("videos")` queries |
 
-No changes needed to any content pages (BookDetail, SermonDetail, Graphics, etc.) since they all rely on the `check-subscription` response.
+This single change fixes:
+- Cannot create sermons (issue #1)
+- Cannot create books (issue #2)
+- Cannot publish videos (issue #3)
+- Unknown price field error (issue #4) -- DB defaults price to 0, is_free to true
+- SQL syntax errors in books (issue #5) -- eliminates VPS as middleman
+
+---
+
+## Batch 2 (1 message): Analytics + Navbar + Signup Redirect
+
+| File | Change |
+|------|--------|
+| `src/pages/admin/AdminAnalytics.tsx` | Replace static `content.ts` imports with real DB counts from `useSermons`, `useVideos`, and a new members count query |
+| `src/components/Layout.tsx` | Change "Join" to "Sign Up" for logged-out users (lines 112-115); change "Join" to "Membership" for logged-in users (lines 91-93); same for mobile menu (lines 157-163) |
+| `src/pages/Auth.tsx` | After successful signup, redirect to `/membership` instead of the previous page |
+
+---
+
+## Batch 3 (1 message): Comments + Ratings Tables and Components
+
+- Database migration: Create `comments` and `ratings` tables with RLS (authenticated users can insert/read own, anyone can read)
+- Create `src/components/CommentsSection.tsx` -- reusable comment list + form
+- Create `src/components/StarRating.tsx` -- 5-star rating with one-per-user enforcement
+- Add both components to `BlogPost.tsx`, `SermonDetail.tsx`, `BookDetail.tsx`
+
+---
+
+## Batch 4 (1 message): Edge Function Fixes
+
+| Function | Fix |
+|----------|-----|
+| `send-notification` | Add retry logic (up to 2 retries with 1s delay) for Resend API calls; improve error logging |
+| `text-to-speech` | Add explicit check that `OPENAI_API_KEY` is loaded before attempting generation; improve auth error messages |
+| `share-blog` | Improve fallback: if `image_url` is empty, use a high-quality default image URL instead of the logo |
+
+---
+
+## Batch 5 (1 message): SEO + OG + EPUB Fixes
+
+| Item | Change |
+|------|--------|
+| SEO: sitemap | Create `supabase/functions/sitemap/index.ts` edge function that queries published blogs, books, sermons and returns XML sitemap |
+| SEO: JSON-LD | Add structured data script tags to `BlogPost.tsx`, `SermonDetail.tsx`, `BookDetail.tsx` |
+| EPUB fix | Review and fix `src/lib/bookExport.ts` storage path and signed URL logic for the download flow |
+
+---
+
+## Batch 6 (1 message): Inner Circle Pricing + AI Sidebar + Remaining
+
+| Item | Change |
+|------|--------|
+| Inner Circle price | Update `src/lib/stripe.ts` to $26.95; update `membership_plans` table row |
+| Inner Circle gating | Already working via `access_tiers` + `check-subscription` -- no code changes needed, just confirm |
+| AI Sidebar | Add error handling and fallback messaging in `AISidebar.tsx` for auth failures |
+| Member passwords | Not possible to set passwords for other users securely -- the current flow (admin adds email, user signs up with their own password) is the correct approach |
+
+---
+
+## Items That Require Your Action (Not Code Changes)
+
+- **Resend emails**: You must verify a sender domain in your Resend dashboard. Using `onboarding@resend.dev` only sends to your own account email.
+- **Inner Circle Stripe price**: You need to create a new $26.95/month price in your Stripe dashboard and provide the new price ID. I will update `stripe.ts` with the current constant for now.
+- **Site visitor tracking / page views / referrers**: These require a third-party analytics service (Google Analytics, Plausible, etc.) -- there is no built-in way to track page views in the database without significant infrastructure. I can add a simple page-view counter table if you want approximate numbers.
+
+---
+
+## Summary
+
+| Batch | Credits | What Gets Fixed |
+|-------|---------|-----------------|
+| 1 | 1 | Sermons, Books, Videos creation/editing/publishing |
+| 2 | 1 | Analytics real data, Navbar text, Signup redirect |
+| 3 | 1 | Comments + Ratings on blogs/sermons/books |
+| 4 | 1 | Email retry, Audiobook auth, OG image fallback |
+| 5 | 1 | Sitemap, JSON-LD, EPUB download fix |
+| 6 | 1 | Inner Circle pricing, AI sidebar, final validation |
+| **Total** | **~6** | |
