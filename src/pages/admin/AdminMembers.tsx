@@ -21,6 +21,7 @@ interface Member {
   plan: string;
   status: string;
   created_at: string;
+  user_id: string | null;
 }
 
 const statusColors: Record<string, string> = {
@@ -156,6 +157,7 @@ export default function AdminMembers() {
                 <TableHead>Email</TableHead>
                 <TableHead>Plan</TableHead>
                 <TableHead>Joined</TableHead>
+                <TableHead>Account</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -167,6 +169,13 @@ export default function AdminMembers() {
                   <TableCell className="text-muted-foreground">{member.email}</TableCell>
                   <TableCell><Badge variant="secondary">{member.plan}</Badge></TableCell>
                   <TableCell className="text-muted-foreground text-sm">{new Date(member.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell>
+                    {member.user_id ? (
+                      <Badge variant="default" className="bg-green-600 hover:bg-green-600">Linked</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-muted-foreground">Invited</Badge>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge variant="outline" className={statusColors[member.status] || ""}>{member.status}</Badge>
                   </TableCell>
@@ -182,7 +191,7 @@ export default function AdminMembers() {
               ))}
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No members found.</TableCell>
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No members found.</TableCell>
                 </TableRow>
               )}
             </TableBody>
