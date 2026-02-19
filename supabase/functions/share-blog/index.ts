@@ -69,7 +69,7 @@ Deno.serve(async (req: Request) => {
 </body></html>`;
 
     return new Response(page, {
-      headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" },
+      headers: { "Content-Type": "text/html; charset=utf-8", ...corsHeaders },
     });
   } catch (err) {
     console.error("share-blog error:", err);

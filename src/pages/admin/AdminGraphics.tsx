@@ -125,6 +125,7 @@ export default function AdminGraphics() {
             price: 4.99,
           });
         } catch (err: any) {
+          console.error("Graphics upload failed:", err);
           toast({ title: "Upload failed", description: `${files[i].name}: ${err.message}`, variant: "destructive" });
         }
       }

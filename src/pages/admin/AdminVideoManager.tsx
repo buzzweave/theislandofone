@@ -109,6 +109,7 @@ export default function AdminVideoManager() {
       }
       setDialogOpen(false);
     } catch (e: any) {
+      console.error("Video save failed:", e);
       toast({ title: "Error", description: e.message, variant: "destructive" });
     }
   };
