@@ -1,47 +1,44 @@
 
 
-# Upgrade Members Area -- Real Data, Add/Delete Members, Email Action
+# Connect Members Table to Content Access
 
 ## Overview
-Replace the mock-data members page with a real database-backed system. You will be able to add members (assigning them to any membership tier, including free), delete members, and click the email icon to open your email client.
+Right now, manually adding a member in the admin panel is just record-keeping -- it doesn't grant them any actual access. This plan bridges that gap so that when you assign a member a plan (Free, Reader, Pastor, Inner Circle), they can sign in and access the corresponding content.
 
-## What Changes
+## How It Will Work
 
-### 1. Create a `members` database table
-A new table to store manually-added members with their name, email, assigned plan, and status.
+1. A visitor signs up or signs in on the site (email/password, Google, or Apple)
+2. You add them as a member in the admin panel using their email and assign a tier
+3. When they view content, the system checks: "Does this email have a member record with a matching plan?" If yes, access is granted -- no Stripe payment needed
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | Primary key |
-| name | text | Member's name |
-| email | text | Member's email |
-| plan | text | Tier name (Reader, Pastor, Inner Circle, or Free) |
-| status | text | active, paused, or cancelled |
-| created_at | timestamp | When added |
+## Changes
 
-RLS policies: Admin-only for all operations (SELECT, INSERT, UPDATE, DELETE) using the existing `has_role` function.
+### 1. Update the `check-subscription` edge function
+This function already runs every time a user views content. It currently only checks Stripe. We will add a fallback: if no Stripe subscription is found, look up the user's email in the `members` table. If an active member record exists with a paid plan, return that plan's access level.
 
-### 2. Fix the email button
-The mail icon button currently does nothing. It will be changed to open your default email app with the member's email pre-filled (`mailto:` link).
+This means ALL existing content gates (books, sermons, graphics) will automatically respect admin-assigned memberships with zero frontend changes.
 
-### 3. Add "Add Member" button and dialog
-- An "Add Member" button at the top of the page
-- Opens a dialog form with fields: Name, Email, Plan (dropdown including "Free" option), Status
-- Saves the new member to the database
+### 2. Add a `user_id` column to the `members` table (optional link)
+Add an optional `user_id` column so that when a user signs up with the same email as a member record, the system can link them. This makes lookups faster and more reliable than email matching alone.
 
-### 4. Add "Delete" button per member row
-- A trash icon button next to the email button in each row
-- Shows a confirmation dialog before deleting
-- Removes the member from the database
+### 3. Create a database trigger to auto-link members
+When a new user signs up (profile created), check if their email exists in the `members` table. If so, automatically set the `user_id` on that member record.
 
-### 5. Load members from database
-- Replace the hardcoded mock data with a real database query
-- Plan summary cards will reflect actual member counts
+### 4. Update the admin Members page
+- Show a status indicator: "Linked" (has signed up) vs "Invited" (hasn't signed up yet)
+- The admin can still add members by email before they sign up -- once they do sign up, the link happens automatically
+
+## What This Means for You
+- **Free tier members**: Add their email, assign "Free" plan. They sign up normally and get free-tier access
+- **Paid tier members**: Add their email, assign "Reader" / "Pastor" / "Inner Circle". They sign up and immediately get that tier's content without paying
+- **Stripe subscribers**: Continue to work exactly as before -- Stripe is checked first, member table is the fallback
 
 ## Technical Details
 
 | File | Change |
 |------|--------|
-| Database migration | Create `members` table with admin-only RLS policies |
-| `src/pages/admin/AdminMembers.tsx` | Full rewrite: fetch from DB, add member dialog, delete confirmation, `mailto:` on email button |
+| Database migration | Add optional `user_id` column to `members` table; add trigger to auto-link on profile creation |
+| `supabase/functions/check-subscription/index.ts` | Add fallback: if no Stripe sub, query `members` table for active record matching user email/id and return equivalent access |
+| `src/pages/admin/AdminMembers.tsx` | Show linked/invited badge per member row |
 
+No changes needed to any content pages (BookDetail, SermonDetail, Graphics, etc.) since they all rely on the `check-subscription` response.
