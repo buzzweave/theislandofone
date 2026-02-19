@@ -1,34 +1,36 @@
 
 
-# Fix: Admin Graphics Not Showing
+# Fix: Admin Graphics Upload and Display
 
 ## Problem
+The admin Graphics page currently routes ALL operations (list, upload, update, delete) through your external VPS API at `api.theislandofone.com`. When that API is unreachable or returns errors, the page shows "No graphics yet" and uploads fail. Your database already has 12 graphics stored.
 
-The `AdminGraphics` page has a race condition bug:
+## Solution
+Switch the admin Graphics page to work directly with Lovable Cloud (database + file storage) instead of the VPS. This makes it fully self-contained and reliable.
 
-1. On mount, it calls `fetchAll()` which tries `/api/graphics/admin` on the VPS
-2. If that endpoint fails (auth issue, network error, etc.), it falls back to `graphics` from `useGraphics()`
-3. But at mount time, `graphics` is still `[]` (loading)
-4. The `useEffect` has an empty dependency array `[]`, so it never re-runs when the public graphics data arrives later
+## Changes
 
-This means the admin page always shows "No graphics yet."
+### 1. Database: Add admin SELECT policy
+Currently only active graphics are visible via the database. Admins need to see all graphics (including drafts).
+- Add RLS policy: "Admins can view all graphics" for SELECT using `has_role(auth.uid(), 'admin')`
 
-## Fix
+### 2. Rewrite `AdminGraphics.tsx` to use Lovable Cloud directly
+- Remove all `api.get/post/put/delete` VPS calls
+- **Fetch**: Use `supabase.from("graphics").select("*").order("sort_order")` (admin RLS policy returns all, including inactive)
+- **Upload**: Upload image files to the existing `graphics` storage bucket, then insert a row with the public URL
+- **Update**: Use `supabase.from("graphics").update(...)` 
+- **Delete**: Use `supabase.from("graphics").delete()` and remove the file from storage
+- Remove the `fetchAll` / `allGraphics` / `loadingAll` state -- use `useGraphics` pattern with admin query instead
 
-Update the `useEffect` in `AdminGraphics.tsx` to include `fetchAll` in its dependency array. Since `fetchAll` is wrapped in `useCallback` with `[graphics]` as a dependency, it will automatically re-run when the public graphics data finishes loading -- providing a working fallback.
+### 3. Update `useGraphics.ts` (optional admin variant)
+Add an `useAdminGraphics` hook that queries all graphics (not just active) using the Supabase client directly, removing the VPS dependency.
 
-### Technical Change (single file)
+## What stays the same
+- The public `useGraphics` hook continues to work for the storefront
+- The resize dialog and UI layout remain unchanged
+- The `graphics` storage bucket already exists and is public
 
-**File: `src/pages/admin/AdminGraphics.tsx`**
-
-Change line ~109:
-```
-// Before
-useEffect(() => { fetchAll(); }, []);
-
-// After
-useEffect(() => { fetchAll(); }, [fetchAll]);
-```
-
-This ensures that when the VPS admin endpoint fails, the fallback to public graphics data actually works because `fetchAll` is re-created (and thus re-invoked) once the public data loads.
-
+## Technical notes
+- The `graphics` storage bucket is already created and public
+- RLS policies for storage may need to be added to allow admin uploads
+- The admin must be logged in with a user that has the `admin` role for RLS to work
