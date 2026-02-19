@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface Graphic {
   id: string;
@@ -16,11 +16,34 @@ export interface Graphic {
   updated_at: string;
 }
 
-/** Public hook – VPS returns active graphics */
+/** Public hook – returns active graphics only */
 export function useGraphics() {
   const { data: graphics = [], isLoading } = useQuery({
     queryKey: ["graphics"],
-    queryFn: () => api.get<Graphic[]>("/api/graphics"),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("graphics")
+        .select("*")
+        .order("sort_order", { ascending: true });
+      if (error) throw error;
+      return data as Graphic[];
+    },
   });
   return { graphics, isLoading };
+}
+
+/** Admin hook – returns ALL graphics (including inactive/draft) via admin RLS */
+export function useAdminGraphics() {
+  const { data: graphics = [], isLoading, refetch } = useQuery({
+    queryKey: ["graphics", "admin"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("graphics")
+        .select("*")
+        .order("sort_order", { ascending: true });
+      if (error) throw error;
+      return data as Graphic[];
+    },
+  });
+  return { graphics, isLoading, refetch };
 }
