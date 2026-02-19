@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { useAdminGraphics, Graphic } from "@/hooks/useGraphics";
+import { adminFetch } from "@/lib/adminApi";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Eye, EyeOff, Image, Maximize2, Download } from "lucide-react";
@@ -116,14 +117,13 @@ export default function AdminGraphics() {
         try {
           const publicUrl = await uploadFile(files[i]);
           const title = files[i].name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
-          const { error } = await supabase.from("graphics").insert({
+          await adminFetch("graphics-admin", "POST", {
             title,
             preview_url: publicUrl,
             file_url: publicUrl,
             sort_order: graphics.length + i,
             price: 4.99,
           });
-          if (error) throw error;
         } catch (err: any) {
           toast({ title: "Upload failed", description: `${files[i].name}: ${err.message}`, variant: "destructive" });
         }
@@ -137,21 +137,21 @@ export default function AdminGraphics() {
   };
 
   const updateGraphic = async (id: string, updates: Partial<Graphic>) => {
-    const { error } = await supabase.from("graphics").update(updates).eq("id", id);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
+    try {
+      await adminFetch("graphics-admin", "PUT", { id, ...updates });
       refetch();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   };
 
   const deleteGraphic = async (id: string) => {
-    const { error } = await supabase.from("graphics").delete().eq("id", id);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
+    try {
+      await adminFetch("graphics-admin", "DELETE", { id });
       toast({ title: "Graphic deleted" });
       refetch();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   };
 
