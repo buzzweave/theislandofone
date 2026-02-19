@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { adminFetch } from "@/lib/adminApi";
 
 export interface Video {
   id: string;
@@ -32,17 +33,12 @@ export function useVideos() {
   });
 }
 
-/** Admin hook – returns ALL videos via admin RLS */
+/** Admin hook – calls videos-admin edge function */
 export function useAdminVideos() {
   return useQuery({
     queryKey: ["videos", "admin"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("videos")
-        .select("*")
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return data as Video[];
+      return adminFetch<Video[]>("videos-admin", "GET");
     },
   });
 }
@@ -51,9 +47,7 @@ export function useAddVideo() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (video: Partial<Video>) => {
-      const { data, error } = await supabase.from("videos").insert([video as any]).select().single();
-      if (error) throw error;
-      return data as Video;
+      return adminFetch<Video>("videos-admin", "POST", video);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["videos"] }),
   });
@@ -63,9 +57,7 @@ export function useUpdateVideo() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Video> & { id: string }) => {
-      const { data, error } = await supabase.from("videos").update(updates).eq("id", id).select().single();
-      if (error) throw error;
-      return data as Video;
+      return adminFetch<Video>("videos-admin", "PUT", { id, ...updates });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["videos"] }),
   });
@@ -75,8 +67,7 @@ export function useDeleteVideo() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("videos").delete().eq("id", id);
-      if (error) throw error;
+      await adminFetch("videos-admin", "DELETE", { id });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["videos"] }),
   });

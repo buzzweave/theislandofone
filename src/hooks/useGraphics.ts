@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { adminFetch } from "@/lib/adminApi";
 
 export interface Graphic {
   id: string;
@@ -32,17 +33,12 @@ export function useGraphics() {
   return { graphics, isLoading };
 }
 
-/** Admin hook – returns ALL graphics (including inactive/draft) via admin RLS */
+/** Admin hook – calls graphics-admin edge function (bypasses RLS via service role) */
 export function useAdminGraphics() {
   const { data: graphics = [], isLoading, refetch } = useQuery({
     queryKey: ["graphics", "admin"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("graphics")
-        .select("*")
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return data as Graphic[];
+      return adminFetch<Graphic[]>("graphics-admin", "GET");
     },
   });
   return { graphics, isLoading, refetch };
