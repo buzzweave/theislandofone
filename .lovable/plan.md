@@ -1,36 +1,59 @@
 
 
-# Fix: Admin Graphics Upload and Display
+# Fix: Admin Graphics, Public Graphics Pricing, and Admin Videos
 
-## Problem
-The admin Graphics page currently routes ALL operations (list, upload, update, delete) through your external VPS API at `api.theislandofone.com`. When that API is unreachable or returns errors, the page shows "No graphics yet" and uploads fail. Your database already has 12 graphics stored.
+## Issue 1: Admin Graphics -- Cannot Upload or Publish/Unpublish
 
-## Solution
-Switch the admin Graphics page to work directly with Lovable Cloud (database + file storage) instead of the VPS. This makes it fully self-contained and reliable.
+**Root Cause**: The `graphics` table is missing an admin SELECT policy. The only SELECT policy is `is_active = true`, so admins can only see published graphics. When they unpublish a graphic or upload a new one (which defaults to `is_active = true` but may not be readable after insert due to timing), the data disappears from the admin view.
 
-## Changes
+**Fix**: Add a single RLS policy:
+```sql
+CREATE POLICY "Admins can view all graphics"
+ON public.graphics FOR SELECT
+TO authenticated
+USING (public.has_role(auth.uid(), 'admin'));
+```
 
-### 1. Database: Add admin SELECT policy
-Currently only active graphics are visible via the database. Admins need to see all graphics (including drafts).
-- Add RLS policy: "Admins can view all graphics" for SELECT using `has_role(auth.uid(), 'admin')`
+No code changes needed -- the `AdminGraphics.tsx` and `useAdminGraphics` hook already query via Supabase correctly.
 
-### 2. Rewrite `AdminGraphics.tsx` to use Lovable Cloud directly
-- Remove all `api.get/post/put/delete` VPS calls
-- **Fetch**: Use `supabase.from("graphics").select("*").order("sort_order")` (admin RLS policy returns all, including inactive)
-- **Upload**: Upload image files to the existing `graphics` storage bucket, then insert a row with the public URL
-- **Update**: Use `supabase.from("graphics").update(...)` 
-- **Delete**: Use `supabase.from("graphics").delete()` and remove the file from storage
-- Remove the `fetchAll` / `allGraphics` / `loadingAll` state -- use `useGraphics` pattern with admin query instead
+---
 
-### 3. Update `useGraphics.ts` (optional admin variant)
-Add an `useAdminGraphics` hook that queries all graphics (not just active) using the Supabase client directly, removing the VPS dependency.
+## Issue 2: Public Graphics Page -- Pricing and Buy Button Not Working
 
-## What stays the same
-- The public `useGraphics` hook continues to work for the storefront
-- The resize dialog and UI layout remain unchanged
-- The `graphics` storage bucket already exists and is public
+**Root Cause**: The public `Graphics.tsx` page hardcodes the word "Free" and renders a plain download link for every graphic, completely ignoring the `price` field from the database. There is no buy/purchase button.
 
-## Technical notes
-- The `graphics` storage bucket is already created and public
-- RLS policies for storage may need to be added to allow admin uploads
-- The admin must be logged in with a user that has the `admin` role for RLS to work
+**Fix**: Update `src/pages/Graphics.tsx` to:
+- Show the actual price from the database (e.g., "$2.99") instead of hardcoded "Free"
+- If `price > 0`, show a "Buy" button that triggers the existing Stripe checkout flow (via the `create-checkout` edge function)
+- If `price` is 0 or the user has already purchased, show the "Download" button
+
+---
+
+## Issue 3: Admin Videos -- Cannot Post Videos
+
+**Root Cause**: The `AdminVideoManager.tsx` and `useVideos.ts` hook use the external VPS API (`api.get("/api/videos")`, `api.post`, etc.) via `src/lib/api.ts`. The VPS at `api.theislandofone.com` is unreachable or rejecting requests, so all CRUD operations fail.
+
+The database already has a `videos` table with proper admin RLS policies. However, the videos table is also missing an admin SELECT policy (same pattern as graphics -- only `is_active = true` is visible).
+
+**Fix**:
+1. Add admin SELECT policy for videos table
+2. Rewrite `useVideos.ts` to use the Supabase client directly (same pattern as `useGraphics.ts`)
+3. Update `AdminVideoManager.tsx` to remove the VPS `api.upload` call for thumbnails and use Supabase storage (`video-thumbnails` bucket) instead
+
+---
+
+## Summary of Changes
+
+### Database Migration (1 migration)
+- Add `Admins can view all graphics` SELECT policy on `public.graphics`
+- Add `Admins can view all videos` SELECT policy on `public.videos`
+- Add storage policy for admin uploads to `video-thumbnails` bucket
+
+### Code Changes
+
+| File | Change |
+|------|--------|
+| `src/pages/Graphics.tsx` | Show real price, add buy button with Stripe checkout |
+| `src/hooks/useVideos.ts` | Replace VPS API calls with Supabase client queries and mutations |
+| `src/pages/admin/AdminVideoManager.tsx` | Replace VPS thumbnail upload with Supabase storage upload |
+
