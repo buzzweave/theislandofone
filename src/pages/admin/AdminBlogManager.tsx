@@ -133,7 +133,7 @@ export default function AdminBlogManager() {
       excerpt: post.excerpt,
       content: post.content,
       image_url: post.image_url,
-      is_published: post.is_published,
+      is_published: !!post.is_published,
       published_at: post.published_at,
     });
     setEditing(post.id);
@@ -147,6 +147,7 @@ export default function AdminBlogManager() {
     }
     const payload = {
       ...form,
+      is_published: form.is_published ? 1 : 0,
       published_at: form.is_published && !form.published_at ? new Date().toISOString() : form.published_at,
     };
     try {

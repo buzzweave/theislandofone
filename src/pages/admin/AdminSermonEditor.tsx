@@ -99,15 +99,16 @@ export default function AdminSermonEditor() {
         date: new Date().toISOString().slice(0, 10),
         category: "Faith",
         price: 0,
-        is_free: true,
+        is_free: 1,
         preview_cutoff: 2,
-        featured: false,
+        featured: 0,
         audio_url: null,
         sort_order: 0,
         access_tiers: [],
       });
       setActiveId(result.id);
-    } catch {
+    } catch (err) {
+      console.error(err);
       toast.error("Failed to create sermon");
     }
   };
@@ -137,9 +138,9 @@ export default function AdminSermonEditor() {
         date: draft.date,
         category: draft.category,
         price: draft.price,
-        is_free: draft.is_free,
+        is_free: draft.is_free ? 1 : 0,
         preview_cutoff: draft.preview_cutoff,
-        featured: draft.featured,
+        featured: draft.featured ? 1 : 0,
         audio_url: draft.audio_url,
         access_tiers: draft.access_tiers,
       });
@@ -306,7 +307,7 @@ export default function AdminSermonEditor() {
                   <p className="text-xs text-muted-foreground">Show this sermon in the featured section.</p>
                 </div>
                 <Switch
-                  checked={draft.featured || false}
+                  checked={!!draft.featured}
                   onCheckedChange={(v) => update({ featured: v })}
                 />
               </div>
