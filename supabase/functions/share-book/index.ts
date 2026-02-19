@@ -1,11 +1,10 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+const esc = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -18,21 +17,31 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const sbUrl = Deno.env.get("SUPABASE_URL")!;
+    const sbKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const [apiRes, settingResult] = await Promise.all([
-      fetch(`https://api.theislandofone.com/api/books/${id}`),
-      supabase.from("site_settings").select("value").eq("key", "fb_app_id").single(),
-    ]);
+    // Fetch book from local DB
+    const bookRes = await fetch(`${sbUrl}/rest/v1/books?id=eq.${encodeURIComponent(id)}&select=*&limit=1`, {
+      headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` },
+    });
+    const books = await bookRes.json();
 
-    if (!apiRes.ok) {
-      return new Response("Not found", { status: 404, headers: corsHeaders });
+    // Fallback to VPS API if not in local DB
+    let book = books?.[0];
+    if (!book) {
+      const apiRes = await fetch(`https://api.theislandofone.com/api/books/${id}`);
+      if (!apiRes.ok) {
+        return new Response("Not found", { status: 404, headers: corsHeaders });
+      }
+      book = await apiRes.json();
     }
-    const book = await apiRes.json();
-    const fbAppId = settingResult.data?.value || "1169014871775113";
+
+    // Fetch fb_app_id
+    const settingRes = await fetch(`${sbUrl}/rest/v1/site_settings?key=eq.fb_app_id&select=value&limit=1`, {
+      headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` },
+    });
+    const settings = await settingRes.json();
+    const fbAppId = settings?.[0]?.value || "1169014871775113";
 
     const site = "https://theislandofone.com";
     const link = `${site}/books/${id}`;
