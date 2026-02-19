@@ -1,95 +1,38 @@
 
-# Backend Stabilization -- Surgical Fixes Only
+# Fix: Admin Auth Must Use Database Authentication
 
-**Estimated credits: 5-7 messages total**
+## Problem
+The database logs show repeated errors: **"new row violates row-level security policy"** for both `sermons` and `books` tables.
 
----
+The hooks (useSermons, useBooks, useVideos) were correctly migrated to use the database in the last batch. However, the **admin login still authenticates against the old external VPS API** instead of the database authentication system. This means when an admin tries to create/edit/delete content, the database sees no authenticated user and blocks the operation.
 
-## Batch 1 (1 message): Migrate Content Hooks to Database
+Your admin account (`support@buzzweave.com`) already exists in the database with the `admin` role -- it just needs the login flow to actually use it.
 
-**The root cause of issues #1-5** is that `useSermons`, `useBooks`, and `useVideos` all call the external VPS API (`api.theislandofone.com`) via `src/lib/api.ts`. The database tables already exist with correct schemas, defaults, and RLS policies. The fix is to rewrite these three hooks to use the database client directly.
+## Fix (1 file change)
 
-| File | Change |
-|------|--------|
-| `src/hooks/useSermons.ts` | Replace all VPS `api.get/post/put/delete` calls with `supabase.from("sermons")` queries |
-| `src/hooks/useBooks.ts` | Replace VPS calls with `supabase.from("books")` and `supabase.from("book_chapters")` queries |
-| `src/hooks/useVideos.ts` | Replace VPS calls with `supabase.from("videos")` queries |
+Rewrite `src/contexts/AdminAuthContext.tsx` to use `supabase.auth.signInWithPassword()` instead of the VPS API calls. This is a surgical change to the authentication flow only -- no UI changes.
 
-This single change fixes:
-- Cannot create sermons (issue #1)
-- Cannot create books (issue #2)
-- Cannot publish videos (issue #3)
-- Unknown price field error (issue #4) -- DB defaults price to 0, is_free to true
-- SQL syntax errors in books (issue #5) -- eliminates VPS as middleman
+### What changes:
+- **Login**: Use `supabase.auth.signInWithPassword({ email, password })` instead of `api.post("/api/auth/login")`
+- **Session check**: Use `supabase.auth.getSession()` and `supabase.auth.onAuthStateChange()` instead of `api.get("/api/auth/me")`
+- **Logout**: Use `supabase.auth.signOut()` instead of `api.clearToken()`
+- **Token refresh**: Remove manual refresh interval (Supabase handles this automatically)
+- **Admin verification**: After login, check that the user has the `admin` role in `user_roles` table. If not, sign them out and reject login.
 
----
+### What stays the same:
+- All UI components (AdminLogin.tsx, AdminLayout.tsx, etc.) remain untouched
+- The `useAdminAuth()` hook interface stays identical
+- Failed attempts tracking and lockout logic preserved
+- CAPTCHA on login page preserved
 
-## Batch 2 (1 message): Analytics + Navbar + Signup Redirect
+## Technical Detail
 
-| File | Change |
-|------|--------|
-| `src/pages/admin/AdminAnalytics.tsx` | Replace static `content.ts` imports with real DB counts from `useSermons`, `useVideos`, and a new members count query |
-| `src/components/Layout.tsx` | Change "Join" to "Sign Up" for logged-out users (lines 112-115); change "Join" to "Membership" for logged-in users (lines 91-93); same for mobile menu (lines 157-163) |
-| `src/pages/Auth.tsx` | After successful signup, redirect to `/membership` instead of the previous page |
+```text
+Current flow (broken):
+  AdminLogin -> VPS API login -> VPS token stored -> hooks use Supabase client (no session) -> RLS BLOCKS
 
----
+Fixed flow:
+  AdminLogin -> Supabase auth login -> Supabase session active -> hooks use Supabase client (has session) -> RLS PASSES
+```
 
-## Batch 3 (1 message): Comments + Ratings Tables and Components
-
-- Database migration: Create `comments` and `ratings` tables with RLS (authenticated users can insert/read own, anyone can read)
-- Create `src/components/CommentsSection.tsx` -- reusable comment list + form
-- Create `src/components/StarRating.tsx` -- 5-star rating with one-per-user enforcement
-- Add both components to `BlogPost.tsx`, `SermonDetail.tsx`, `BookDetail.tsx`
-
----
-
-## Batch 4 (1 message): Edge Function Fixes
-
-| Function | Fix |
-|----------|-----|
-| `send-notification` | Add retry logic (up to 2 retries with 1s delay) for Resend API calls; improve error logging |
-| `text-to-speech` | Add explicit check that `OPENAI_API_KEY` is loaded before attempting generation; improve auth error messages |
-| `share-blog` | Improve fallback: if `image_url` is empty, use a high-quality default image URL instead of the logo |
-
----
-
-## Batch 5 (1 message): SEO + OG + EPUB Fixes
-
-| Item | Change |
-|------|--------|
-| SEO: sitemap | Create `supabase/functions/sitemap/index.ts` edge function that queries published blogs, books, sermons and returns XML sitemap |
-| SEO: JSON-LD | Add structured data script tags to `BlogPost.tsx`, `SermonDetail.tsx`, `BookDetail.tsx` |
-| EPUB fix | Review and fix `src/lib/bookExport.ts` storage path and signed URL logic for the download flow |
-
----
-
-## Batch 6 (1 message): Inner Circle Pricing + AI Sidebar + Remaining
-
-| Item | Change |
-|------|--------|
-| Inner Circle price | Update `src/lib/stripe.ts` to $26.95; update `membership_plans` table row |
-| Inner Circle gating | Already working via `access_tiers` + `check-subscription` -- no code changes needed, just confirm |
-| AI Sidebar | Add error handling and fallback messaging in `AISidebar.tsx` for auth failures |
-| Member passwords | Not possible to set passwords for other users securely -- the current flow (admin adds email, user signs up with their own password) is the correct approach |
-
----
-
-## Items That Require Your Action (Not Code Changes)
-
-- **Resend emails**: You must verify a sender domain in your Resend dashboard. Using `onboarding@resend.dev` only sends to your own account email.
-- **Inner Circle Stripe price**: You need to create a new $26.95/month price in your Stripe dashboard and provide the new price ID. I will update `stripe.ts` with the current constant for now.
-- **Site visitor tracking / page views / referrers**: These require a third-party analytics service (Google Analytics, Plausible, etc.) -- there is no built-in way to track page views in the database without significant infrastructure. I can add a simple page-view counter table if you want approximate numbers.
-
----
-
-## Summary
-
-| Batch | Credits | What Gets Fixed |
-|-------|---------|-----------------|
-| 1 | 1 | Sermons, Books, Videos creation/editing/publishing |
-| 2 | 1 | Analytics real data, Navbar text, Signup redirect |
-| 3 | 1 | Comments + Ratings on blogs/sermons/books |
-| 4 | 1 | Email retry, Audiobook auth, OG image fallback |
-| 5 | 1 | Sitemap, JSON-LD, EPUB download fix |
-| 6 | 1 | Inner Circle pricing, AI sidebar, final validation |
-| **Total** | **~6** | |
+## Estimated credits: 1
