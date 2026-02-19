@@ -1,70 +1,52 @@
 
 
-# Add Graphics to Payment System
+# Fix Membership Plans Displaying Wrong Data
 
-## Overview
+## Problem
 
-Connect the Graphics page to the existing Stripe payment system so that:
-- **Inner Circle subscribers** can download graphics for free (no watermark)
-- **Non-subscribers** can buy individual graphics via Stripe Checkout
-- Purchased graphics remove the watermark and unlock the high-res download
+The Membership page uses `useMembershipPlans` which calls `api.get("/api/membership-plans")` -- an external API endpoint. This external API is returning incorrect data (all plans showing as "Premium Monthly" at $29.99). Meanwhile, the database has the correct plans:
 
----
+| Plan | Price | Slug |
+|------|-------|------|
+| Reader | $9.99 | reader |
+| Pastor | $19.99 | pastor |
+| Inner Circle | $39.99 | inner-circle |
 
-## Changes Required
+## Solution
 
-### 1. Update the `create-checkout` Edge Function
+Update `useMembershipPlans` to query the database directly instead of the external API. This ensures the Membership page always reflects the data you manage in the admin dashboard.
 
-Add `"graphic"` as a supported `type` in the existing edge function. It will work exactly like book/sermon one-time purchases -- pass the graphic's price and ID, create a Stripe Checkout session in `payment` mode.
+## Changes
 
-### 2. Update the Graphics Page (`src/pages/Graphics.tsx`)
+### 1. Update `src/hooks/useMembershipPlans.ts`
 
-- Import `useAuth` from `AuthContext`
-- Replace the hardcoded `isInnerCircle = false` with a check against the user's subscription tier (Inner Circle product ID from `src/lib/stripe.ts`)
-- Replace the "Coming Soon" toast handler with a real `create-checkout` call for individual graphic purchases
-- Add purchase checking: track which graphics the user has already bought
-- Show a download button (linking to `file_url`) for purchased or Inner Circle graphics instead of the "Buy" button
+Replace the external API call with a direct database query using the existing database client. The hook will:
+- Query the `membership_plans` table directly
+- Order results by `sort_order`
+- Parse the `features` column (stored as JSON array)
 
-### 3. Update the `check-purchase` Edge Function
+### 2. No other files need to change
 
-Add `"graphic"` as a supported item type so the verification flow works for graphics the same way it does for books and sermons.
-
-### 4. Track Graphic Purchases
-
-The existing `purchases` table already supports any `item_type` text value, so no database changes are needed. Graphic purchases will be stored with `item_type = 'graphic'`.
-
----
+The `Membership.tsx` page and `AdminMembershipPlans.tsx` admin page both consume the same hook, so fixing the data source fixes both views. The `MembershipPlan` interface already matches the database columns.
 
 ## Technical Details
 
-### Graphics Page Logic
-
+The current hook:
 ```text
-if user is Inner Circle subscriber:
-  - Hide watermark
-  - Show "Download" button (links to file_url)
-  - Show "Included" badge
-
-else if user has purchased this graphic:
-  - Hide watermark
-  - Show "Download" button
-
-else:
-  - Show watermark overlay
-  - Show price + "Buy" button
-  - "Buy" triggers create-checkout with type="graphic"
-  - If not logged in, redirect to /auth first
+queryFn: () => api.get("/api/membership-plans")
 ```
 
-### Files Modified
+Will become:
+```text
+queryFn: async () => {
+  const { data, error } = await supabase
+    .from("membership_plans")
+    .select("*")
+    .order("sort_order");
+  if (error) throw error;
+  return data;
+}
+```
 
-| File | Change |
-|------|--------|
-| `src/pages/Graphics.tsx` | Add auth, subscription check, purchase flow, download buttons |
-| `supabase/functions/create-checkout/index.ts` | Add `"graphic"` type support (same pattern as book/sermon) |
-| `supabase/functions/check-purchase/index.ts` | Ensure `"graphic"` type is handled |
-
-### No New Files or Database Changes
-
-Everything fits within the existing architecture. The `purchases` table already accepts any `item_type` string, and the edge functions just need the new type added to their logic.
+Similarly, the `AdminMembershipPlans` page uses `api.put` to update plans -- this will also be switched to use the database client directly so edits are saved to the correct place.
 
