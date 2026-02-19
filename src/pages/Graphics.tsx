@@ -1,11 +1,15 @@
 import { useState } from "react";
 import { useGraphics } from "@/hooks/useGraphics";
-import { Image, Search, Download } from "lucide-react";
+import { Image, Search, Download, ShoppingCart } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Graphics() {
   const { graphics, isLoading } = useGraphics();
   const [activeCategory, setActiveCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
+  const [buyingId, setBuyingId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const categories = ["All", ...Array.from(new Set(graphics.map((g) => g.category)))];
   const filtered = graphics.filter((g) => {
@@ -14,6 +18,26 @@ export default function Graphics() {
       (g.description || "").toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
+
+  const handleBuy = async (graphic: typeof graphics[0]) => {
+    setBuyingId(graphic.id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({ title: "Please sign in to purchase", variant: "destructive" });
+        setBuyingId(null);
+        return;
+      }
+      const { data, error } = await supabase.functions.invoke("create-checkout", {
+        body: { type: "graphic", itemId: graphic.id, priceAmount: graphic.price, itemTitle: graphic.title },
+      });
+      if (error) throw error;
+      if (data?.url) window.open(data.url, "_blank");
+    } catch (err: any) {
+      toast({ title: "Checkout failed", description: err.message, variant: "destructive" });
+    }
+    setBuyingId(null);
+  };
 
   return (
     <div className="min-h-screen">
@@ -65,42 +89,58 @@ export default function Graphics() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto pb-24">
-            {filtered.map((graphic) => (
-              <div
-                key={graphic.id}
-                className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300"
-              >
-                <div className="relative aspect-video overflow-hidden bg-muted">
-                  <img
-                    src={graphic.preview_url}
-                    alt={graphic.title}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                </div>
-                <div className="p-4 space-y-3">
-                  <div>
-                    <p className="text-xs text-primary uppercase tracking-wider mb-1">{graphic.category}</p>
-                    <h3 className="font-display text-sm font-semibold group-hover:text-primary transition-colors">
-                      {graphic.title}
-                    </h3>
-                    {graphic.description && (
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{graphic.description}</p>
-                    )}
+            {filtered.map((graphic) => {
+              const isFree = !graphic.price || graphic.price === 0;
+              return (
+                <div
+                  key={graphic.id}
+                  className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300"
+                >
+                  <div className="relative aspect-video overflow-hidden bg-muted">
+                    <img
+                      src={graphic.preview_url}
+                      alt={graphic.title}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-lg font-bold text-primary">Free</span>
-                    <a
-                      href={graphic.file_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors"
-                    >
-                      <Download className="h-3.5 w-3.5" /> Download
-                    </a>
+                  <div className="p-4 space-y-3">
+                    <div>
+                      <p className="text-xs text-primary uppercase tracking-wider mb-1">{graphic.category}</p>
+                      <h3 className="font-display text-sm font-semibold group-hover:text-primary transition-colors">
+                        {graphic.title}
+                      </h3>
+                      {graphic.description && (
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{graphic.description}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-lg font-bold text-primary">
+                        {isFree ? "Free" : `$${Number(graphic.price).toFixed(2)}`}
+                      </span>
+                      {isFree ? (
+                        <a
+                          href={graphic.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors"
+                        >
+                          <Download className="h-3.5 w-3.5" /> Download
+                        </a>
+                      ) : (
+                        <button
+                          onClick={() => handleBuy(graphic)}
+                          disabled={buyingId === graphic.id}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+                        >
+                          <ShoppingCart className="h-3.5 w-3.5" />
+                          {buyingId === graphic.id ? "Processing…" : "Buy Now"}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
