@@ -366,6 +366,33 @@ export type Database = {
         }
         Relationships: []
       }
+      members: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          name: string
+          plan: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+          plan?: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          plan?: string
+          status?: string
+        }
+        Relationships: []
+      }
       membership_plans: {
         Row: {
           created_at: string
