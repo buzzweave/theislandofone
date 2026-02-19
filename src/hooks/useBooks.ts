@@ -16,10 +16,10 @@ export interface Book {
   author: string;
   description: string;
   price: number;
-  is_free: boolean;
+  is_free: number | boolean;
   category: string;
   cover_image: string;
-  featured: boolean;
+  featured: number | boolean;
   audio_url: string | null;
   pdf_url: string;
   sort_order: number;

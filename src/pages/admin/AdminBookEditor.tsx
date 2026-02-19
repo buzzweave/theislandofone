@@ -127,14 +127,15 @@ export default function AdminBookEditor() {
         author: "Bryant Clark",
         description: "",
         price: 0,
-        is_free: true,
+        is_free: 1,
         category: "Faith",
         cover_image: "",
-        featured: false,
+        featured: 0,
         audio_url: null,
         pdf_url: "",
         sort_order: 0,
         access_tiers: [],
+        chapters: [],
       });
       setActiveId(result.id);
     } catch (err: any) {
@@ -185,7 +186,7 @@ export default function AdminBookEditor() {
     savingRef.current = true;
 
     try {
-      await updateBookMut.mutateAsync({ id: local.id, ...local });
+      await updateBookMut.mutateAsync({ id: local.id, ...local, is_free: local.is_free ? 1 : 0, featured: local.featured ? 1 : 0 });
 
       setDirty(false);
       setLastSavedAt(new Date());
@@ -498,7 +499,7 @@ export default function AdminBookEditor() {
                   <p className="text-xs text-muted-foreground">Show this book in the featured section.</p>
                 </div>
                 <Switch
-                  checked={local.featured}
+                  checked={!!local.featured}
                   onCheckedChange={(v) => updateLocal({ featured: v })}
                 />
               </div>

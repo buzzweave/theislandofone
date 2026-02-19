@@ -10,8 +10,8 @@ export interface Sermon {
   excerpt: string;
   manuscript: string;
   audio_url: string | null;
-  featured: boolean;
-  is_free: boolean;
+  featured: number | boolean;
+  is_free: number | boolean;
   price: number;
   sort_order: number;
   access_level: string;
