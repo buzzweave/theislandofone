@@ -429,6 +429,57 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      purchases: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          item_id: string
+          item_type: string
+          stripe_session_id: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          id?: string
+          item_id: string
+          item_type: string
+          stripe_session_id: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          item_id?: string
+          item_type?: string
+          stripe_session_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       sermons: {
         Row: {
           access_level: string
