@@ -107,7 +107,7 @@ export default function AdminGraphics() {
     setLoadingAll(false);
   }, [graphics]);
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["graphics"] });
