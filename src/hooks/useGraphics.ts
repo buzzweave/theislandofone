@@ -10,6 +10,7 @@ export interface Graphic {
   preview_url: string;
   file_url: string;
   is_active: boolean;
+  access_tiers: string[];
   sort_order: number;
   created_at: string;
   updated_at: string;

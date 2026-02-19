@@ -5,7 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useAuth } from "@/contexts/AuthContext";
-import { getTierByProductId } from "@/lib/stripe";
+import { getTierByProductId, tierHasAccess } from "@/lib/stripe";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function Graphics() {
@@ -44,7 +44,11 @@ export default function Graphics() {
     return matchesCategory && matchesSearch;
   });
 
-  const hasAccess = (graphicId: string) => isInnerCircle || purchasedIds.has(graphicId);
+  const userTier = getTierByProductId(subscription.product_id);
+  const hasAccess = (graphic: Graphic) => {
+    if (isInnerCircle || purchasedIds.has(graphic.id)) return true;
+    return tierHasAccess(userTier, (graphic as any).access_tiers || []);
+  };
 
   const handleBuy = async (graphic: Graphic) => {
     if (!user) {
@@ -128,7 +132,7 @@ export default function Graphics() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto pb-24">
             {filtered.map((graphic) => {
-              const unlocked = hasAccess(graphic.id);
+              const unlocked = hasAccess(graphic);
               return (
                 <div
                   key={graphic.id}

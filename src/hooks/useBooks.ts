@@ -22,6 +22,7 @@ export interface Book {
   featured: boolean;
   audio_url: string | null;
   pdf_url: string;
+  access_tiers: string[];
   sort_order: number;
   created_at: string;
   updated_at: string;

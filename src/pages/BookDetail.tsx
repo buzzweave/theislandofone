@@ -4,6 +4,7 @@ import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, Crown, Download, FileTe
 import { exportBookToPdf, exportBookToEpub, exportBookToWord } from "@/lib/bookExport";
 import { useBook } from "@/hooks/useBooks";
 import { useAuth } from "@/contexts/AuthContext";
+import { getTierByProductId, tierHasAccess } from "@/lib/stripe";
 import { supabase } from "@/integrations/supabase/client";
 import SocialShareLinks from "@/components/SocialShareLinks";
 import FacebookComments from "@/components/FacebookComments";
@@ -20,7 +21,7 @@ export default function BookDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: book, isLoading } = useBook(id);
-  const { user, isSubscribed, checkPurchase } = useAuth();
+  const { user, isSubscribed, subscription, checkPurchase } = useAuth();
   const [openChapter, setOpenChapter] = useState<string | null>(null);
   const [purchased, setPurchased] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
@@ -56,7 +57,9 @@ export default function BookDetail() {
     );
   }
 
-  const canRead = book.is_free || purchased || isSubscribed;
+  const userTier = getTierByProductId(subscription.product_id);
+  const tierAccess = tierHasAccess(userTier, (book as any).access_tiers || []);
+  const canRead = book.is_free || purchased || isSubscribed || tierAccess;
 
   const toggleChapter = (chapterId: string) => {
     setOpenChapter(openChapter === chapterId ? null : chapterId);
