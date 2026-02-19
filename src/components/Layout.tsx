@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, BookOpen } from "lucide-react";
+import { Menu, X, BookOpen, User, LogOut } from "lucide-react";
 import { useSiteLogo } from "@/hooks/useSiteLogo";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import InstallPrompt from "@/components/InstallPrompt";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navLinks = [
   { to: "/", label: "Home" },
@@ -39,6 +40,7 @@ function SiteLogo({ sizeOverride }: { sizeOverride?: number }) {
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
+  const { user, signOut } = useAuth();
 
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => e.preventDefault();
@@ -81,12 +83,38 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </Link>
             ))}
             <InstallPrompt />
-            <Link
-              to="/membership"
-              className="px-5 py-2 text-sm font-semibold rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-            >
-              Join
-            </Link>
+            {user ? (
+              <div className="flex items-center gap-3">
+                <Link
+                  to="/membership"
+                  className="px-5 py-2 text-sm font-semibold rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  Join
+                </Link>
+                <button
+                  onClick={() => signOut()}
+                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  title="Sign out"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <Link
+                  to="/auth"
+                  className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
+                >
+                  <User className="h-4 w-4" /> Sign In
+                </Link>
+                <Link
+                  to="/membership"
+                  className="px-5 py-2 text-sm font-semibold rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  Join
+                </Link>
+              </div>
+            )}
           </div>
 
           {/* Mobile toggle */}
@@ -117,13 +145,30 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   {link.label}
                 </Link>
               ))}
+              {!user && (
+                <Link
+                  to="/auth"
+                  onClick={() => setMenuOpen(false)}
+                  className="mt-2 px-5 py-2.5 text-center text-sm font-semibold rounded-full border border-primary/30 text-foreground"
+                >
+                  Sign In
+                </Link>
+              )}
               <Link
                 to="/membership"
                 onClick={() => setMenuOpen(false)}
-                className="mt-3 px-5 py-2.5 text-center text-sm font-semibold rounded-full bg-primary text-primary-foreground"
+                className="mt-1 px-5 py-2.5 text-center text-sm font-semibold rounded-full bg-primary text-primary-foreground"
               >
                 Join the Community
               </Link>
+              {user && (
+                <button
+                  onClick={() => { signOut(); setMenuOpen(false); }}
+                  className="mt-1 px-5 py-2.5 text-center text-sm text-muted-foreground hover:text-foreground"
+                >
+                  Sign Out
+                </button>
+              )}
             </div>
           </div>
         )}
