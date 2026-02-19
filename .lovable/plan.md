@@ -1,88 +1,32 @@
 
 
-# Community Forum and Ministry Support Group - Implementation Plan
+# Fix Facebook Share Images -- Deployment and Configuration
 
-## Overview
+## Problem
+When sharing blog posts or books to Facebook, no images appear because:
+1. The `share-blog` and `share-book` backend functions are not deployed -- Facebook's crawler gets a 404
+2. The Facebook App ID is missing from the database settings
 
-Build two membership-gated discussion areas under `/community`:
-- **Community Forum** -- accessible to Reader tier and above
-- **Ministry Support Group** -- accessible to Pastor tier and above
+## Fix Steps
 
-## Database Changes (1 migration)
+### Step 1 -- Deploy the share functions
+Deploy `share-blog` and `share-book` so Facebook's crawler can reach the Open Graph metadata pages. No code changes needed -- these functions already exist and are correct.
 
-### New Tables
+### Step 2 -- Save your Facebook App ID
+Insert your Facebook App ID (`1169014871775113` based on the default in your code) into the `site_settings` table so the share pages include it in the `fb:app_id` meta tag.
 
-**forum_categories**
-- `id` (uuid, PK, default gen_random_uuid())
-- `name` (text, not null)
-- `description` (text, default '')
-- `slug` (text, unique, not null)
-- `tier_required` (text, default 'reader')
-- `sort_order` (int, default 0)
-- `created_at` (timestamptz, default now())
+This will be done via a small database migration:
+```sql
+INSERT INTO site_settings (key, value)
+VALUES ('fb_app_id', '1169014871775113')
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+```
 
-**forum_posts**
-- `id` (uuid, PK, default gen_random_uuid())
-- `category_id` (uuid, FK -> forum_categories, on delete cascade)
-- `user_id` (uuid, not null)
-- `author_name` (text, not null)
-- `title` (text, not null)
-- `content` (text, not null)
-- `is_pinned` (boolean, default false)
-- `is_locked` (boolean, default false)
-- `created_at` (timestamptz, default now())
-- `updated_at` (timestamptz, default now())
+### Step 3 -- Verify
+After deployment, test by pasting a share URL into Facebook's Sharing Debugger to confirm the image, title, and description appear correctly.
 
-**forum_replies**
-- `id` (uuid, PK, default gen_random_uuid())
-- `post_id` (uuid, FK -> forum_posts, on delete cascade)
-- `user_id` (uuid, not null)
-- `author_name` (text, not null)
-- `content` (text, not null)
-- `created_at` (timestamptz, default now())
-- `updated_at` (timestamptz, default now())
-
-### RLS Policies
-- Categories: SELECT for all authenticated users
-- Posts/Replies: SELECT for authenticated, INSERT where auth.uid() = user_id, UPDATE/DELETE where auth.uid() = user_id
-- Admins get full access on all three tables
-
-### Seed Data (6 categories)
-- General Discussion (reader)
-- Prayer Requests (reader)
-- Bible Study (reader)
-- Ministry Questions (pastor)
-- Pastor Resources (pastor)
-- Leadership Support (pastor)
-
-## New Files
-
-| File | Purpose |
-|------|---------|
-| `src/pages/Community.tsx` | Main forum landing -- shows categories grouped by tier |
-| `src/pages/ForumCategory.tsx` | Thread listing for a single category |
-| `src/pages/ForumThread.tsx` | Single thread with replies |
-| `src/hooks/useForum.ts` | React Query hooks for all forum CRUD |
-| `src/components/forum/TierGate.tsx` | Membership gate -- shows upgrade prompt if tier insufficient |
-
-## Modified Files
-
-| File | Change |
-|------|--------|
-| `src/App.tsx` | Add 3 routes: `/community`, `/community/:slug`, `/community/:slug/:postId` |
-| `src/components/Layout.tsx` | Add "Community" to navLinks array |
-
-## User Flow
-
-1. Click "Community" in navigation
-2. If not logged in, redirected to `/auth`
-3. See categories split into Community Forum and Ministry Support Group sections
-4. Pastor-tier categories show lock/upgrade prompt for Reader-tier users
-5. Click a category to see threads (pinned first, then newest)
-6. Create new threads or reply to existing ones
-7. Edit or delete own posts/replies
-
-## Tier Gating Logic
-
-Uses existing `getTierByProductId` and `tierHasAccess` from `src/lib/stripe.ts` combined with the `check-subscription` edge function to determine user's active tier. Categories with `tier_required = 'pastor'` are locked for Reader-tier users.
+## What stays the same
+- No changes to `share-blog/index.ts` or `share-book/index.ts` -- the code is already correct
+- No changes to `BlogPost.tsx`, `BookDetail.tsx`, or `SocialShareLinks.tsx`
+- The share URLs in the frontend already point to the correct function endpoints
 
