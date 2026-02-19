@@ -1,58 +1,31 @@
 
+# Fix Sermon, Book, and Blog Creation via VPS API
 
-# Revert All Content + Admin Auth to VPS API
+## Problem
+Creating new sermons and books fails because the VPS API expects integer values (`1`/`0`) for boolean fields, but the frontend sends JavaScript booleans (`true`/`false`). Books also need `chapters: []` in the creation payload.
 
-Restore sermons, books, graphics, blog, videos, and admin authentication to use your VPS API at `api.theislandofone.com` so all content creation and management works through your server.
+## Changes (5 files)
 
-## Changes Summary
+### 1. `src/pages/admin/AdminSermonEditor.tsx`
+- In `addNew` (line 93-112): Change `is_free: true` to `is_free: 1`, `featured: false` to `featured: 0`
+- Add `console.error` in catch block for debugging
+- In `handleSave` (line 140-142): Convert `is_free` and `featured` to `1`/`0` before sending
 
-| # | File | Change |
-|---|------|--------|
-| 1 | `src/contexts/AdminAuthContext.tsx` | Revert auth from database auth back to VPS API (`api.post("/api/auth/login")`, token refresh, `api.get("/api/auth/me")`) |
-| 2 | `src/hooks/useSermons.ts` | Replace all database queries with VPS API calls (`api.get/post/put/delete("/api/sermons/...")`) |
-| 3 | `src/hooks/useBooks.ts` | Replace database queries with VPS API calls; remove `useUpsertChapters` (VPS handles chapters inside book object) |
-| 4 | `src/hooks/useBlogPosts.ts` | Replace database queries with VPS API calls (`api.get/post/put/delete("/api/blog/...")`) |
-| 5 | `src/hooks/useGraphics.ts` | Replace database query with VPS API call (`api.get("/api/graphics")`) |
-| 6 | `src/hooks/useVideos.ts` | Replace database queries with VPS API calls (`api.get/post/put/delete("/api/videos/...")`) |
-| 7 | `src/pages/admin/AdminGraphics.tsx` | Replace edge function calls with VPS API calls (`api.get/post/put/delete("/api/graphics/...")`) |
-| 8 | `src/pages/admin/AdminBookEditor.tsx` | Remove `useUpsertChapters`; save chapters as part of book body via VPS; keep `api.upload` for file uploads |
+### 2. `src/pages/admin/AdminBookEditor.tsx`
+- In `addNew` (line 124-138): Change `is_free: true` to `is_free: 1`, `featured: false` to `featured: 0`, add `chapters: []`
+- In `handleSave` (line 188): Ensure `is_free` and `featured` are sent as `1`/`0`
 
-## Technical Details
+### 3. `src/pages/admin/AdminBlogManager.tsx`
+- In `handleSave` (line 148-151): Convert `is_published` to `1`/`0` before sending to VPS
 
-### Admin Auth (file 1)
-- Login: `api.post("/api/auth/login", { email, password })` stores token via `api.setToken()`
-- Session check on mount: `api.get("/api/auth/me")` with stored token
-- Token refresh: `api.post("/api/auth/refresh")` every 4 minutes while authenticated
-- Logout: `api.clearToken()`
-- Forgot password: `api.post("/api/auth/forgot-password", { email })`
-- Remove `checkAdminRole`, database auth imports, and `onAuthStateChange` listener
+### 4. `src/hooks/useSermons.ts`
+- Update `Sermon` interface: `is_free` and `featured` typed as `number | boolean`
 
-### Content Hooks (files 2-6)
-All follow the same REST pattern using the `api` client from `src/lib/api.ts`:
-```text
-List:    api.get("/api/{resource}")
-Single:  api.get("/api/{resource}/{id}")
-Create:  api.post("/api/{resource}", body)
-Update:  api.put("/api/{resource}/{id}", body)
-Delete:  api.delete("/api/{resource}/{id}")
-```
+### 5. `src/hooks/useBooks.ts`
+- Update `Book` interface: `is_free` and `featured` typed as `number | boolean`
 
-### Books (file 3 + 8)
-- VPS returns chapters embedded in the book object (no separate `book_chapters` table queries)
-- `useUpsertChapters` is removed entirely
-- `AdminBookEditor.tsx` save sends `{ ...bookData, chapters }` to `api.put("/api/books/{id}", body)`
-
-### Graphics Admin (file 7)
-- Remove `adminApi()` helper and `getAdminToken()` functions
-- Fetch all (including inactive): `api.get("/api/graphics/admin")`
-- Create with file upload: `api.uploadMultiple("/api/graphics", { preview, file })`
-- Update: `api.put("/api/graphics/{id}", body)`
-- Delete: `api.delete("/api/graphics/{id}")`
-
-### What Stays the Same
-- `src/lib/api.ts` -- already correct, pointing to `VITE_API_URL`
-- All admin UI layouts -- no visual changes
-- Blog image uploads via storage bucket (ImageUploader in AdminBlogManager stays as-is)
-- Blog sync from VPS feature stays as-is
-- Database tables remain in place
-
+## What This Fixes
+- New sermon creation via the "+" button
+- New book creation via the "+" button
+- Blog post creation and updates
+- Saving existing sermons and books with correct data format
