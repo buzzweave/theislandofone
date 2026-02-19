@@ -126,7 +126,7 @@ export default function Membership() {
                         {loadingSlug === slug ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
-                          "Get Started"
+                          "Join Now"
                         )}
                       </button>
                     )}

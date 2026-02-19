@@ -29,3 +29,19 @@ export function getTierByProductId(productId: string | null): MembershipSlug | n
   }
   return null;
 }
+
+/** Tier hierarchy: inner-circle > pastor > reader */
+const TIER_RANK: Record<string, number> = {
+  reader: 1,
+  pastor: 2,
+  "inner-circle": 3,
+};
+
+/** Check if a user's tier grants access given the item's access_tiers array */
+export function tierHasAccess(userTier: MembershipSlug | null, accessTiers: string[]): boolean {
+  if (!accessTiers || accessTiers.length === 0) return false;
+  if (!userTier) return false;
+  const userRank = TIER_RANK[userTier] || 0;
+  const minRequired = Math.min(...accessTiers.map((t) => TIER_RANK[t] || 99));
+  return userRank >= minRequired;
+}

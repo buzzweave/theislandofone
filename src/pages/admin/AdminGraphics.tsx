@@ -262,6 +262,32 @@ export default function AdminGraphics() {
                       <Label className="text-xs">Description</Label>
                       <Input className="h-8 text-sm" defaultValue={graphic.description} onBlur={(e) => updateGraphic(graphic.id, { description: e.target.value })} />
                     </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Membership Access</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {(["reader", "pastor", "inner-circle"] as const).map((tier) => {
+                          const tiers = (graphic as any).access_tiers || [];
+                          const checked = tiers.includes(tier);
+                          const label = tier === "inner-circle" ? "Inner Circle" : tier.charAt(0).toUpperCase() + tier.slice(1);
+                          return (
+                            <button
+                              key={tier}
+                              onClick={() => {
+                                const next = checked ? tiers.filter((t: string) => t !== tier) : [...tiers, tier];
+                                updateGraphic(graphic.id, { access_tiers: next } as any);
+                              }}
+                              className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+                                checked
+                                  ? "bg-primary text-primary-foreground border-primary"
+                                  : "bg-card text-muted-foreground border-border hover:border-primary/40"
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                   {/* Action buttons row */}
                   <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border [&>button]:min-h-[44px]">

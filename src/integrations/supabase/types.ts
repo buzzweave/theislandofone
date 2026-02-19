@@ -188,6 +188,7 @@ export type Database = {
       }
       books: {
         Row: {
+          access_tiers: string[]
           audio_url: string | null
           author: string
           category: string
@@ -205,6 +206,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          access_tiers?: string[]
           audio_url?: string | null
           author?: string
           category?: string
@@ -222,6 +224,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          access_tiers?: string[]
           audio_url?: string | null
           author?: string
           category?: string
@@ -281,6 +284,7 @@ export type Database = {
       }
       graphics: {
         Row: {
+          access_tiers: string[]
           category: string
           created_at: string
           description: string
@@ -294,6 +298,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          access_tiers?: string[]
           category?: string
           created_at?: string
           description?: string
@@ -307,6 +312,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          access_tiers?: string[]
           category?: string
           created_at?: string
           description?: string
@@ -483,6 +489,7 @@ export type Database = {
       sermons: {
         Row: {
           access_level: string
+          access_tiers: string[]
           audio_url: string | null
           category: string
           created_at: string
@@ -501,6 +508,7 @@ export type Database = {
         }
         Insert: {
           access_level?: string
+          access_tiers?: string[]
           audio_url?: string | null
           category?: string
           created_at?: string
@@ -519,6 +527,7 @@ export type Database = {
         }
         Update: {
           access_level?: string
+          access_tiers?: string[]
           audio_url?: string | null
           category?: string
           created_at?: string

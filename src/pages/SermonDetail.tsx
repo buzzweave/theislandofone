@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { membershipPlans } from "@/data/content";
 import { useSermon } from "@/hooks/useSermons";
 import { useAuth } from "@/contexts/AuthContext";
+import { getTierByProductId, tierHasAccess } from "@/lib/stripe";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,7 +33,7 @@ export default function SermonDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: sermon, isLoading } = useSermon(id);
-  const { user, isSubscribed, checkPurchase } = useAuth();
+  const { user, isSubscribed, subscription, checkPurchase } = useAuth();
   const [purchased, setPurchased] = useState(false);
   const [checkingPurchase, setCheckingPurchase] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
@@ -70,7 +71,9 @@ export default function SermonDetail() {
 
   const paragraphs = sermon.manuscript.split("\n\n");
   const previewParagraphs = paragraphs.slice(0, sermon.preview_cutoff + 1);
-  const isFullAccess = sermon.is_free || purchased || isSubscribed;
+  const userTier = getTierByProductId(subscription.product_id);
+  const tierAccess = tierHasAccess(userTier, (sermon as any).access_tiers || []);
+  const isFullAccess = sermon.is_free || purchased || isSubscribed || tierAccess;
 
   const handlePurchase = async () => {
     if (!user) {

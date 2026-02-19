@@ -24,6 +24,7 @@ import {
   Lock,
   BookOpen,
   ArrowLeft,
+  Crown,
 } from "lucide-react";
 import { useSermons, useAddSermon, useUpdateSermon, useDeleteSermon, type Sermon } from "@/hooks/useSermons";
 import { useAIContent } from "@/contexts/AIContentContext";
@@ -103,6 +104,7 @@ export default function AdminSermonEditor() {
         featured: false,
         audio_url: null,
         sort_order: 0,
+        access_tiers: [],
       });
       setActiveId(result.id);
     } catch {
@@ -139,6 +141,7 @@ export default function AdminSermonEditor() {
         preview_cutoff: draft.preview_cutoff,
         featured: draft.featured,
         audio_url: draft.audio_url,
+        access_tiers: draft.access_tiers,
       });
       setDirty(false);
       toast.success("Sermon saved!");
@@ -358,6 +361,33 @@ export default function AdminSermonEditor() {
                   value={[(draft.preview_cutoff || 0) + 1]}
                   onValueChange={([v]) => update({ preview_cutoff: v - 1 })}
                 />
+              </div>
+
+              <div>
+                <p className="text-sm font-medium flex items-center gap-1.5 mb-2">
+                  <Crown className="h-3.5 w-3.5" /> Membership Access
+                </p>
+                <p className="text-xs text-muted-foreground mb-3">Select which membership tiers can access this sermon for free.</p>
+                <div className="flex flex-wrap gap-3">
+                  {(["reader", "pastor", "inner-circle"] as const).map((tier) => {
+                    const tiers = draft.access_tiers || [];
+                    const checked = tiers.includes(tier);
+                    return (
+                      <label key={tier} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => {
+                            const next = checked ? tiers.filter((t) => t !== tier) : [...tiers, tier];
+                            update({ access_tiers: next } as any);
+                          }}
+                          className="accent-primary h-4 w-4"
+                        />
+                        <span className="capitalize">{tier === "inner-circle" ? "Inner Circle" : tier.charAt(0).toUpperCase() + tier.slice(1)}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
             </CardContent>
           </Card>

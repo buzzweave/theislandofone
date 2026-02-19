@@ -15,6 +15,7 @@ export interface Sermon {
   preview_cutoff: number;
   featured: boolean;
   audio_url: string | null;
+  access_tiers: string[];
   sort_order: number;
   created_at: string;
   updated_at: string;
