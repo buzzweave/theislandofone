@@ -1,7 +1,6 @@
 import { useState, useRef } from "react";
 import { useAdminGraphics, Graphic } from "@/hooks/useGraphics";
-import { adminFetch } from "@/lib/adminApi";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Eye, EyeOff, Image, Maximize2, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -93,15 +92,6 @@ export default function AdminGraphics() {
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const [resizeGraphic, setResizeGraphic] = useState<Graphic | null>(null);
 
-  const uploadFile = async (file: File): Promise<string> => {
-    const ext = file.name.split(".").pop() || "png";
-    const path = `${crypto.randomUUID()}.${ext}`;
-    const { error } = await supabase.storage.from("graphics").upload(path, file);
-    if (error) throw error;
-    const { data } = supabase.storage.from("graphics").getPublicUrl(path);
-    return data.publicUrl;
-  };
-
   const handleAddClick = () => {
     const input = document.createElement("input");
     input.type = "file";
@@ -115,14 +105,16 @@ export default function AdminGraphics() {
       for (let i = 0; i < files.length; i++) {
         setUploadProgress({ current: i + 1, total: files.length });
         try {
-          const publicUrl = await uploadFile(files[i]);
+          const uploadRes = await api.upload<{ url: string }>("/api/upload", files[i]);
+          const publicUrl = uploadRes.url;
           const title = files[i].name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
-          await adminFetch("graphics-admin", "POST", {
+          await api.post("/api/graphics", {
             title,
             preview_url: publicUrl,
             file_url: publicUrl,
             sort_order: graphics.length + i,
             price: 4.99,
+            is_active: 1,
           });
         } catch (err: any) {
           console.error("Graphics upload failed:", err);
@@ -139,7 +131,9 @@ export default function AdminGraphics() {
 
   const updateGraphic = async (id: string, updates: Partial<Graphic>) => {
     try {
-      await adminFetch("graphics-admin", "PUT", { id, ...updates });
+      const payload: any = { ...updates };
+      if ("is_active" in payload) payload.is_active = payload.is_active ? 1 : 0;
+      await api.put(`/api/graphics/${id}`, payload);
       refetch();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -148,7 +142,7 @@ export default function AdminGraphics() {
 
   const deleteGraphic = async (id: string) => {
     try {
-      await adminFetch("graphics-admin", "DELETE", { id });
+      await api.delete(`/api/graphics/${id}`);
       toast({ title: "Graphic deleted" });
       refetch();
     } catch (err: any) {
