@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useGraphics, Graphic } from "@/hooks/useGraphics";
-import { ShoppingCart, Image, Crown, Search } from "lucide-react";
-import { Link } from "react-router-dom";
+import { ShoppingCart, Image, Crown, Search, Download } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { useAuth } from "@/contexts/AuthContext";
+import { getTierByProductId } from "@/lib/stripe";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Graphics() {
   const { graphics, isLoading } = useGraphics();
@@ -11,7 +14,27 @@ export default function Graphics() {
   const { value: watermarkUrl } = useSiteSettings("watermark_url");
   const [activeCategory, setActiveCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const [isInnerCircle] = useState(false); // Will be connected to real membership later
+  const { user, subscription, checkPurchase } = useAuth();
+  const navigate = useNavigate();
+  const [purchasedIds, setPurchasedIds] = useState<Set<string>>(new Set());
+  const [loadingPurchaseId, setLoadingPurchaseId] = useState<string | null>(null);
+
+  const isInnerCircle = getTierByProductId(subscription.product_id) === "inner-circle";
+
+  // Check which graphics the user has purchased
+  const loadPurchases = useCallback(async () => {
+    if (!user || isInnerCircle) return;
+    const ids = new Set<string>();
+    for (const g of graphics) {
+      const purchased = await checkPurchase("graphic", g.id);
+      if (purchased) ids.add(g.id);
+    }
+    setPurchasedIds(ids);
+  }, [user, graphics, checkPurchase, isInnerCircle]);
+
+  useEffect(() => {
+    loadPurchases();
+  }, [loadPurchases]);
 
   const categories = ["All", ...Array.from(new Set(graphics.map((g) => g.category)))];
   const filtered = graphics.filter((g) => {
@@ -21,8 +44,30 @@ export default function Graphics() {
     return matchesCategory && matchesSearch;
   });
 
-  const handleContactPurchase = (graphic: Graphic) => {
-    toast({ title: "Coming Soon", description: `Purchase for "${graphic.title}" will be available soon. Contact us for details.` });
+  const hasAccess = (graphicId: string) => isInnerCircle || purchasedIds.has(graphicId);
+
+  const handleBuy = async (graphic: Graphic) => {
+    if (!user) {
+      navigate("/auth");
+      return;
+    }
+    setLoadingPurchaseId(graphic.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-checkout", {
+        body: {
+          type: "graphic",
+          itemId: graphic.id,
+          priceAmount: graphic.price,
+          itemTitle: graphic.title,
+        },
+      });
+      if (error) throw error;
+      if (data?.url) window.open(data.url, "_blank");
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Could not start checkout", variant: "destructive" });
+    } finally {
+      setLoadingPurchaseId(null);
+    }
   };
 
   return (
@@ -82,57 +127,73 @@ export default function Graphics() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto pb-24">
-            {filtered.map((graphic) => (
-              <div
-                key={graphic.id}
-                className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300"
-              >
-                <div className="relative aspect-video overflow-hidden bg-muted">
-                  <img
-                    src={graphic.preview_url}
-                    alt={graphic.title}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                  {watermarkUrl && !isInnerCircle && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <img
-                        src={watermarkUrl}
-                        alt=""
-                        className="w-2/3 h-2/3 object-contain opacity-40 select-none"
-                        draggable={false}
-                      />
-                    </div>
-                  )}
-                  {isInnerCircle && (
-                    <span className="absolute top-2 left-2 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary text-primary-foreground font-semibold">
-                      <Crown className="h-2.5 w-2.5 inline mr-1" />Included
-                    </span>
-                  )}
-                </div>
-                <div className="p-4 space-y-3">
-                  <div>
-                    <p className="text-xs text-primary uppercase tracking-wider mb-1">{graphic.category}</p>
-                    <h3 className="font-display text-sm font-semibold group-hover:text-primary transition-colors">
-                      {graphic.title}
-                    </h3>
-                    {graphic.description && (
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{graphic.description}</p>
+            {filtered.map((graphic) => {
+              const unlocked = hasAccess(graphic.id);
+              return (
+                <div
+                  key={graphic.id}
+                  className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300"
+                >
+                  <div className="relative aspect-video overflow-hidden bg-muted">
+                    <img
+                      src={graphic.preview_url}
+                      alt={graphic.title}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                    {watermarkUrl && !unlocked && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <img
+                          src={watermarkUrl}
+                          alt=""
+                          className="w-2/3 h-2/3 object-contain opacity-40 select-none"
+                          draggable={false}
+                        />
+                      </div>
+                    )}
+                    {isInnerCircle && (
+                      <span className="absolute top-2 left-2 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary text-primary-foreground font-semibold">
+                        <Crown className="h-2.5 w-2.5 inline mr-1" />Included
+                      </span>
                     )}
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-lg font-bold text-primary">
-                      {isInnerCircle ? "Free" : `$${graphic.price}`}
-                    </span>
-                    <button
-                      onClick={() => handleContactPurchase(graphic)}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-primary/30 text-primary text-xs font-semibold hover:bg-primary/10 transition-colors"
-                    >
-                      <ShoppingCart className="h-3.5 w-3.5" /> Buy
-                    </button>
+                  <div className="p-4 space-y-3">
+                    <div>
+                      <p className="text-xs text-primary uppercase tracking-wider mb-1">{graphic.category}</p>
+                      <h3 className="font-display text-sm font-semibold group-hover:text-primary transition-colors">
+                        {graphic.title}
+                      </h3>
+                      {graphic.description && (
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{graphic.description}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-lg font-bold text-primary">
+                        {unlocked ? "Owned" : `$${graphic.price}`}
+                      </span>
+                      {unlocked ? (
+                        <a
+                          href={graphic.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors"
+                        >
+                          <Download className="h-3.5 w-3.5" /> Download
+                        </a>
+                      ) : (
+                        <button
+                          onClick={() => handleBuy(graphic)}
+                          disabled={loadingPurchaseId === graphic.id}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-primary/30 text-primary text-xs font-semibold hover:bg-primary/10 transition-colors disabled:opacity-50"
+                        >
+                          <ShoppingCart className="h-3.5 w-3.5" />
+                          {loadingPurchaseId === graphic.id ? "…" : "Buy"}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

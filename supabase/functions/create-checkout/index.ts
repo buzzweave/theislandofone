@@ -60,8 +60,14 @@ serve(async (req) => {
       });
     }
 
-    // One-time purchase (book or sermon)
+    // One-time purchase (book, sermon, or graphic)
     if (!priceAmount || !itemId) throw new Error("Missing price or item ID");
+
+    const cancelUrlMap: Record<string, string> = {
+      book: `${origin}/books/${itemId}`,
+      sermon: `${origin}/sermons/${itemId}`,
+      graphic: `${origin}/graphics`,
+    };
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -79,7 +85,7 @@ serve(async (req) => {
       mode: "payment",
       metadata: { item_type: type, item_id: itemId },
       success_url: `${origin}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/${type === "book" ? "books" : "sermons"}/${itemId}`,
+      cancel_url: cancelUrlMap[type] || `${origin}`,
     });
 
     return new Response(JSON.stringify({ url: session.url }), {
