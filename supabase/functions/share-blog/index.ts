@@ -1,43 +1,45 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
-const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const esc = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 Deno.serve(async (req: Request) => {
-  const headers = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  };
-
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers });
+    return new Response(null, { headers: corsHeaders });
   }
 
   const slug = new URL(req.url).searchParams.get("slug");
   if (!slug) {
-    return new Response("Missing slug", { status: 400, headers });
+    return new Response("Missing slug", { status: 400, headers: corsHeaders });
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const sbUrl = Deno.env.get("SUPABASE_URL")!;
+    const sbKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const [postResult, settingResult] = await Promise.all([
-      supabase.from("blog_posts").select("*").eq("slug", slug).eq("is_published", true).single(),
-      supabase.from("site_settings").select("value").eq("key", "fb_app_id").single(),
-    ]);
-
-    if (postResult.error || !postResult.data) {
-      return new Response("Not found", { status: 404, headers });
+    // Fetch blog post
+    const postRes = await fetch(`${sbUrl}/rest/v1/blog_posts?slug=eq.${encodeURIComponent(slug)}&is_published=eq.true&select=*&limit=1`, {
+      headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` },
+    });
+    const posts = await postRes.json();
+    if (!posts?.length) {
+      return new Response("Not found", { status: 404, headers: corsHeaders });
     }
+    const post = posts[0];
 
-    const post = postResult.data;
-    const fbAppId = settingResult.data?.value || "1169014871775113";
+    // Fetch fb_app_id
+    const settingRes = await fetch(`${sbUrl}/rest/v1/site_settings?key=eq.fb_app_id&select=value&limit=1`, {
+      headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` },
+    });
+    const settings = await settingRes.json();
+    const fbAppId = settings?.[0]?.value || "1169014871775113";
 
     const site = "https://theislandofone.com";
-    const link = site + "/blog/" + post.slug;
-    const fallbackImg = site + "/logo.png";
+    const link = `${site}/blog/${post.slug}`;
+    const fallbackImg = `${site}/logo.png`;
     const rawImg = post.image_url || fallbackImg;
     const img = rawImg.replace(/^http:\/\//i, "https://");
     const desc = post.excerpt || "Faith, healing, and belonging for the ones who felt alone.";
@@ -67,10 +69,10 @@ Deno.serve(async (req: Request) => {
 </body></html>`;
 
     return new Response(page, {
-      headers: { ...headers, "Content-Type": "text/html; charset=utf-8" },
+      headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" },
     });
   } catch (err) {
     console.error("share-blog error:", err);
-    return new Response("Internal error", { status: 500, headers });
+    return new Response("Internal error", { status: 500, headers: corsHeaders });
   }
 });
