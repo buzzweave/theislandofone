@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { useAdminVideos, useAddVideo, useUpdateVideo, useDeleteVideo, type Video } from "@/hooks/useVideos";
+import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,8 +11,6 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, Video as VideoIcon, ExternalLink, Upload, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { adminFetch } from "@/lib/adminApi";
 
 function ThumbnailUploader({ currentUrl, onUploaded }: { currentUrl: string; onUploaded: (url: string) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -23,12 +22,8 @@ function ThumbnailUploader({ currentUrl, onUploaded }: { currentUrl: string; onU
     if (!file) return;
     setUploading(true);
     try {
-      const ext = file.name.split(".").pop();
-      const path = `${crypto.randomUUID()}.${ext}`;
-      const { error } = await supabase.storage.from("video-thumbnails").upload(path, file);
-      if (error) throw error;
-      const { data: urlData } = supabase.storage.from("video-thumbnails").getPublicUrl(path);
-      onUploaded(urlData.publicUrl);
+      const res = await api.upload<{ url: string }>("/api/upload", file);
+      onUploaded(res.url);
     } catch (err: any) {
       toast({ title: "Upload failed", description: err.message, variant: "destructive" });
     }

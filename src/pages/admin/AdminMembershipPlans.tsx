@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { useMembershipPlans, MembershipPlan } from "@/hooks/useMembershipPlans";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Save, Plus, Trash2, X } from "lucide-react";
+import { Save, Plus, X } from "lucide-react";
 
 export default function AdminMembershipPlans() {
   const { plans, isLoading } = useMembershipPlans();
@@ -21,15 +21,14 @@ export default function AdminMembershipPlans() {
 
   const updatePlan = async (id: string, updates: Partial<MembershipPlan>) => {
     try {
-      const { error } = await supabase
-        .from("membership_plans")
-        .update(updates)
-        .eq("id", id);
-      if (error) throw error;
+      const payload: any = { ...updates };
+      if ("is_featured" in payload) payload.is_featured = payload.is_featured ? 1 : 0;
+      if ("price" in payload) payload.price = Number(payload.price) || 0;
+      await api.put(`/api/plans/${id}`, payload);
       toast({ title: "Plan updated" });
       invalidate();
     } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: "Save failed", description: err.message || "Unknown error", variant: "destructive" });
     }
   };
 

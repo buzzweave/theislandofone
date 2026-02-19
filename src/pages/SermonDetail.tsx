@@ -153,7 +153,7 @@ export default function SermonDetail() {
               {new Date(sermon.date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
               {" · "}By Bryant Clark
             </p>
-            <SocialShareLinks title={sermon.title} url={`https://zovakngafdwzbqhwvssf.supabase.co/functions/v1/share-sermon?id=${id}`} />
+            <SocialShareLinks title={sermon.title} url={`https://theislandofone.com/share/sermon/${id}`} />
 
             {isFullAccess && sermon.audio_url && (
               <div className="mt-6">

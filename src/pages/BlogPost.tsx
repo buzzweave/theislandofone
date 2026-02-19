@@ -1,7 +1,7 @@
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { ArrowLeft, Calendar, User } from "lucide-react";
 import { format } from "date-fns";
 import { extractParagraphs } from "@/lib/textFormat";
@@ -15,14 +15,10 @@ export default function BlogPost() {
   const { data: post, isLoading } = useQuery({
     queryKey: ["blog_post", slug],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("blog_posts")
-        .select("*")
-        .eq("slug", slug!)
-        .eq("is_published", true)
-        .single();
-      if (error) throw error;
-      return data;
+      const posts = await api.get<any[]>("/api/blog");
+      const found = posts.find((p: any) => p.slug === slug && (p.is_published === true || p.is_published === 1));
+      if (!found) throw new Error("Not found");
+      return found;
     },
     enabled: !!slug,
   });
@@ -113,7 +109,7 @@ export default function BlogPost() {
         <div className="mt-4 pt-6 border-t border-border">
           <SocialShareLinks
             title={post.title}
-            url={`https://zovakngafdwzbqhwvssf.supabase.co/functions/v1/share-blog?slug=${slug}`}
+            url={`https://theislandofone.com/share/blog/${slug}`}
           />
         </div>
         <div className="mt-6 pt-6 border-t border-border">

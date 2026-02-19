@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, PenLine, Upload, Eye, EyeOff, Facebook, RefreshCw, Download, Settings, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 type PostForm = {
@@ -44,12 +45,8 @@ function ImageUploader({ currentUrl, onUploaded }: { currentUrl: string; onUploa
     if (!file) return;
     setUploading(true);
     try {
-      const ext = file.name.split(".").pop() || "jpg";
-      const path = `${Date.now()}.${ext}`;
-      const { error } = await supabase.storage.from("blog-images").upload(path, file);
-      if (error) throw error;
-      const { data: urlData } = supabase.storage.from("blog-images").getPublicUrl(path);
-      onUploaded(urlData.publicUrl);
+      const res = await api.upload<{ url: string }>("/api/upload", file);
+      onUploaded(res.url);
     } catch (err: any) {
       toast({ title: "Upload failed", description: err.message, variant: "destructive" });
     }
@@ -172,7 +169,7 @@ export default function AdminBlogManager() {
   };
 
   const getShareUrl = (post: BlogPost) =>
-    `https://zovakngafdwzbqhwvssf.supabase.co/functions/v1/share-blog?slug=${post.slug}`;
+    `https://theislandofone.com/share/blog/${post.slug}`;
 
   const shareToFacebook = (post: BlogPost) => {
     const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(getShareUrl(post))}&quote=${encodeURIComponent(post.excerpt || post.title)}`;

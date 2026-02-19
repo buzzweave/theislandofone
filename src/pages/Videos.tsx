@@ -113,7 +113,7 @@ export default function Videos() {
                       <h3 className="font-display text-sm font-semibold group-hover:text-primary transition-colors mb-2">{video.title}</h3>
                       <div className="flex items-center gap-1.5">
                         <a
-                          href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(video.youtube_url || window.location.href)}`}
+                          href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`https://theislandofone.com/share/video/${video.id}`)}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
@@ -122,7 +122,7 @@ export default function Videos() {
                           <Facebook className="h-3 w-3" />
                         </a>
                         <a
-                          href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(video.title)}&url=${encodeURIComponent(video.youtube_url || window.location.href)}`}
+                          href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(video.title)}&url=${encodeURIComponent(`https://theislandofone.com/share/video/${video.id}`)}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
