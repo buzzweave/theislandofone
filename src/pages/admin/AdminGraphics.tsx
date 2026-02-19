@@ -1,8 +1,7 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import { useGraphics, Graphic } from "@/hooks/useGraphics";
-import { useQueryClient } from "@tanstack/react-query";
+import { useState, useRef } from "react";
+import { useAdminGraphics, Graphic } from "@/hooks/useGraphics";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { api } from "@/lib/api";
 import { Plus, Trash2, Eye, EyeOff, Image, Maximize2, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -87,60 +86,19 @@ function ResizeDialog({ graphic, open, onClose }: { graphic: Graphic | null; ope
 }
 
 export default function AdminGraphics() {
-  const { graphics, isLoading } = useGraphics();
-  const queryClient = useQueryClient();
+  const { graphics, isLoading, refetch } = useAdminGraphics();
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
-  const [allGraphics, setAllGraphics] = useState<Graphic[]>([]);
-  const [loadingAll, setLoadingAll] = useState(true);
+  const [resizeGraphic, setResizeGraphic] = useState<Graphic | null>(null);
 
-  // Fetch all graphics (including inactive) via VPS admin endpoint
-  const fetchAll = useCallback(async () => {
-    setLoadingAll(true);
-    try {
-      const data = await api.get<Graphic[]>("/api/graphics/admin");
-      setAllGraphics(data);
-    } catch {
-      setAllGraphics(graphics);
-    }
-    setLoadingAll(false);
-  }, [graphics]);
-
-  useEffect(() => { fetchAll(); }, [fetchAll]);
-
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ["graphics"] });
-    fetchAll();
-  };
-
-  const addGraphicSimple = async (file: File) => {
-    const form = new FormData();
-    form.append("preview", file);
-    form.append("file", file);
-    form.append("title", file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "));
-    form.append("sort_order", String(allGraphics.length));
-    form.append("price", "4.99");
-    await api.post("/api/graphics", form);
-  };
-
-  const updateGraphic = async (id: string, updates: Partial<Graphic>) => {
-    try {
-      await api.put(`/api/graphics/${id}`, updates);
-      invalidate();
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    }
-  };
-
-  const deleteGraphic = async (id: string) => {
-    try {
-      await api.delete(`/api/graphics/${id}`);
-      toast({ title: "Graphic deleted" });
-      invalidate();
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    }
+  const uploadFile = async (file: File): Promise<string> => {
+    const ext = file.name.split(".").pop() || "png";
+    const path = `${crypto.randomUUID()}.${ext}`;
+    const { error } = await supabase.storage.from("graphics").upload(path, file);
+    if (error) throw error;
+    const { data } = supabase.storage.from("graphics").getPublicUrl(path);
+    return data.publicUrl;
   };
 
   const handleAddClick = () => {
@@ -156,23 +114,48 @@ export default function AdminGraphics() {
       for (let i = 0; i < files.length; i++) {
         setUploadProgress({ current: i + 1, total: files.length });
         try {
-          await addGraphicSimple(files[i]);
+          const publicUrl = await uploadFile(files[i]);
+          const title = files[i].name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
+          const { error } = await supabase.from("graphics").insert({
+            title,
+            preview_url: publicUrl,
+            file_url: publicUrl,
+            sort_order: graphics.length + i,
+            price: 4.99,
+          });
+          if (error) throw error;
         } catch (err: any) {
           toast({ title: "Upload failed", description: `${files[i].name}: ${err.message}`, variant: "destructive" });
         }
       }
       toast({ title: `${files.length} graphic(s) uploaded` });
-      invalidate();
+      refetch();
       setUploading(false);
       setUploadProgress(null);
     };
     input.click();
   };
 
-  const [resizeGraphic, setResizeGraphic] = useState<Graphic | null>(null);
-  const displayGraphics = loadingAll ? [] : allGraphics;
+  const updateGraphic = async (id: string, updates: Partial<Graphic>) => {
+    const { error } = await supabase.from("graphics").update(updates).eq("id", id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      refetch();
+    }
+  };
 
-  if (loadingAll) return <div className="text-muted-foreground">Loading…</div>;
+  const deleteGraphic = async (id: string) => {
+    const { error } = await supabase.from("graphics").delete().eq("id", id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Graphic deleted" });
+      refetch();
+    }
+  };
+
+  if (isLoading) return <div className="text-muted-foreground">Loading…</div>;
 
   return (
     <div className="space-y-6">
@@ -189,20 +172,15 @@ export default function AdminGraphics() {
         </Button>
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        When adding: first select the preview image, then select the downloadable file (high-res image, PSD, ZIP, etc.)
-      </p>
-
-      {displayGraphics.length === 0 ? (
+      {graphics.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border p-12 text-center text-muted-foreground">
           <Image className="h-10 w-10 mx-auto mb-3 opacity-50" />
           No graphics yet. Add one to get started.
         </div>
       ) : (
         <div className="space-y-4">
-          {displayGraphics.map((graphic) => (
+          {graphics.map((graphic) => (
             <div key={graphic.id} className="rounded-lg border border-border bg-card overflow-hidden">
-              {/* Status badge */}
               <div className={`px-4 py-1.5 text-xs font-semibold uppercase tracking-wider flex items-center justify-between ${graphic.is_active ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>
                 <span className="flex items-center gap-1.5">
                   {graphic.is_active ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
@@ -260,7 +238,6 @@ export default function AdminGraphics() {
                       </div>
                     </div>
                   </div>
-                  {/* Action buttons row */}
                   <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border [&>button]:min-h-[44px]">
                     <Button
                       variant={graphic.is_active ? "outline" : "default"}
