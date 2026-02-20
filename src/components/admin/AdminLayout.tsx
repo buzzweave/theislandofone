@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
+import { AdminErrorBoundary } from "./AdminErrorBoundary";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { AIContentProvider } from "@/contexts/AIContentContext";
 import {
@@ -189,7 +190,9 @@ export default function AdminLayout() {
           {/* Content + AI sidebar */}
           <div className="flex-1 flex overflow-hidden">
             <div className="flex-1 overflow-y-auto p-4 md:p-6">
-              <Outlet />
+              <AdminErrorBoundary>
+                <Outlet />
+              </AdminErrorBoundary>
             </div>
 
             {/* AI Sidebar - desktop only */}

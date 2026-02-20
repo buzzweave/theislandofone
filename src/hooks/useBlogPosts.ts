@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { api } from "@/lib/api";
 
 export interface BlogPost {
@@ -19,9 +20,16 @@ export function useBlogPosts(publishedOnly = false) {
   return useQuery({
     queryKey: ["blog_posts", publishedOnly],
     queryFn: async () => {
-      const posts = await api.get<BlogPost[]>("/api/blog");
-      if (publishedOnly) return posts.filter((p) => p.is_published);
-      return posts;
+      let query = supabase
+        .from("blog_posts")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (publishedOnly) {
+        query = query.eq("is_published", true);
+      }
+      const { data, error } = await query;
+      if (error) throw new Error(error.message);
+      return data as BlogPost[];
     },
   });
 }

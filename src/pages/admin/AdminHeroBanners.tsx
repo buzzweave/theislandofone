@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { api } from "@/lib/api";
-import { useHeroBanners, HeroBanner } from "@/hooks/useHeroBanners";
+import { useAdminHeroBanners, HeroBanner } from "@/hooks/useHeroBanners";
 import { useSiteLogo } from "@/hooks/useSiteLogo";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useQueryClient } from "@tanstack/react-query";
@@ -290,7 +290,7 @@ function WatermarkSection() {
 }
 
 export default function AdminHeroBanners() {
-  const { banners, isLoading } = useHeroBanners();
+  const { banners, isLoading } = useAdminHeroBanners();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);

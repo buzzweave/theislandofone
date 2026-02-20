@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { api } from "@/lib/api";
 
 export interface BookChapterInput {
@@ -32,14 +33,35 @@ export interface Book {
 export function useBooks() {
   return useQuery({
     queryKey: ["books"],
-    queryFn: () => api.get<Book[]>("/api/books"),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("books")
+        .select("*")
+        .order("sort_order", { ascending: true });
+      if (error) throw new Error(error.message);
+      return data as Book[];
+    },
   });
 }
 
 export function useBook(id: string | undefined) {
   return useQuery({
     queryKey: ["books", id],
-    queryFn: () => api.get<Book>(`/api/books/${id}`),
+    queryFn: async () => {
+      const { data: book, error } = await supabase
+        .from("books")
+        .select("*")
+        .eq("id", id!)
+        .single();
+      if (error) throw new Error(error.message);
+      // Also fetch chapters
+      const { data: chapters } = await supabase
+        .from("book_chapters")
+        .select("*")
+        .eq("book_id", id!)
+        .order("sort_order", { ascending: true });
+      return { ...book, chapters: chapters || [] } as Book;
+    },
     enabled: !!id,
   });
 }

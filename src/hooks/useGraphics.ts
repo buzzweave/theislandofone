@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface Graphic {
   id: string;
@@ -16,26 +16,18 @@ export interface Graphic {
   updated_at: string;
 }
 
-function normalize(raw: any[]): Graphic[] {
-  return raw.map((g: any) => ({
-    ...g,
-    price: Number(g.price) || 0,
-    is_active: g.is_active === 1 || g.is_active === true,
-    access_tiers: Array.isArray(g.access_tiers)
-      ? g.access_tiers
-      : typeof g.access_tiers === "string"
-      ? JSON.parse(g.access_tiers || "[]")
-      : [],
-  }));
-}
-
 /** Public hook – returns active graphics only */
 export function useGraphics() {
   const { data: graphics = [], isLoading } = useQuery({
     queryKey: ["graphics"],
     queryFn: async () => {
-      const raw = await api.get<any[]>("/api/graphics");
-      return normalize(raw).filter((g) => g.is_active);
+      const { data, error } = await supabase
+        .from("graphics")
+        .select("*")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
+      if (error) throw new Error(error.message);
+      return data as Graphic[];
     },
   });
   return { graphics, isLoading };
@@ -46,8 +38,12 @@ export function useAdminGraphics() {
   const { data: graphics = [], isLoading, refetch } = useQuery({
     queryKey: ["graphics", "admin"],
     queryFn: async () => {
-      const raw = await api.get<any[]>("/api/graphics");
-      return normalize(raw);
+      const { data, error } = await supabase
+        .from("graphics")
+        .select("*")
+        .order("sort_order", { ascending: true });
+      if (error) throw new Error(error.message);
+      return data as Graphic[];
     },
   });
   return { graphics, isLoading, refetch };
