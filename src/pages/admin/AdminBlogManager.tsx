@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, PenLine, Upload, Eye, EyeOff, Facebook, RefreshCw, Download, Settings, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { api } from "@/lib/api";
+import { uploadToStorage } from "@/lib/supabaseUpload";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 type PostForm = {
@@ -45,8 +45,8 @@ function ImageUploader({ currentUrl, onUploaded }: { currentUrl: string; onUploa
     if (!file) return;
     setUploading(true);
     try {
-      const res = await api.upload<{ url: string }>("/api/upload", file);
-      onUploaded(res.url);
+      const url = await uploadToStorage("blog-images", file);
+      onUploaded(url);
     } catch (err: any) {
       toast({ title: "Upload failed", description: err.message, variant: "destructive" });
     }
