@@ -23,6 +23,10 @@ import {
   BookUp,
   Headphones,
   Bell as BellIcon,
+  Bot,
+  Search,
+  ClipboardList,
+  ScrollText,
 } from "lucide-react";
 import AISidebar from "./AISidebar";
 import NotificationBell from "./NotificationBell";
@@ -49,6 +53,15 @@ const navItems = [
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
+const aiDevNavItems = [
+  { to: "/admin/ai-developer", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/admin/ai-developer/console", label: "AI Console", icon: MessageSquare },
+  { to: "/admin/ai-developer/scan", label: "Site Scan", icon: Search },
+  { to: "/admin/ai-developer/plans", label: "Plans", icon: ClipboardList },
+  { to: "/admin/ai-developer/settings", label: "Settings", icon: Settings },
+  { to: "/admin/ai-developer/audit", label: "Audit Log", icon: ScrollText },
+];
+
 export default function AdminLayout() {
   const [aiSidebarOpen, setAiSidebarOpen] = useState(true);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -68,24 +81,32 @@ export default function AdminLayout() {
     return "sermon";
   };
 
+  const renderNavLinks = (items: typeof navItems) =>
+    items.map((item) => (
+      <Link
+        key={item.to}
+        to={item.to}
+        onClick={() => setMobileNavOpen(false)}
+        className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+          isActive(item.to, (item as any).end)
+            ? "bg-primary/10 text-primary font-medium"
+            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+        }`}
+      >
+        <item.icon className="h-4 w-4 shrink-0" />
+        <span>{item.label}</span>
+      </Link>
+    ));
+
   const NavContent = () => (
     <>
       <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
-        {navItems.map((item) => (
-          <Link
-            key={item.to}
-            to={item.to}
-            onClick={() => setMobileNavOpen(false)}
-            className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
-              isActive(item.to, item.end)
-                ? "bg-primary/10 text-primary font-medium"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted"
-            }`}
-          >
-            <item.icon className="h-4 w-4 shrink-0" />
-            <span>{item.label}</span>
-          </Link>
-        ))}
+        {renderNavLinks(navItems)}
+        <div className="my-3 border-t border-border" />
+        <div className="px-3 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+          <Bot className="h-3.5 w-3.5" /> AI Developer
+        </div>
+        {renderNavLinks(aiDevNavItems)}
       </nav>
       <div className="border-t border-border p-2">
         <button
