@@ -17,6 +17,7 @@ function normalizePath(p: string): string {
 }
 
 const DEFAULT_FORBIDDEN = [".env", ".env.*", "supabase/config.toml", "config", "secrets", "auth", "billing", "payments"];
+const DEFAULT_ALLOWED = ["src", "public", "supabase/functions"];
 
 function validatePaths(files: string[], allowed: string[], forbidden: string[]): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
@@ -274,7 +275,8 @@ serve(async (req) => {
         if (changes.length === 0) throw new Error("Plan has no changes array");
 
         const settingsMap = await getSettingsMap(serviceClient);
-        const allowed = (settingsMap.allowed_folders || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+        const allowedRaw = (settingsMap.allowed_folders || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+        const allowed = allowedRaw.length > 0 ? allowedRaw : DEFAULT_ALLOWED;
         const forbidden = (settingsMap.forbidden_folders || "").split(",").map((s: string) => s.trim()).filter(Boolean);
 
         const allPaths = changes.map((c: any) => c.path);
@@ -339,7 +341,8 @@ serve(async (req) => {
 
         const changes = plan.plan?.changes || [];
         const settingsMap = await getSettingsMap(serviceClient);
-        const allowed = (settingsMap.allowed_folders || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+        const allowedRaw = (settingsMap.allowed_folders || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+        const allowed = allowedRaw.length > 0 ? allowedRaw : DEFAULT_ALLOWED;
         const forbidden = (settingsMap.forbidden_folders || "").split(",").map((s: string) => s.trim()).filter(Boolean);
 
         const allPaths = changes.map((c: any) => c.path);
@@ -583,7 +586,8 @@ serve(async (req) => {
 
         const changes = backup.snapshot?.changes || [];
         const allPaths = changes.map((c: any) => c.path);
-        const allowed = (settingsMap.allowed_folders || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+        const allowedRaw2 = (settingsMap.allowed_folders || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+        const allowed = allowedRaw2.length > 0 ? allowedRaw2 : DEFAULT_ALLOWED;
         const forbidden = (settingsMap.forbidden_folders || "").split(",").map((s: string) => s.trim()).filter(Boolean);
         const validation = validatePaths(allPaths, allowed, forbidden);
         if (!validation.valid) throw new Error(`Path validation failed: ${validation.errors.join("; ")}`);
@@ -685,7 +689,8 @@ serve(async (req) => {
 
         const changes = backup.snapshot?.changes || [];
         const allPaths = changes.map((c: any) => c.path);
-        const allowed = (settingsMap.allowed_folders || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+        const allowedRaw3 = (settingsMap.allowed_folders || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+        const allowed = allowedRaw3.length > 0 ? allowedRaw3 : DEFAULT_ALLOWED;
         const forbidden = (settingsMap.forbidden_folders || "").split(",").map((s: string) => s.trim()).filter(Boolean);
         const validation = validatePaths(allPaths, allowed, forbidden);
         if (!validation.valid) throw new Error(`Path validation failed: ${validation.errors.join("; ")}`);
