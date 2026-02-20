@@ -59,6 +59,7 @@ export default function AdminBookEditor() {
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [dirty, setDirty] = useState(false);
   const savingRef = useRef(false);
+  const [loadingChapters, setLoadingChapters] = useState(false);
 
   useEffect(() => {
     if (!activeId && bookList.length > 0) {
@@ -66,11 +67,27 @@ export default function AdminBookEditor() {
     }
   }, [bookList]);
 
+  // Fetch chapters from database when a book is selected
   useEffect(() => {
     if (activeId) {
       const book = bookList.find((b) => b.id === activeId);
       if (book) {
-        setLocal({ ...book });
+        setLoadingChapters(true);
+        supabase
+          .from("book_chapters")
+          .select("*")
+          .eq("book_id", activeId)
+          .order("sort_order", { ascending: true })
+          .then(({ data: chapters, error }) => {
+            if (error) {
+              console.error("Failed to load chapters:", error);
+              setLocal({ ...book, chapters: [] });
+            } else {
+              setLocal({ ...book, chapters: chapters || [] });
+            }
+            setLoadingChapters(false);
+            setDirty(false);
+          });
       }
     } else {
       setLocal(null);
@@ -197,7 +214,11 @@ export default function AdminBookEditor() {
       // Save chapters to database
       if (chapters && chapters.length > 0) {
         // Delete existing chapters
-        await supabase.from("book_chapters").delete().eq("book_id", local.id);
+        const { error: delErr } = await supabase.from("book_chapters").delete().eq("book_id", local.id);
+        if (delErr) {
+          console.error("Chapter delete error:", delErr);
+          throw new Error("Failed to save chapters: " + delErr.message);
+        }
         // Insert all chapters
         const chapterRows = chapters.map((ch: any, i: number) => ({
           id: ch.id,
@@ -207,7 +228,10 @@ export default function AdminBookEditor() {
           sort_order: i,
         }));
         const { error: chErr } = await supabase.from("book_chapters").insert(chapterRows);
-        if (chErr) console.error("Chapter save error:", chErr);
+        if (chErr) {
+          console.error("Chapter insert error:", chErr);
+          throw new Error("Failed to save chapters: " + chErr.message);
+        }
       } else {
         await supabase.from("book_chapters").delete().eq("book_id", local.id);
       }

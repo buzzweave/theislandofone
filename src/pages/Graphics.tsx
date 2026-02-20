@@ -140,6 +140,11 @@ export default function Graphics() {
                       fetchPriority={filtered.indexOf(graphic) < 3 ? "high" : "low"}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+                      <span className="text-white/20 font-display text-lg sm:text-xl font-bold rotate-[-25deg] whitespace-nowrap">
+                        The Island of One
+                      </span>
+                    </div>
                   </div>
                   <div className="p-4 space-y-3">
                     <div>

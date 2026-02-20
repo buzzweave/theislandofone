@@ -34,12 +34,17 @@ export default function Blog() {
                 className="group rounded-xl border border-border bg-card overflow-hidden hover:shadow-lg transition-all"
               >
                 {post.image_url && (
-                <div className="aspect-[16/9] overflow-hidden bg-black/40 flex items-center justify-center">
+                <div className="relative aspect-[16/9] overflow-hidden bg-black/40 flex items-center justify-center">
                     <img
                       src={post.image_url}
                       alt={post.title}
                       className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                     />
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+                      <span className="text-white/20 font-display text-2xl sm:text-3xl font-bold rotate-[-25deg] whitespace-nowrap">
+                        The Island of One
+                      </span>
+                    </div>
                   </div>
                 )}
                 <div className="p-5">
