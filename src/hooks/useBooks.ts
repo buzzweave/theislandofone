@@ -34,6 +34,12 @@ export function useBooks() {
   return useQuery({
     queryKey: ["books"],
     queryFn: async () => {
+      try {
+        const vpsBooks = await api.get<Book[]>("/api/books");
+        if (Array.isArray(vpsBooks) && vpsBooks.length > 0) return vpsBooks;
+      } catch (e) {
+        console.warn("VPS books fetch failed, falling back to database:", e);
+      }
       const { data, error } = await supabase
         .from("books")
         .select("*")
@@ -48,13 +54,21 @@ export function useBook(id: string | undefined) {
   return useQuery({
     queryKey: ["books", id],
     queryFn: async () => {
+      try {
+        const vpsBook = await api.get<Book>(`/api/books/${id}`);
+        if (vpsBook && vpsBook.id) {
+          if (!vpsBook.chapters) vpsBook.chapters = [];
+          return vpsBook;
+        }
+      } catch (e) {
+        console.warn("VPS book fetch failed, falling back to database:", e);
+      }
       const { data: book, error } = await supabase
         .from("books")
         .select("*")
         .eq("id", id!)
         .single();
       if (error) throw new Error(error.message);
-      // Also fetch chapters
       const { data: chapters } = await supabase
         .from("book_chapters")
         .select("*")
