@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-admin-token, x-admin-secret, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 function normalizePath(p: string): string {
@@ -81,25 +81,56 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 2
 // --- End Phase 3 helpers ---
 
 async function verifyAdmin(req: Request) {
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader) throw new Error("No authorization header");
-  const token = authHeader.replace("Bearer ", "");
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-  const userClient = createClient(supabaseUrl, supabaseKey, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
-  });
-  const { data: { user }, error } = await userClient.auth.getUser();
-  if (error || !user) throw new Error("Invalid token");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-  const serviceClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const { data: roles } = await serviceClient
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", user.id)
-    .eq("role", "admin");
-  if (!roles || roles.length === 0) throw new Error("Not an admin");
-  return { user, serviceClient };
+  // Method 1: Supabase auth token
+  const authHeader = req.headers.get("Authorization");
+  if (authHeader) {
+    try {
+      const token = authHeader.replace("Bearer ", "");
+      const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+      const userClient = createClient(supabaseUrl, supabaseKey, {
+        global: { headers: { Authorization: `Bearer ${token}` } },
+      });
+      const { data: { user }, error } = await userClient.auth.getUser();
+      if (!error && user) {
+        const serviceClient = createClient(supabaseUrl, serviceRoleKey);
+        const { data: roles } = await serviceClient
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id)
+          .eq("role", "admin");
+        if (roles && roles.length > 0) {
+          return { user, serviceClient };
+        }
+      }
+    } catch { /* fall through to method 2 */ }
+  }
+
+  // Method 2: VPS admin token - validate against VPS API
+  const adminToken = req.headers.get("x-admin-token");
+  if (adminToken) {
+    try {
+      const vpsResponse = await fetch("https://api.theislandofone.com/api/auth/me", {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      });
+      if (vpsResponse.ok) {
+        const serviceClient = createClient(supabaseUrl, serviceRoleKey);
+        return { user: { id: "vps-admin-user" }, serviceClient };
+      }
+    } catch { /* VPS validation failed */ }
+  }
+
+  // Method 3: Shared admin secret (fallback)
+  const sharedToken = req.headers.get("x-admin-secret");
+  const expectedToken = Deno.env.get("AI_DEV_ADMIN_TOKEN");
+  if (expectedToken && sharedToken && sharedToken === expectedToken) {
+    const serviceClient = createClient(supabaseUrl, serviceRoleKey);
+    return { user: { id: "admin-token-user" }, serviceClient };
+  }
+
+  throw new Error("Invalid token");
 }
 
 async function getSettingsMap(serviceClient: any): Promise<Record<string, string>> {

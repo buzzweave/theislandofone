@@ -3,8 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 async function invokeAIDev(action: string, extra: Record<string, any> = {}) {
+  const headers: Record<string, string> = {};
+  const vpsToken = localStorage.getItem("admin_token");
+  if (vpsToken) {
+    headers["x-admin-token"] = vpsToken;
+  }
+
   const { data, error } = await supabase.functions.invoke("ai-dev-operator", {
     body: { action, ...extra },
+    headers,
   });
   if (error) throw new Error(error.message || "Edge function error");
   return data;
