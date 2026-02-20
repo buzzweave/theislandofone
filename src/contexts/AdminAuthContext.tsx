@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import { api } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AdminAuthContextType {
   isAuthenticated: boolean;
@@ -82,6 +83,15 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
         setIsAuthenticated(true);
         setFailedAttempts(0);
         setLockoutEnd(null);
+
+        // Also sign into Supabase so RLS policies work for admin mutations
+        try {
+          await supabase.auth.signInWithPassword({ email, password });
+        } catch {
+          // Supabase auth is optional — VPS auth is the primary gate
+          console.warn("Supabase admin sign-in failed — admin DB mutations may be limited");
+        }
+
         return true;
       } catch {
         const next = failedAttempts + 1;
@@ -107,6 +117,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     api.clearToken();
     setIsAuthenticated(false);
+    supabase.auth.signOut().catch(() => {});
   }, []);
 
   return (
