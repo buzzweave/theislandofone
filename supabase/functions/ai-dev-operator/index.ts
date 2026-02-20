@@ -43,6 +43,43 @@ function validatePaths(files: string[], allowed: string[], forbidden: string[]):
   return { valid: errors.length === 0, errors };
 }
 
+// --- Phase 3 helpers ---
+
+const SANITIZE_KEYS = new Set(["authorization", "token", "agent_token", "api_key", "apikey", "secret", "password"]);
+
+function sanitizePayload(obj: any): any {
+  if (obj === null || obj === undefined) return obj;
+  const clone = JSON.parse(JSON.stringify(obj));
+  function walk(o: any) {
+    if (typeof o !== "object" || o === null) return;
+    for (const key of Object.keys(o)) {
+      if (SANITIZE_KEYS.has(key.toLowerCase())) {
+        delete o[key];
+      } else {
+        walk(o[key]);
+      }
+    }
+  }
+  walk(clone);
+  return clone;
+}
+
+function parsePreservePaths(raw: string): string[] {
+  return raw.split(/[\n,]/).map((s: string) => s.trim()).filter(Boolean);
+}
+
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 25000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// --- End Phase 3 helpers ---
+
 async function verifyAdmin(req: Request) {
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) throw new Error("No authorization header");
@@ -454,6 +491,303 @@ serve(async (req) => {
           details: { keys: settings.map((s: any) => s.key) },
         });
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      case "deploy_test": {
+        const { environment } = body;
+        if (!environment) throw new Error("environment required");
+        const settingsMap = await getSettingsMap(serviceClient);
+        const agentUrl = settingsMap[`${environment}_agent_url`];
+        const agentToken = settingsMap[`${environment}_agent_token`];
+        if (!agentUrl || !agentToken) throw new Error(`Agent URL or token not configured for ${environment}`);
+
+        try {
+          const res = await fetchWithTimeout(agentUrl + "/deploy/test", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${agentToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ environment }),
+          });
+          const resData = await res.json();
+          await serviceClient.from("ai_dev_audit").insert({
+            action: "deploy_connection_tested",
+            details: { environment, success: res.ok },
+          });
+          return new Response(JSON.stringify(sanitizePayload(resData)), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        } catch (fetchErr: any) {
+          await serviceClient.from("ai_dev_audit").insert({
+            action: "deploy_connection_tested",
+            details: { environment, success: false, error: fetchErr.message },
+          });
+          throw new Error(`Agent connection failed: ${fetchErr.message}`);
+        }
+      }
+
+      case "deploy_preview": {
+        const { plan_id, environment } = body;
+        if (!plan_id || !environment) throw new Error("plan_id and environment required");
+
+        const settingsMap = await getSettingsMap(serviceClient);
+        const agentUrl = settingsMap[`${environment}_agent_url`];
+        const agentToken = settingsMap[`${environment}_agent_token`];
+        if (!agentUrl || !agentToken) throw new Error(`Agent not configured for ${environment}`);
+
+        if (settingsMap.block_deploy_when_allowed_folders_empty === "true" || !settingsMap.block_deploy_when_allowed_folders_empty) {
+          const allowed = (settingsMap.allowed_folders || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+          if (allowed.length === 0) throw new Error("Deploy blocked: allowed_folders is empty");
+        }
+
+        const { data: plan, error: pErr } = await serviceClient.from("ai_dev_plans").select("*").eq("id", plan_id).single();
+        if (pErr || !plan) throw new Error("Plan not found");
+        if (plan.status !== "applied") throw new Error(`Plan status is "${plan.status}", must be "applied"`);
+
+        const { data: backup } = await serviceClient
+          .from("ai_dev_backups")
+          .select("*")
+          .eq("plan_id", plan_id)
+          .eq("type", "apply")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+        if (!backup) throw new Error("No apply snapshot found");
+
+        const changes = backup.snapshot?.changes || [];
+        const allPaths = changes.map((c: any) => c.path);
+        const allowed = (settingsMap.allowed_folders || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+        const forbidden = (settingsMap.forbidden_folders || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+        const validation = validatePaths(allPaths, allowed, forbidden);
+        if (!validation.valid) throw new Error(`Path validation failed: ${validation.errors.join("; ")}`);
+
+        const preservePaths = parsePreservePaths(settingsMap.preserve_paths || "");
+        const bundle = { plan_id, version_tag: backup.version_tag, preserve_paths: preservePaths, changes };
+
+        // Insert deployment record with status running
+        const { data: deployment, error: depErr } = await serviceClient
+          .from("ai_dev_deployments")
+          .insert({ plan_id, environment, version_tag: backup.version_tag, status: "running", kind: "preview", request_payload: sanitizePayload(bundle) })
+          .select()
+          .single();
+        if (depErr) throw depErr;
+
+        try {
+          const res = await fetchWithTimeout(agentUrl + "/deploy/preview", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${agentToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify(bundle),
+          });
+          const resData = await res.json();
+          const finalStatus = res.ok ? "success" : "failed";
+          await serviceClient
+            .from("ai_dev_deployments")
+            .update({ status: finalStatus, response_payload: sanitizePayload(resData) })
+            .eq("id", deployment.id);
+
+          await serviceClient.from("ai_dev_audit").insert({
+            plan_id,
+            action: "deploy_preview_generated",
+            details: { environment, version_tag: backup.version_tag, status: finalStatus },
+          });
+
+          return new Response(JSON.stringify({ deployment_id: deployment.id, status: finalStatus, preview: sanitizePayload(resData) }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        } catch (fetchErr: any) {
+          const errorPayload = sanitizePayload({
+            error: fetchErr instanceof Error ? fetchErr.name : "UnknownError",
+            message: fetchErr instanceof Error ? fetchErr.message : "Agent call failed",
+            timestamp: new Date().toISOString(),
+          });
+          await serviceClient
+            .from("ai_dev_deployments")
+            .update({ status: "failed", response_payload: errorPayload })
+            .eq("id", deployment.id);
+          await serviceClient.from("ai_dev_audit").insert({
+            plan_id,
+            action: "deploy_preview_generated",
+            details: { environment, version_tag: backup.version_tag, status: "failed", error: fetchErr.message },
+          });
+          throw new Error(`Agent call failed: ${fetchErr.message}`);
+        }
+      }
+
+      case "deploy_push": {
+        const { plan_id, environment, confirm } = body;
+        if (!plan_id || !environment) throw new Error("plan_id and environment required");
+        if (confirm !== true) throw new Error("confirm must be true");
+
+        const settingsMap = await getSettingsMap(serviceClient);
+        const agentUrl = settingsMap[`${environment}_agent_url`];
+        const agentToken = settingsMap[`${environment}_agent_token`];
+        if (!agentUrl || !agentToken) throw new Error(`Agent not configured for ${environment}`);
+
+        const { data: plan, error: pErr } = await serviceClient.from("ai_dev_plans").select("*").eq("id", plan_id).single();
+        if (pErr || !plan) throw new Error("Plan not found");
+        if (plan.status !== "applied") throw new Error(`Plan status is "${plan.status}", must be "applied"`);
+
+        const { data: backup } = await serviceClient
+          .from("ai_dev_backups")
+          .select("*")
+          .eq("plan_id", plan_id)
+          .eq("type", "apply")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+        if (!backup) throw new Error("No apply snapshot found");
+
+        // Staging gate for production
+        if (environment === "production" && (settingsMap.require_staging_before_live !== "false")) {
+          const { data: stagingDeploy } = await serviceClient
+            .from("ai_dev_deployments")
+            .select("id")
+            .eq("plan_id", plan_id)
+            .eq("version_tag", backup.version_tag)
+            .eq("environment", "staging")
+            .eq("status", "success")
+            .eq("kind", "push")
+            .limit(1);
+          if (!stagingDeploy || stagingDeploy.length === 0) {
+            throw new Error("Staging deployment with matching version_tag required before production");
+          }
+        }
+
+        if (settingsMap.block_deploy_when_allowed_folders_empty === "true" || !settingsMap.block_deploy_when_allowed_folders_empty) {
+          const allowed = (settingsMap.allowed_folders || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+          if (allowed.length === 0) throw new Error("Deploy blocked: allowed_folders is empty");
+        }
+
+        const changes = backup.snapshot?.changes || [];
+        const allPaths = changes.map((c: any) => c.path);
+        const allowed = (settingsMap.allowed_folders || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+        const forbidden = (settingsMap.forbidden_folders || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+        const validation = validatePaths(allPaths, allowed, forbidden);
+        if (!validation.valid) throw new Error(`Path validation failed: ${validation.errors.join("; ")}`);
+
+        const preservePaths = parsePreservePaths(settingsMap.preserve_paths || "");
+        const bundle = { plan_id, version_tag: backup.version_tag, preserve_paths: preservePaths, changes };
+
+        const { data: deployment, error: depErr } = await serviceClient
+          .from("ai_dev_deployments")
+          .insert({ plan_id, environment, version_tag: backup.version_tag, status: "running", kind: "push", request_payload: sanitizePayload(bundle) })
+          .select()
+          .single();
+        if (depErr) throw depErr;
+
+        try {
+          const res = await fetchWithTimeout(agentUrl + "/deploy/push", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${agentToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify(bundle),
+          });
+          const resData = await res.json();
+          const finalStatus = res.ok ? "success" : "failed";
+          await serviceClient
+            .from("ai_dev_deployments")
+            .update({ status: finalStatus, response_payload: sanitizePayload(resData) })
+            .eq("id", deployment.id);
+
+          await serviceClient.from("ai_dev_audit").insert({
+            plan_id,
+            action: environment === "production" ? "production_deployed" : "staging_deployed",
+            details: { environment, version_tag: backup.version_tag, status: finalStatus },
+          });
+
+          return new Response(JSON.stringify({ deployment_id: deployment.id, status: finalStatus, result: sanitizePayload(resData) }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        } catch (fetchErr: any) {
+          const errorPayload = sanitizePayload({
+            error: fetchErr instanceof Error ? fetchErr.name : "UnknownError",
+            message: fetchErr instanceof Error ? fetchErr.message : "Agent call failed",
+            timestamp: new Date().toISOString(),
+          });
+          await serviceClient
+            .from("ai_dev_deployments")
+            .update({ status: "failed", response_payload: errorPayload })
+            .eq("id", deployment.id);
+          await serviceClient.from("ai_dev_audit").insert({
+            plan_id,
+            action: environment === "production" ? "production_deployed" : "staging_deployed",
+            details: { environment, version_tag: backup.version_tag, status: "failed", error: fetchErr.message },
+          });
+          throw new Error(`Agent call failed: ${fetchErr.message}`);
+        }
+      }
+
+      case "deploy_rollback": {
+        const { environment, version_tag, target_version_tag } = body;
+        if (!environment || !version_tag) throw new Error("environment and version_tag required");
+
+        const settingsMap = await getSettingsMap(serviceClient);
+        const agentUrl = settingsMap[`${environment}_agent_url`];
+        const agentToken = settingsMap[`${environment}_agent_token`];
+        if (!agentUrl || !agentToken) throw new Error(`Agent not configured for ${environment}`);
+
+        try {
+          const res = await fetchWithTimeout(agentUrl + "/deploy/rollback", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${agentToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ version_tag, target_version_tag }),
+          });
+          const resData = await res.json();
+
+          if (res.ok) {
+            await serviceClient.from("ai_dev_deployments").insert({
+              plan_id: "00000000-0000-0000-0000-000000000000",
+              environment,
+              version_tag,
+              status: "rolled_back",
+              kind: "push",
+              request_payload: sanitizePayload({ version_tag, target_version_tag }),
+              response_payload: sanitizePayload(resData),
+            });
+          } else {
+            await serviceClient.from("ai_dev_deployments").insert({
+              plan_id: "00000000-0000-0000-0000-000000000000",
+              environment,
+              version_tag,
+              status: "failed",
+              kind: "push",
+              request_payload: sanitizePayload({ version_tag, target_version_tag }),
+              response_payload: sanitizePayload(resData),
+            });
+          }
+
+          await serviceClient.from("ai_dev_audit").insert({
+            action: "deploy_rolled_back",
+            details: { environment, version_tag, target_version_tag, success: res.ok },
+          });
+
+          return new Response(JSON.stringify({ success: res.ok, result: sanitizePayload(resData) }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        } catch (fetchErr: any) {
+          const errorPayload = sanitizePayload({
+            error: fetchErr instanceof Error ? fetchErr.name : "UnknownError",
+            message: fetchErr instanceof Error ? fetchErr.message : "Agent call failed",
+            timestamp: new Date().toISOString(),
+          });
+          await serviceClient.from("ai_dev_deployments").insert({
+            plan_id: "00000000-0000-0000-0000-000000000000",
+            environment,
+            version_tag,
+            status: "failed",
+            kind: "push",
+            request_payload: sanitizePayload({ version_tag, target_version_tag }),
+            response_payload: errorPayload,
+          });
+          await serviceClient.from("ai_dev_audit").insert({
+            action: "deploy_rolled_back",
+            details: { environment, version_tag, target_version_tag, success: false, error: fetchErr.message },
+          });
+          throw new Error(`Agent rollback failed: ${fetchErr.message}`);
+        }
+      }
+
+      case "list_deployments": {
+        const { environment, kind, limit } = body;
+        let query = serviceClient
+          .from("ai_dev_deployments")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(limit || 50);
+        if (environment) query = query.eq("environment", environment);
+        if (kind) query = query.eq("kind", kind);
+        const { data, error: listErr } = await query;
+        if (listErr) throw listErr;
+        return new Response(JSON.stringify(data), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       default:
