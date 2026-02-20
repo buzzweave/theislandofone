@@ -6,6 +6,17 @@ import { useSiteSettings } from "@/hooks/useSiteSettings";
 import InstallPrompt from "@/components/InstallPrompt";
 import { useAuth } from "@/contexts/AuthContext";
 
+function useOgShareImage() {
+  const { value: ogImage } = useSiteSettings("og_share_image");
+  useEffect(() => {
+    if (!ogImage) return;
+    const ogMeta = document.querySelector('meta[property="og:image"]');
+    const twMeta = document.querySelector('meta[name="twitter:image"]');
+    if (ogMeta) ogMeta.setAttribute("content", ogImage);
+    if (twMeta) twMeta.setAttribute("content", ogImage);
+  }, [ogImage]);
+}
+
 const navLinks = [
   { to: "/", label: "Home" },
   { to: "/books", label: "Books" },
@@ -42,6 +53,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
   const { user, signOut } = useAuth();
+  useOgShareImage();
 
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => e.preventDefault();

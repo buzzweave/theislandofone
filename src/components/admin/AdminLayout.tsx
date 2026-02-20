@@ -31,6 +31,7 @@ import {
   Upload,
   Globe,
   History,
+  Mail,
 } from "lucide-react";
 import AISidebar from "./AISidebar";
 import NotificationBell from "./NotificationBell";
@@ -53,6 +54,7 @@ const navItems = [
   { to: "/admin/audiobooks", label: "Audiobooks", icon: Headphones },
   { to: "/admin/blog", label: "Blog", icon: PenLine },
   { to: "/admin/publisher", label: "Publisher", icon: BookUp },
+  { to: "/admin/crm", label: "Email CRM", icon: Mail },
   { to: "/admin/notifications", label: "Notifications", icon: BellIcon },
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];

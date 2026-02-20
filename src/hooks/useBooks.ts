@@ -38,7 +38,7 @@ export function useBooks() {
         .select("*")
         .order("sort_order", { ascending: true });
       if (error) throw new Error(error.message);
-      return data as Book[];
+      return (data || []).map((b: any) => ({ ...b, chapters: [] })) as Book[];
     },
   });
 }
