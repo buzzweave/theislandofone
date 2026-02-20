@@ -135,6 +135,9 @@ export default function Graphics() {
                     <img
                       src={graphic.preview_url}
                       alt={graphic.title}
+                      loading="lazy"
+                      decoding="async"
+                      fetchPriority={filtered.indexOf(graphic) < 3 ? "high" : "low"}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                   </div>
