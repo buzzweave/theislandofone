@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useAdminGraphics, Graphic } from "@/hooks/useGraphics";
 import { supabase } from "@/integrations/supabase/client";
 import { uploadToStorage } from "@/lib/supabaseUpload";
@@ -9,6 +9,31 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+/** Compress an image file to a smaller preview (max 800px, 70% quality JPEG) */
+async function createCompressedPreview(file: File): Promise<File> {
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.onload = () => {
+      const MAX = 800;
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) {
+        const ratio = Math.min(MAX / w, MAX / h);
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+      canvas.toBlob((blob) => {
+        resolve(new File([blob!], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" }));
+      }, "image/jpeg", 0.7);
+    };
+    img.onerror = () => resolve(file);
+    img.src = URL.createObjectURL(file);
+  });
+}
 
 const RESIZE_PRESETS = [
   { label: "Instagram Post", w: 1080, h: 1080, platform: "Instagram" },
@@ -108,8 +133,11 @@ export default function AdminGraphics() {
       for (let i = 0; i < files.length; i++) {
         setUploadProgress({ current: i + 1, total: files.length });
         try {
-          const previewUrl = await uploadToStorage("graphics", files[i], "previews");
-          const fileUrl = await uploadToStorage("graphics", files[i], "files");
+          const compressed = await createCompressedPreview(files[i]);
+          const [previewUrl, fileUrl] = await Promise.all([
+            uploadToStorage("graphics", compressed, "previews"),
+            uploadToStorage("graphics", files[i], "files"),
+          ]);
           const title = files[i].name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
           const { error } = await supabase.from("graphics").insert({
             title,
@@ -188,7 +216,7 @@ export default function AdminGraphics() {
               </div>
               <div className="flex flex-col md:flex-row">
                 <div className="relative w-full md:w-56 aspect-video md:aspect-auto md:h-48 shrink-0 bg-muted overflow-hidden">
-                  <img src={graphic.preview_url} alt={graphic.title} className="w-full h-full object-cover" />
+                  <img src={graphic.preview_url} alt={graphic.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                 </div>
                 <div className="flex-1 p-4 space-y-3">
                   <div className="flex-1 space-y-2">
