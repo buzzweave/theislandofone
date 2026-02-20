@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { api } from "@/lib/api";
 
 export interface Video {
   id: string;
@@ -53,12 +52,24 @@ export function useAddVideo() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (video: Partial<Video>) => {
-      return api.post<Video>("/api/videos", {
-        ...video,
-        featured: video.featured ? 1 : 0,
-        is_active: (video as any).is_active ? 1 : 0,
-        is_free: video.is_free ? 1 : 0,
-      });
+      const { data, error } = await supabase
+        .from("videos")
+        .insert({
+          title: video.title || "",
+          youtube_url: video.youtube_url || "",
+          thumbnail: video.thumbnail || "",
+          duration: video.duration || "",
+          category: video.category || "Ministry",
+          featured: !!video.featured,
+          is_active: video.is_active !== undefined ? !!video.is_active : true,
+          is_free: video.is_free !== undefined ? !!video.is_free : true,
+          price: video.price || 0,
+          sort_order: video.sort_order || 0,
+        })
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return data as Video;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["videos"] }),
   });
@@ -67,12 +78,21 @@ export function useAddVideo() {
 export function useUpdateVideo() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, sort_order, ...updates }: Partial<Video> & { id: string }) => {
+    mutationFn: async ({ id, ...updates }: Partial<Video> & { id: string }) => {
       const payload: any = { ...updates };
-      if ("featured" in updates) payload.featured = updates.featured ? 1 : 0;
-      if ("is_active" in updates) payload.is_active = updates.is_active ? 1 : 0;
-      if ("is_free" in updates) payload.is_free = updates.is_free ? 1 : 0;
-      return api.put<Video>(`/api/videos/${id}`, payload);
+      // Ensure booleans are actual booleans
+      if ("featured" in payload) payload.featured = !!payload.featured;
+      if ("is_active" in payload) payload.is_active = !!payload.is_active;
+      if ("is_free" in payload) payload.is_free = !!payload.is_free;
+      
+      const { data, error } = await supabase
+        .from("videos")
+        .update(payload)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return data as Video;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["videos"] }),
   });
@@ -82,7 +102,8 @@ export function useDeleteVideo() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      await api.delete(`/api/videos/${id}`);
+      const { error } = await supabase.from("videos").delete().eq("id", id);
+      if (error) throw new Error(error.message);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["videos"] }),
   });

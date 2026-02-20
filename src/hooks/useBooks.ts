@@ -34,6 +34,7 @@ export function useBooks() {
   return useQuery({
     queryKey: ["books"],
     queryFn: async () => {
+      // Try VPS first (source of truth for books with chapters)
       try {
         const vpsBooks = await api.get<Book[]>("/api/books");
         if (Array.isArray(vpsBooks) && vpsBooks.length > 0) return vpsBooks;
@@ -83,7 +84,32 @@ export function useBook(id: string | undefined) {
 export function useAddBook() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (book: Partial<Book>) => api.post<Book>("/api/books", book),
+    mutationFn: async (book: Partial<Book>) => {
+      // Try VPS first for books (manages chapters)
+      try {
+        return await api.post<Book>("/api/books", {
+          ...book,
+          is_free: book.is_free ? 1 : 0,
+          featured: book.featured ? 1 : 0,
+        });
+      } catch (e) {
+        console.warn("VPS add book failed, using database:", e);
+      }
+      // Fallback to Supabase
+      const payload: any = { ...book };
+      payload.is_free = !!payload.is_free;
+      payload.featured = !!payload.featured;
+      delete payload.chapters;
+      delete payload.access_tiers;
+      
+      const { data, error } = await supabase
+        .from("books")
+        .insert(payload)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return { ...data, chapters: [] } as Book;
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["books"] }),
   });
 }
@@ -91,8 +117,35 @@ export function useAddBook() {
 export function useUpdateBook() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...rest }: Partial<Book> & { id: string }) =>
-      api.put<Book>(`/api/books/${id}`, rest),
+    mutationFn: async ({ id, ...rest }: Partial<Book> & { id: string }) => {
+      // Try VPS first
+      try {
+        const { access_tiers, chapters, sort_order, ...bookData } = rest as any;
+        return await api.put<Book>(`/api/books/${id}`, {
+          ...bookData,
+          is_free: rest.is_free ? 1 : 0,
+          featured: rest.featured ? 1 : 0,
+        });
+      } catch (e) {
+        console.warn("VPS update book failed, using database:", e);
+      }
+      // Fallback to Supabase
+      const payload: any = { ...rest };
+      if ("is_free" in payload) payload.is_free = !!payload.is_free;
+      if ("featured" in payload) payload.featured = !!payload.featured;
+      delete payload.chapters;
+      delete payload.access_tiers;
+      delete payload.sort_order;
+      
+      const { data, error } = await supabase
+        .from("books")
+        .update(payload)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return data as Book;
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["books"] }),
   });
 }
@@ -100,7 +153,16 @@ export function useUpdateBook() {
 export function useDeleteBook() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.delete(`/api/books/${id}`),
+    mutationFn: async (id: string) => {
+      try {
+        await api.delete(`/api/books/${id}`);
+        return;
+      } catch (e) {
+        console.warn("VPS delete book failed, using database:", e);
+      }
+      const { error } = await supabase.from("books").delete().eq("id", id);
+      if (error) throw new Error(error.message);
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["books"] }),
   });
 }

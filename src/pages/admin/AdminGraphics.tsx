@@ -1,7 +1,9 @@
 import { useState, useRef } from "react";
 import { useAdminGraphics, Graphic } from "@/hooks/useGraphics";
-import { api } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
+import { uploadToStorage } from "@/lib/supabaseUpload";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Eye, EyeOff, Image, Maximize2, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -88,6 +90,7 @@ function ResizeDialog({ graphic, open, onClose }: { graphic: Graphic | null; ope
 export default function AdminGraphics() {
   const { graphics, isLoading, refetch } = useAdminGraphics();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const [resizeGraphic, setResizeGraphic] = useState<Graphic | null>(null);
@@ -105,17 +108,18 @@ export default function AdminGraphics() {
       for (let i = 0; i < files.length; i++) {
         setUploadProgress({ current: i + 1, total: files.length });
         try {
-          const uploadRes = await api.upload<{ url: string }>("/api/upload", files[i]);
-          const publicUrl = uploadRes.url;
+          const previewUrl = await uploadToStorage("graphics", files[i], "previews");
+          const fileUrl = await uploadToStorage("graphics", files[i], "files");
           const title = files[i].name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
-          await api.post("/api/graphics", {
+          const { error } = await supabase.from("graphics").insert({
             title,
-            preview_url: publicUrl,
-            file_url: publicUrl,
+            preview_url: previewUrl,
+            file_url: fileUrl,
             sort_order: graphics.length + i,
             price: 4.99,
-            is_active: 1,
+            is_active: true,
           });
+          if (error) throw new Error(error.message);
         } catch (err: any) {
           console.error("Graphics upload failed:", err);
           toast({ title: "Upload failed", description: `${files[i].name}: ${err.message}`, variant: "destructive" });
@@ -131,9 +135,8 @@ export default function AdminGraphics() {
 
   const updateGraphic = async (id: string, updates: Partial<Graphic>) => {
     try {
-      const payload: any = { ...updates };
-      if ("is_active" in payload) payload.is_active = payload.is_active ? 1 : 0;
-      await api.put(`/api/graphics/${id}`, payload);
+      const { error } = await supabase.from("graphics").update(updates).eq("id", id);
+      if (error) throw new Error(error.message);
       refetch();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -142,7 +145,8 @@ export default function AdminGraphics() {
 
   const deleteGraphic = async (id: string) => {
     try {
-      await api.delete(`/api/graphics/${id}`);
+      const { error } = await supabase.from("graphics").delete().eq("id", id);
+      if (error) throw new Error(error.message);
       toast({ title: "Graphic deleted" });
       refetch();
     } catch (err: any) {
