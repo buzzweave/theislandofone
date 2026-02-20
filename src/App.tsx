@@ -49,6 +49,12 @@ import ResetPassword from "./pages/ResetPassword";
 import Community from "./pages/Community";
 import ForumCategory from "./pages/ForumCategory";
 import ForumThread from "./pages/ForumThread";
+import AIDevDashboard from "./pages/admin/ai-developer/AIDevDashboard";
+import AIDevConsole from "./pages/admin/ai-developer/AIDevConsole";
+import AIDevSiteScan from "./pages/admin/ai-developer/AIDevSiteScan";
+import AIDevPlans from "./pages/admin/ai-developer/AIDevPlans";
+import AIDevSettings from "./pages/admin/ai-developer/AIDevSettings";
+import AIDevAuditLog from "./pages/admin/ai-developer/AIDevAuditLog";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -115,6 +121,12 @@ const App = () => (
               <Route path="publisher" element={<AdminPublisher />} />
               <Route path="notifications" element={<AdminNotifications />} />
               <Route path="settings" element={<AdminSettings />} />
+              <Route path="ai-developer" element={<AIDevDashboard />} />
+              <Route path="ai-developer/console" element={<AIDevConsole />} />
+              <Route path="ai-developer/scan" element={<AIDevSiteScan />} />
+              <Route path="ai-developer/plans" element={<AIDevPlans />} />
+              <Route path="ai-developer/settings" element={<AIDevSettings />} />
+              <Route path="ai-developer/audit" element={<AIDevAuditLog />} />
             </Route>
 
               <Route path="*" element={<NotFound />} />

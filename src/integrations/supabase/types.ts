@@ -14,6 +14,110 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_dev_audit: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json
+          id: string
+          plan_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json
+          id?: string
+          plan_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json
+          id?: string
+          plan_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_dev_audit_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "ai_dev_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_dev_plans: {
+        Row: {
+          created_at: string
+          id: string
+          mode: string
+          plan: Json | null
+          prompt: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mode?: string
+          plan?: Json | null
+          prompt: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mode?: string
+          plan?: Json | null
+          prompt?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ai_dev_scans: {
+        Row: {
+          created_at: string
+          id: string
+          results: Json
+          scan_type: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          results?: Json
+          scan_type?: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          results?: Json
+          scan_type?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      ai_dev_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value?: string
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
+      }
       audiobooks: {
         Row: {
           audio_url: string
