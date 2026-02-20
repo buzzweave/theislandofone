@@ -1,201 +1,231 @@
 
 
-# Phase 1: AI Developer Module (Plan-Only)
+# Phase 2: Metadata-Only Apply Workflow (Final Corrected)
 
 ## Summary
 
-Add a self-contained AI Developer module to the admin panel. This phase is plan-only -- the AI Console generates and stores structured plans but does not apply any changes. No existing admin pages, routes, tables, or components are modified except adding sidebar links and routes.
+Extend the AI Developer module with the complete Apply/Diff/Rollback pipeline. All operations are metadata-driven -- no project source files are read from disk. The original `ai_dev_plans.plan` JSON is never mutated after creation. Diff payloads are stored separately in `ai_dev_backups`. A new `version_tag` column on `ai_dev_backups` provides ISO timestamp identifiers for Phase 3 release tagging. Path normalization is hardened to handle backslashes, `./` prefixes, duplicate slashes, and `..` traversal attacks.
 
 ---
 
-## New Database Tables
+## Database Migration
 
-All prefixed with `ai_dev_` to avoid conflicts.
-
-### `ai_dev_plans`
-
-Stores every AI-generated plan with its prompt, mode, status, and result.
+### New table: `ai_dev_backups`
 
 | Column | Type | Default | Notes |
 |--------|------|---------|-------|
 | id | uuid | gen_random_uuid() | PK |
-| prompt | text | -- | User's natural language input |
-| mode | text | 'fix_bugs' | fix_bugs, build_feature, refactor, content_publish |
-| plan | jsonb | null | Structured plan JSON (summary, proposedChanges, filesToChange, filesToCreate, navChanges, dbChanges, risks, rollbackSteps, requiresApproval) |
-| status | text | 'draft' | draft, approved, rejected, applied, failed |
-| created_at | timestamptz | now() | |
-| updated_at | timestamptz | now() | |
-
-RLS: Admin-only for all operations.
-
-### `ai_dev_scans`
-
-Stores site scan results.
-
-| Column | Type | Default | Notes |
-|--------|------|---------|-------|
-| id | uuid | gen_random_uuid() | PK |
-| scan_type | text | 'full' | full, quick |
-| results | jsonb | '{}' | Scan findings |
-| status | text | 'completed' | running, completed, failed |
+| plan_id | uuid | not null | References plan conceptually |
+| type | text | 'apply' | 'diff' or 'apply' |
+| version_tag | text | not null | ISO timestamp string (e.g. 2026-02-20T14:30:00.000Z) for Phase 3 release identifier |
+| snapshot | jsonb | '{}' | For diff: computed diff payload + validation. For apply: plan patch metadata + validation + timestamp |
 | created_at | timestamptz | now() | |
 
-RLS: Admin-only for all operations.
-
-### `ai_dev_audit`
-
-Immutable log of all AI Developer actions.
-
-| Column | Type | Default | Notes |
-|--------|------|---------|-------|
-| id | uuid | gen_random_uuid() | PK |
-| plan_id | uuid | null | FK to ai_dev_plans (nullable) |
-| action | text | -- | plan_generated, plan_approved, plan_rejected, scan_run, settings_updated |
-| details | jsonb | '{}' | Context data |
-| created_at | timestamptz | now() | |
-
-RLS: Admin-only SELECT and INSERT. No UPDATE or DELETE (immutable).
-
-### `ai_dev_settings`
-
-Key-value settings for the AI Developer module.
-
-| Column | Type | Default | Notes |
-|--------|------|---------|-------|
-| key | text | -- | PK (e.g., ai_model, allowed_folders, forbidden_folders) |
-| value | text | '' | Setting value |
-| updated_at | timestamptz | now() | |
-
-RLS: Admin-only for all operations.
+RLS policies (admin-only):
+- SELECT for admins
+- INSERT for admins
+- DELETE for admins (future retention)
+- No UPDATE
 
 ---
 
-## Backend: Edge Function `ai-dev-operator`
+## Plan JSON Format (Immutable After Creation)
 
-Single edge function handling all operations via an `action` field in the request body:
+The `generate_plan` AI tool-calling schema is extended with a `changes` array:
 
-**Actions:**
-
-1. **generate_plan** -- Takes `prompt` and `mode`, calls Lovable AI (google/gemini-3-flash-preview) with tool calling to produce the structured plan JSON format, inserts into `ai_dev_plans`, logs to `ai_dev_audit`, returns the plan.
-
-2. **run_scan** -- Returns placeholder scan data (Phase 1), inserts into `ai_dev_scans`, logs to `ai_dev_audit`.
-
-3. **list_plans** -- Queries `ai_dev_plans` ordered by created_at desc.
-
-4. **approve_plan** -- Updates plan status to 'approved', logs to audit.
-
-5. **reject_plan** -- Updates plan status to 'rejected', logs to audit.
-
-6. **get_audit** -- Queries `ai_dev_audit` with optional search filter.
-
-7. **get_settings** / **update_settings** -- Read/write `ai_dev_settings`.
-
-Security: Uses service role key internally. Validates admin JWT from request Authorization header by checking `user_roles` table. Rate limit not needed in Phase 1 (admin-only).
-
-AI prompt design: The edge function sends the user's prompt to Lovable AI with a system prompt instructing it to return a structured plan via tool calling, using the exact plan JSON schema (summary, proposedChanges, filesToChange, filesToCreate, navChanges, dbChanges, risks, rollbackSteps, requiresApproval).
-
----
-
-## New Files
-
-| File | Purpose |
-|------|---------|
-| `src/pages/admin/ai-developer/AIDevDashboard.tsx` | Status cards (total plans, approved, scans run), recent activity |
-| `src/pages/admin/ai-developer/AIDevConsole.tsx` | Textarea prompt, mode dropdown, Generate Plan button, read-only JSON output |
-| `src/pages/admin/ai-developer/AIDevSiteScan.tsx` | Run Scan button, results list |
-| `src/pages/admin/ai-developer/AIDevPlans.tsx` | Plans list with status badges, click to view details with approve/reject buttons |
-| `src/pages/admin/ai-developer/AIDevSettings.tsx` | Model name, allowed/forbidden folders fields |
-| `src/pages/admin/ai-developer/AIDevAuditLog.tsx` | Searchable table of all actions |
-| `src/hooks/useAIDev.ts` | React hook wrapping all edge function calls |
-| `supabase/functions/ai-dev-operator/index.ts` | Backend edge function |
-
-## Modified Files
-
-| File | Change |
-|------|--------|
-| `src/components/admin/AdminLayout.tsx` | Add "AI Developer" nav group with 6 items after existing nav items, using a Bot or Cpu icon |
-| `src/App.tsx` | Add 6 nested routes under `/admin/ai-developer/*` inside the existing admin Route group |
-
----
-
-## Sidebar Addition
-
-A new group labeled "AI Developer" added to the existing `navItems` array in AdminLayout.tsx with a separator/divider before it:
-
-- Dashboard (`/admin/ai-developer`) -- LayoutDashboard icon
-- AI Console (`/admin/ai-developer/console`) -- MessageSquare icon
-- Site Scan (`/admin/ai-developer/scan`) -- Search icon
-- Plans (`/admin/ai-developer/plans`) -- ClipboardList icon
-- Settings (`/admin/ai-developer/settings`) -- Settings icon
-- Audit Log (`/admin/ai-developer/audit`) -- ScrollText icon
-
----
-
-## Route Structure
-
-All routes are nested under the existing `<Route path="/admin">` group:
-
-```
-/admin/ai-developer          -> AIDevDashboard
-/admin/ai-developer/console  -> AIDevConsole
-/admin/ai-developer/scan     -> AIDevSiteScan
-/admin/ai-developer/plans    -> AIDevPlans
-/admin/ai-developer/settings -> AIDevSettings
-/admin/ai-developer/audit    -> AIDevAuditLog
-```
-
----
-
-## AI Console UI Details
-
-- Large textarea with placeholder: "Describe what you want to fix, build, or improve..."
-- Dropdown select for mode: "Fix bugs", "Build feature", "Refactor", "Content publish"
-- "Generate Plan" primary button
-- Loading state while AI processes
-- Read-only code block showing the returned plan JSON, formatted with syntax highlighting
-- Below the plan output: "Approve" and "Reject" buttons that update the plan status
-
----
-
-## Plan JSON Format
-
-```json
+```text
 {
-  "summary": "string",
-  "proposedChanges": "string",
-  "filesToChange": ["string"],
-  "filesToCreate": ["string"],
-  "navChanges": ["string"],
-  "dbChanges": ["string"],
-  "risks": "string",
-  "rollbackSteps": "string",
+  "summary": "...",
+  "proposedChanges": "...",
+  "filesToChange": ["path/to/file"],
+  "filesToCreate": ["path/to/new"],
+  "changes": [
+    {
+      "path": "src/pages/Foo.tsx",
+      "operation": "create" | "replace",
+      "before": "string | null",
+      "after": "string (required)",
+      "notes": "string | null"
+    }
+  ],
+  "navChanges": [...],
+  "dbChanges": [...],
+  "risks": "...",
+  "rollbackSteps": "...",
   "requiresApproval": true
 }
 ```
+
+Once stored in `ai_dev_plans.plan`, this JSON is never mutated.
+
+---
+
+## Edge Function Changes (`ai-dev-operator/index.ts`)
+
+### Path normalization helper (hardened)
+
+```text
+function normalizePath(p: string): string
+  1. Trim whitespace
+  2. Convert all backslashes to forward slashes
+  3. Strip leading "./"
+  4. Collapse duplicate slashes (e.g. "src//pages" -> "src/pages")
+  5. Remove trailing slash
+  6. Reject (throw error) if result contains ".."
+
+function validatePaths(files: string[], allowed: string[], forbidden: string[]): { valid: boolean, errors: string[] }
+  - Normalize all inputs (files, allowed entries, forbidden entries)
+  - If allowed is empty, return error "allowedPaths is empty -- Apply blocked"
+  - Each file must start with at least one normalized allowed entry
+  - No file may start with any normalized forbidden entry
+  - Default forbidden (if setting not configured):
+    .env, .env.*, supabase/config.toml, config, secrets, auth, billing, payments
+```
+
+### Updated action: `generate_plan`
+
+Add `changes` array to the AI tool-calling schema so the model returns per-file patch objects with `path`, `operation`, `before`, `after`, `notes`.
+
+### New action: `generate_diff`
+
+- Takes `plan_id`
+- Reads plan from `ai_dev_plans` (never mutates it)
+- Validates all paths using `validatePaths` (which uses hardened `normalizePath`)
+- Computes diff from plan metadata only:
+  - If `before` and `after` exist: unified diff text
+  - If only `after`: change summary with operation label and new content
+- Generates `version_tag` as `new Date().toISOString()`
+- Stores diff payload as a new row in `ai_dev_backups` with `type = 'diff'` and `version_tag`
+- Logs `diff_generated` to `ai_dev_audit`
+- Returns the diff payload and version_tag
+
+### New action: `apply_plan`
+
+- Takes `plan_id`
+- Verifies status is "approved"
+- Validates paths; refuses if allowed_folders is empty
+- Generates `version_tag` as `new Date().toISOString()`
+- Creates record in `ai_dev_backups` with `type = 'apply'`, `version_tag`, snapshot containing: plan changes array, validation results, timestamp
+- Updates plan status to "applied"
+- Logs `plan_applied` to `ai_dev_audit` with filesAffected, version_tag
+
+### New action: `rollback_plan`
+
+- Takes `plan_id`
+- Verifies status is "applied" OR "failed"
+- Updates plan status to "rolled_back"
+- Logs `plan_rolled_back` to `ai_dev_audit`
+
+### New action: `get_plan_status`
+
+- Takes `plan_id`
+- Returns plan record, related `ai_dev_backups` records (both diff and apply types), and related audit entries
+
+---
+
+## Hook Updates (`useAIDev.ts`)
+
+Add 4 new methods:
+- `generateDiff(plan_id: string)`
+- `applyPlan(plan_id: string)`
+- `rollbackPlan(plan_id: string)`
+- `getPlanStatus(plan_id: string)`
+
+---
+
+## New Page: `AIDevPlanDetail.tsx`
+
+Route: `/admin/ai-developer/plans/:id`
+
+1. **Header**: Plan summary, mode, date, prompt, status badge
+   - Status colors: Draft (gray), Approved (blue), Applied (green), Failed (red), Rolled Back (orange)
+
+2. **Diff Preview Panel**:
+   - Reads diff data from `ai_dev_backups` records where `type = 'diff'` (not from plan JSON)
+   - If no diff generated yet, shows "Generate Diff" button
+   - If `before` and `after` exist: unified diff view
+   - If only `after`: "New file" label with content preview
+   - Shows version_tag for each diff snapshot
+
+3. **Action Buttons**:
+   - "Generate Diff" -- validates paths, creates diff snapshot in ai_dev_backups
+   - "Apply Approved Plan" -- enabled only when status is "approved" and allowed_folders configured
+   - "Rollback" -- enabled when status is "applied" or "failed"
+
+4. **Confirmation Modals**:
+   - Apply: shows file count, affected paths, requires confirmation
+   - Rollback: simple confirmation
+
+5. **Audit Trail**: related audit entries for this plan
+
+---
+
+## Updated Pages
+
+### `AIDevPlans.tsx`
+- Status badges with colors: draft (gray), approved (blue), applied (green), failed (red), rolled_back (orange)
+- Each plan links to `/admin/ai-developer/plans/:id`
+- Show file counts from plan changes array
+
+### `AIDevSettings.tsx`
+- Update forbidden_folders placeholder to: `.env, .env.*, supabase/config.toml, config, secrets, auth, billing, payments`
+- Show warning when allowed_folders is empty: "Apply workflow is blocked until allowed folders are configured."
+
+---
+
+## Route Addition (`App.tsx`)
+
+Add inside admin route group after line 127:
+```text
+<Route path="ai-developer/plans/:id" element={<AIDevPlanDetail />} />
+```
+
+---
+
+## Files Summary
+
+### New files
+| File | Purpose |
+|------|---------|
+| `src/pages/admin/ai-developer/AIDevPlanDetail.tsx` | Plan detail with diff preview (from ai_dev_backups), apply/rollback, confirmation modals, audit trail |
+
+### Modified files
+| File | Change |
+|------|--------|
+| `supabase/functions/ai-dev-operator/index.ts` | Hardened normalizePath (backslashes, ./, //, .. rejection), validatePaths, generate_diff (stores to ai_dev_backups with version_tag), apply_plan (stores to ai_dev_backups with version_tag), rollback_plan (accepts applied OR failed), get_plan_status, extended generate_plan schema with changes array |
+| `src/hooks/useAIDev.ts` | Add generateDiff, applyPlan, rollbackPlan, getPlanStatus |
+| `src/pages/admin/ai-developer/AIDevPlans.tsx` | Status colors for all statuses, link each plan to detail page |
+| `src/pages/admin/ai-developer/AIDevSettings.tsx` | Updated forbidden placeholder, empty-allowed-folders warning |
+| `src/App.tsx` | Add plans/:id route |
+
+### Unchanged
+Everything outside the AI Developer namespace.
+
+---
+
+## Status Lifecycle
+
+```text
+Draft --> Approved --> Applied --> (success)
+  |         |            |
+  v         v            v
+Rejected  (stays)    Failed --> Rolled Back
+```
+
+- Only Approved plans can be Applied
+- Applied OR Failed plans can be Rolled Back
+- Every transition logged in ai_dev_audit
 
 ---
 
 ## Implementation Order
 
-1. Database migration -- 4 new tables with RLS policies
-2. Edge function -- `ai-dev-operator` with all actions
-3. React hook -- `useAIDev.ts`
-4. AI Console page (core feature)
-5. Plans page
-6. Site Scan page
-7. Dashboard page
-8. Settings page
-9. Audit Log page
-10. Route and sidebar integration in App.tsx and AdminLayout.tsx
-
----
-
-## What Is NOT Touched
-
-- No existing admin pages modified (Dashboard, Books, Sermons, etc.)
-- No existing database tables modified
-- No existing edge functions modified
-- No VPS/SSH deployment
-- No automatic code application -- plans are generated and stored only
-- No existing routes changed
+1. Database migration (ai_dev_backups table with type and version_tag columns)
+2. Edge function (hardened normalizePath + validatePaths + 4 new actions + extended generate_plan schema)
+3. Deploy edge function
+4. Hook updates (4 new methods)
+5. Plan Detail page (reads diff from ai_dev_backups, not plan JSON)
+6. Plans list updates (status colors, links)
+7. Settings page (forbidden defaults, empty-allowed warning)
+8. Route addition
 
