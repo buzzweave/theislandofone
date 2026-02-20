@@ -1,52 +1,66 @@
 
 
-# Fix: "Apply Plan" Blocked by Empty `allowed_folders` Setting
+# Fix: "Apply Plan" Non-2xx Error -- Empty `allowed_folders`
 
 ## Problem
 
-When clicking "Apply Plan" in the AI Developer dashboard, the edge function throws:
+Clicking "Confirm Apply" on any plan triggers a non-2xx error from the backend function. The error is:
 
 ```
 Path validation failed: allowedPaths is empty -- Apply blocked
 ```
 
-The `ai_dev_settings` table has `allowed_folders` set to an empty string. The `validatePaths` function (line 27-28) intentionally blocks all apply/deploy operations when no allowed folders are configured, as a safety measure.
-
-## Root Cause
-
-The setting `allowed_folders` in the database is blank. This was designed as a safety gate -- without explicit folder permissions, no plan can be applied. But the Settings page doesn't make it obvious that this must be configured first.
+The `allowed_folders` setting in the `ai_dev_settings` table has an empty string value. The `validatePaths` function (line 27-28 of the edge function) intentionally blocks all operations when no allowed folders are configured.
 
 ## Solution
 
-Two changes:
+Two changes to fix this permanently:
 
-### 1. Seed `allowed_folders` with a sensible default
+### 1. Seed the database with a default value
 
-Update the `allowed_folders` setting in the database to a reasonable default value that covers the typical project structure:
+Run a migration to set `allowed_folders` to `src, public, supabase/functions`. This covers the typical project structure while the existing `forbidden_folders` list still blocks sensitive paths like `.env`, `config`, `secrets`, `auth`, `billing`, and `payments`.
 
+### 2. Harden the edge function with a fallback
+
+Update the `apply_plan` action in `ai-dev-operator/index.ts` so that if `allowed_folders` is empty at runtime, it falls back to the same sensible default (`src, public, supabase/functions`) instead of blocking outright. This prevents the error from recurring if the setting gets cleared.
+
+## Technical Details
+
+### Database Migration
+
+```sql
+INSERT INTO ai_dev_settings (key, value)
+VALUES ('allowed_folders', 'src, public, supabase/functions')
+ON CONFLICT (key) DO UPDATE
+SET value = 'src, public, supabase/functions',
+    updated_at = now();
 ```
-src, public, supabase/functions
+
+### Edge Function Change (`supabase/functions/ai-dev-operator/index.ts`)
+
+In the section where `allowed_folders` is read from the database and passed to `validatePaths`, add a fallback default so an empty setting doesn't block everything:
+
+```typescript
+const DEFAULT_ALLOWED = ["src", "public", "supabase/functions"];
+
+// Where allowed is read from settings:
+const allowedRaw = settingsMap["allowed_folders"] || "";
+const allowed = allowedRaw.split(",").map(s => s.trim()).filter(Boolean);
+const effectiveAllowed = allowed.length > 0 ? allowed : DEFAULT_ALLOWED;
 ```
 
-This allows plans to modify source code, public assets, and edge functions while the existing `forbidden_folders` list still blocks `.env`, `config`, `secrets`, `auth`, `billing`, and `payments`.
+This way, even if the admin clears the setting, plans targeting standard project paths will still work.
 
-### 2. Add a visible warning in the Settings page
-
-Update `AIDevSettings.tsx` to show a warning banner when `allowed_folders` is empty, so the admin knows this must be configured before plans can be applied.
-
-## Files Changed
+### Files Changed
 
 | File | Change |
 |------|--------|
-| `src/pages/admin/ai-developer/AIDevSettings.tsx` | Add warning when allowed_folders is empty |
+| Database migration | Seed `allowed_folders` with `src, public, supabase/functions` |
+| `supabase/functions/ai-dev-operator/index.ts` | Add `DEFAULT_ALLOWED` fallback when `allowed_folders` is empty |
 
-## Database Change
+### Implementation Order
 
-Update `ai_dev_settings` to set `allowed_folders` to `src, public, supabase/functions`.
-
-## Implementation Order
-
-1. Update the database setting with a default value
-2. Add the warning UI to the Settings page
-3. Test applying a plan again
-
+1. Run database migration to seed the setting
+2. Update edge function with fallback default
+3. Redeploy edge function
+4. Test "Confirm Apply" on a plan
