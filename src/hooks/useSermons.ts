@@ -59,16 +59,26 @@ export function useAddSermon() {
       // Normalize booleans for DB
       if ("featured" in payload) payload.featured = !!payload.featured;
       if ("is_free" in payload) payload.is_free = payload.is_free === 1 || payload.is_free === true;
-      // Remove fields not in schema
-      delete payload.access_tiers;
-      delete payload.sort_order;
+      // Ensure audio_url is null not empty string
+      if (!payload.audio_url) payload.audio_url = null;
+      // Handle access_tiers - ensure it's an array
+      if ("access_tiers" in payload) {
+        if (typeof payload.access_tiers === "string") {
+          payload.access_tiers = payload.access_tiers.split(",").filter(Boolean);
+        }
+      } else {
+        payload.access_tiers = [];
+      }
       
       const { data, error } = await supabase
         .from("sermons")
         .insert(payload)
         .select()
         .single();
-      if (error) throw new Error(error.message);
+      if (error) {
+        console.error("Sermon insert error:", error);
+        throw new Error(error.message);
+      }
       return data as Sermon;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["sermons"] }),
@@ -83,6 +93,8 @@ export function useUpdateSermon() {
       // Normalize booleans
       if ("featured" in payload) payload.featured = payload.featured === 1 || payload.featured === true;
       if ("is_free" in payload) payload.is_free = payload.is_free === 1 || payload.is_free === true;
+      // Ensure audio_url is null not empty string
+      if ("audio_url" in payload && !payload.audio_url) payload.audio_url = null;
       // Handle access_tiers - ensure it's an array
       if ("access_tiers" in payload) {
         if (typeof payload.access_tiers === "string") {
@@ -96,7 +108,10 @@ export function useUpdateSermon() {
         .eq("id", id)
         .select()
         .single();
-      if (error) throw new Error(error.message);
+      if (error) {
+        console.error("Sermon update error:", error);
+        throw new Error(error.message);
+      }
       return data as Sermon;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["sermons"] }),
