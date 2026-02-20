@@ -55,6 +55,7 @@ import AIDevSiteScan from "./pages/admin/ai-developer/AIDevSiteScan";
 import AIDevPlans from "./pages/admin/ai-developer/AIDevPlans";
 import AIDevSettings from "./pages/admin/ai-developer/AIDevSettings";
 import AIDevAuditLog from "./pages/admin/ai-developer/AIDevAuditLog";
+import AIDevPlanDetail from "./pages/admin/ai-developer/AIDevPlanDetail";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -125,6 +126,7 @@ const App = () => (
               <Route path="ai-developer/console" element={<AIDevConsole />} />
               <Route path="ai-developer/scan" element={<AIDevSiteScan />} />
               <Route path="ai-developer/plans" element={<AIDevPlans />} />
+              <Route path="ai-developer/plans/:id" element={<AIDevPlanDetail />} />
               <Route path="ai-developer/settings" element={<AIDevSettings />} />
               <Route path="ai-developer/audit" element={<AIDevAuditLog />} />
             </Route>

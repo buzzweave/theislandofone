@@ -49,5 +49,22 @@ export function useAIDev() {
   const updateSettings = (settings: { key: string; value: string }[]) =>
     wrap(() => invokeAIDev("update_settings", { settings }));
 
-  return { loading, generatePlan, runScan, listPlans, approvePlan, rejectPlan, getAudit, getSettings, updateSettings };
+  const generateDiff = (plan_id: string) =>
+    wrap(() => invokeAIDev("generate_diff", { plan_id }));
+
+  const applyPlan = (plan_id: string) =>
+    wrap(() => invokeAIDev("apply_plan", { plan_id }));
+
+  const rollbackPlan = (plan_id: string) =>
+    wrap(() => invokeAIDev("rollback_plan", { plan_id }));
+
+  const getPlanStatus = (plan_id: string) =>
+    wrap(() => invokeAIDev("get_plan_status", { plan_id }));
+
+  return {
+    loading,
+    generatePlan, runScan, listPlans, approvePlan, rejectPlan,
+    getAudit, getSettings, updateSettings,
+    generateDiff, applyPlan, rollbackPlan, getPlanStatus,
+  };
 }

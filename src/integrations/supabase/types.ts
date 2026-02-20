@@ -46,6 +46,33 @@ export type Database = {
           },
         ]
       }
+      ai_dev_backups: {
+        Row: {
+          created_at: string
+          id: string
+          plan_id: string
+          snapshot: Json
+          type: string
+          version_tag: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          plan_id: string
+          snapshot?: Json
+          type?: string
+          version_tag: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          plan_id?: string
+          snapshot?: Json
+          type?: string
+          version_tag?: string
+        }
+        Relationships: []
+      }
       ai_dev_plans: {
         Row: {
           created_at: string
