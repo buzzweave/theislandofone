@@ -1,16 +1,26 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAIDev } from "@/hooks/useAIDev";
 import { useToast } from "@/hooks/use-toast";
-import { Check, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Check, X, ChevronRight } from "lucide-react";
+
+const STATUS_VARIANT: Record<string, string> = {
+  draft: "secondary",
+  approved: "default",
+  applied: "default",
+  failed: "destructive",
+  rolled_back: "outline",
+  rejected: "destructive",
+};
 
 export default function AIDevPlans() {
   const [plans, setPlans] = useState<any[]>([]);
-  const [expanded, setExpanded] = useState<string | null>(null);
   const { listPlans, approvePlan, rejectPlan, loading } = useAIDev();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const load = async () => {
     const data = await listPlans();
@@ -19,20 +29,16 @@ export default function AIDevPlans() {
 
   useEffect(() => { load(); }, []);
 
-  const handleApprove = async (id: string) => {
+  const handleApprove = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
     const res = await approvePlan(id);
     if (res) { toast({ title: "Plan approved" }); load(); }
   };
 
-  const handleReject = async (id: string) => {
+  const handleReject = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
     const res = await rejectPlan(id);
     if (res) { toast({ title: "Plan rejected" }); load(); }
-  };
-
-  const statusVariant = (s: string) => {
-    if (s === "approved") return "default";
-    if (s === "rejected") return "destructive";
-    return "secondary";
   };
 
   return (
@@ -43,42 +49,40 @@ export default function AIDevPlans() {
         <p className="text-muted-foreground text-sm">No plans yet. Generate one from the AI Console.</p>
       )}
 
-      {plans.map((p) => (
-        <Card key={p.id}>
-          <CardHeader
-            className="cursor-pointer flex flex-row items-center justify-between"
-            onClick={() => setExpanded(expanded === p.id ? null : p.id)}
+      {plans.map((p) => {
+        const changeCount = p.plan?.changes?.length || 0;
+        return (
+          <Card
+            key={p.id}
+            className="cursor-pointer hover:border-primary/40 transition-colors"
+            onClick={() => navigate(`/admin/ai-developer/plans/${p.id}`)}
           >
-            <div className="space-y-1 min-w-0">
-              <CardTitle className="text-sm truncate">{p.plan?.summary || p.prompt?.slice(0, 60)}</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                {p.mode.replace(/_/g, " ")} · {new Date(p.created_at).toLocaleDateString()}
-              </p>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <Badge variant={statusVariant(p.status)}>{p.status}</Badge>
-              {expanded === p.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </div>
-          </CardHeader>
-          {expanded === p.id && (
-            <CardContent className="space-y-4">
-              <pre className="bg-muted p-4 rounded-md text-xs overflow-auto max-h-80 whitespace-pre-wrap">
-                {JSON.stringify(p.plan, null, 2)}
-              </pre>
-              {p.status === "draft" && (
-                <div className="flex gap-2">
-                  <Button onClick={() => handleApprove(p.id)} disabled={loading} size="sm">
-                    <Check className="h-4 w-4 mr-1" /> Approve
-                  </Button>
-                  <Button onClick={() => handleReject(p.id)} disabled={loading} variant="destructive" size="sm">
-                    <X className="h-4 w-4 mr-1" /> Reject
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          )}
-        </Card>
-      ))}
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div className="space-y-1 min-w-0">
+                <CardTitle className="text-sm truncate">{p.plan?.summary || p.prompt?.slice(0, 60)}</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  {p.mode.replace(/_/g, " ")} · {new Date(p.created_at).toLocaleDateString()}
+                  {changeCount > 0 && ` · ${changeCount} file${changeCount !== 1 ? "s" : ""}`}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {p.status === "draft" && (
+                  <>
+                    <Button onClick={(e) => handleApprove(e, p.id)} disabled={loading} size="sm" variant="outline">
+                      <Check className="h-4 w-4" />
+                    </Button>
+                    <Button onClick={(e) => handleReject(e, p.id)} disabled={loading} variant="destructive" size="sm">
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
+                <Badge variant={STATUS_VARIANT[p.status] as any || "secondary"}>{p.status.replace(/_/g, " ")}</Badge>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </CardHeader>
+          </Card>
+        );
+      })}
     </div>
   );
 }

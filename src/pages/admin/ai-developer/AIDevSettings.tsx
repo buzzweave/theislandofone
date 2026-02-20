@@ -51,8 +51,13 @@ export default function AIDevSettings() {
           </div>
           <div className="space-y-2">
             <Label>Forbidden Folders</Label>
-            <Textarea value={settings.forbidden_folders || ""} onChange={(e) => update("forbidden_folders", e.target.value)} placeholder="node_modules, .env, auth" rows={3} />
+            <Textarea value={settings.forbidden_folders || ""} onChange={(e) => update("forbidden_folders", e.target.value)} placeholder=".env, .env.*, supabase/config.toml, config, secrets, auth, billing, payments" rows={3} />
           </div>
+          {(!settings.allowed_folders || settings.allowed_folders.trim() === "") && (
+            <p className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
+              ⚠️ Apply workflow is blocked until allowed folders are configured.
+            </p>
+          )}
           <Button onClick={handleSave} disabled={loading}>
             {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving…</> : "Save Settings"}
           </Button>
