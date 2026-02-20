@@ -1,38 +1,75 @@
 
 
-# Fix: Membership Plans Not Showing in Admin
+## Fix Remaining Warn-Level Security Issues
 
-## Root Cause
+### Issues to Address
 
-The VPS endpoint `GET /api/plans` does **not exist** -- it returns `Cannot GET /api/plans`. The `useMembershipPlans` hook tries to fetch from this endpoint, fails, and falls back to an empty array. That is why plans don't render.
+1. **RLS Policy Always True (7 findings)** -- Restrict write access on `blog_posts` and `site_settings` to admin-only. Mark `contact_submissions` INSERT as intentionally public.
 
-The original plan data lives in `src/data/content.ts` as a static `membershipPlans` export, and several other pages (Index, BookDetail, SermonDetail, AdminAnalytics) still import from there successfully.
+2. **Leaked Password Protection Disabled** -- Enable leaked password protection in auth configuration.
 
-## Fix Strategy
+3. **Dual Admin System** -- Update finding to reflect known architectural constraint (no code fix).
 
-Rewrite `useMembershipPlans` to use the static `membershipPlans` data from `src/data/content.ts` as the source, since the VPS plans endpoint does not exist. This restores plans in both the admin editor and the public Membership page.
+---
 
-## Changes
+### Step 1: Database Migration -- Secure `blog_posts` and `site_settings`
 
-### 1. `src/hooks/useMembershipPlans.ts`
+Create a migration that:
 
-- Remove the VPS API call to `/api/plans`
-- Import `membershipPlans` from `src/data/content`
-- Return the static data directly (mapped to the `MembershipPlan` interface with `is_featured` and `sort_order` defaults)
-- Keep the `useQuery` wrapper so the rest of the app works unchanged
+**blog_posts** -- Replace all permissive policies with admin-only:
+```sql
+DROP POLICY IF EXISTS "Anyone can insert blog posts" ON public.blog_posts;
+DROP POLICY IF EXISTS "Anyone can update blog posts" ON public.blog_posts;
+DROP POLICY IF EXISTS "Anyone can delete blog posts" ON public.blog_posts;
 
-### 2. `src/pages/admin/AdminMembershipPlans.tsx`
+CREATE POLICY "Admins can insert blog posts"
+  ON public.blog_posts FOR INSERT
+  WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
 
-- Remove the `api.put` call to `/api/plans/:id` (endpoint doesn't exist)
-- Change the save logic to show a toast explaining that plan changes must be updated in the static content file or on the VPS once the endpoint is created
-- Alternatively, keep the edit UI functional for preview but disable the save network call
+CREATE POLICY "Admins can update blog posts"
+  ON public.blog_posts FOR UPDATE
+  USING (has_role(auth.uid(), 'admin'::app_role));
 
-## What Does Not Change
+CREATE POLICY "Admins can delete blog posts"
+  ON public.blog_posts FOR DELETE
+  USING (has_role(auth.uid(), 'admin'::app_role));
+```
 
-- No routing changes
-- No other pages change (they already import from `src/data/content.ts`)
-- No new dependencies
+**site_settings** -- Replace permissive INSERT/UPDATE with admin-only:
+```sql
+DROP POLICY IF EXISTS "Anyone can insert site settings" ON public.site_settings;
+DROP POLICY IF EXISTS "Anyone can update site settings" ON public.site_settings;
 
-## Result
+CREATE POLICY "Admins can insert site settings"
+  ON public.site_settings FOR INSERT
+  WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
 
-Plans will show immediately in the admin panel and on the public Membership page using the existing static data.
+CREATE POLICY "Admins can update site settings"
+  ON public.site_settings FOR UPDATE
+  USING (has_role(auth.uid(), 'admin'::app_role));
+```
+
+### Step 2: Enable Leaked Password Protection
+
+Use the auth configuration tool to enable leaked password protection, which checks passwords against known breached password databases during signup and password changes.
+
+### Step 3: Update Security Findings
+
+- **Ignore** the remaining `SUPA_rls_policy_always_true` for `contact_submissions` INSERT (intentional public form)
+- **Mark** `dual_admin_system` as a known architectural constraint with increased remediation difficulty
+- **Delete** resolved findings after migration succeeds
+
+### Step 4: Verify Edge Function Compatibility
+
+Review `sync-blog-posts` edge function and any admin code that writes to `blog_posts` or `site_settings` to confirm they use service role (which bypasses RLS) or authenticated admin sessions. The `sync-blog-posts` function already uses `serviceClient` with `SUPABASE_SERVICE_ROLE_KEY`, so it will continue to work.
+
+---
+
+### Impact
+
+- Closes 5 of the 7 RLS "Always True" warnings (blog_posts x3, site_settings x2)
+- Marks remaining 2 as intentional (contact_submissions, speaking_requests)
+- Enables leaked password protection
+- Documents dual admin system as architectural decision
+- Also resolves the overlapping error-level findings for blog_posts and site_settings
+
