@@ -158,6 +158,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   {link.label}
                 </Link>
               ))}
+              <div className="px-3 py-2">
+                <InstallPrompt />
+              </div>
               {!user && (
                 <Link
                   to="/auth"

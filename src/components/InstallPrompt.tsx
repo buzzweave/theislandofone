@@ -53,7 +53,7 @@ export default function InstallPrompt() {
     <>
       <button
         onClick={handleClick}
-        className="hidden sm:inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors border border-primary/20"
+        className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors border border-primary/20"
       >
         <Download className="h-3.5 w-3.5" />
         Get App

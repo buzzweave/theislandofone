@@ -67,7 +67,7 @@ export default function AdminBookEditor() {
     }
   }, [bookList]);
 
-  // Fetch chapters from database when a book is selected
+  // Fetch chapters from database when a book is selected (only on activeId change)
   useEffect(() => {
     if (activeId) {
       const book = bookList.find((b) => b.id === activeId);
@@ -92,7 +92,19 @@ export default function AdminBookEditor() {
     } else {
       setLocal(null);
     }
-  }, [activeId, bookList]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId]);
+
+  // Sync book metadata (not chapters) when bookList updates
+  useEffect(() => {
+    if (activeId && local) {
+      const book = bookList.find((b) => b.id === activeId);
+      if (book) {
+        setLocal((prev) => prev ? { ...prev, title: book.title, subtitle: book.subtitle, author: book.author, category: book.category, cover_image: book.cover_image, price: book.price, is_free: book.is_free, featured: book.featured, pdf_url: book.pdf_url, audio_url: book.audio_url, sort_order: book.sort_order, access_tiers: book.access_tiers } : prev);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookList]);
 
   useEffect(() => {
     if (!local) {
