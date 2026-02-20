@@ -27,6 +27,9 @@ import {
   Search,
   ClipboardList,
   ScrollText,
+  Upload,
+  Globe,
+  History,
 } from "lucide-react";
 import AISidebar from "./AISidebar";
 import NotificationBell from "./NotificationBell";
@@ -58,6 +61,9 @@ const aiDevNavItems = [
   { to: "/admin/ai-developer/console", label: "AI Console", icon: MessageSquare },
   { to: "/admin/ai-developer/scan", label: "Site Scan", icon: Search },
   { to: "/admin/ai-developer/plans", label: "Plans", icon: ClipboardList },
+  { to: "/admin/ai-developer/deploy/staging", label: "Staging Deploy", icon: Upload },
+  { to: "/admin/ai-developer/deploy/live", label: "Live Deploy", icon: Globe },
+  { to: "/admin/ai-developer/deploy/history", label: "Deploy History", icon: History },
   { to: "/admin/ai-developer/settings", label: "Settings", icon: Settings },
   { to: "/admin/ai-developer/audit", label: "Audit Log", icon: ScrollText },
 ];

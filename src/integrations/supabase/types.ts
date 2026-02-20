@@ -73,6 +73,42 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_dev_deployments: {
+        Row: {
+          created_at: string
+          environment: string
+          id: string
+          kind: string
+          plan_id: string
+          request_payload: Json
+          response_payload: Json
+          status: string
+          version_tag: string
+        }
+        Insert: {
+          created_at?: string
+          environment: string
+          id?: string
+          kind?: string
+          plan_id: string
+          request_payload?: Json
+          response_payload?: Json
+          status: string
+          version_tag: string
+        }
+        Update: {
+          created_at?: string
+          environment?: string
+          id?: string
+          kind?: string
+          plan_id?: string
+          request_payload?: Json
+          response_payload?: Json
+          status?: string
+          version_tag?: string
+        }
+        Relationships: []
+      }
       ai_dev_plans: {
         Row: {
           created_at: string

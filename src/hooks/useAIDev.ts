@@ -61,10 +61,26 @@ export function useAIDev() {
   const getPlanStatus = (plan_id: string) =>
     wrap(() => invokeAIDev("get_plan_status", { plan_id }));
 
+  const testDeployAgent = (environment: string) =>
+    wrap(() => invokeAIDev("deploy_test", { environment }));
+
+  const previewDeploy = (plan_id: string, environment: string) =>
+    wrap(() => invokeAIDev("deploy_preview", { plan_id, environment }));
+
+  const pushDeploy = (plan_id: string, environment: string, confirm: boolean) =>
+    wrap(() => invokeAIDev("deploy_push", { plan_id, environment, confirm }));
+
+  const rollbackDeploy = (environment: string, version_tag: string, target_version_tag?: string) =>
+    wrap(() => invokeAIDev("deploy_rollback", { environment, version_tag, target_version_tag }));
+
+  const listDeployments = (environment?: string, kind?: string) =>
+    wrap(() => invokeAIDev("list_deployments", { environment, kind }));
+
   return {
     loading,
     generatePlan, runScan, listPlans, approvePlan, rejectPlan,
     getAudit, getSettings, updateSettings,
     generateDiff, applyPlan, rollbackPlan, getPlanStatus,
+    testDeployAgent, previewDeploy, pushDeploy, rollbackDeploy, listDeployments,
   };
 }
