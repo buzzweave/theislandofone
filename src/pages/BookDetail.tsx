@@ -298,9 +298,8 @@ export default function BookDetail() {
                                   Purchase this book to unlock all {book.chapters.length} chapters.
                                 </p>
                                 <Button size="sm" onClick={handlePurchase} disabled={checkoutLoading}>
-                                  {checkoutLoading ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <ShoppingCart className="h-3.5 w-3.5 mr-1" />} Buy for ${Number(book.price || 0).toFixed(2)}
-                                  <ShoppingCart className="h-3.5 w-3.5 mr-1" /> Buy for ${Number(book.price || 0).toFixed(2)}
-                                </Button>
+                                   {checkoutLoading ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <ShoppingCart className="h-3.5 w-3.5 mr-1" />} Buy for ${Number(book.price || 0).toFixed(2)}
+                                 </Button>
                               </div>
                             )}
                           </div>
