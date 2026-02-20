@@ -30,7 +30,8 @@ import { useAIContent } from "@/contexts/AIContentContext";
 import AudioGenerator from "@/components/admin/AudioGenerator";
 import PdfUploadButton from "@/components/admin/PdfUploadButton";
 import RichTextEditor from "@/components/admin/RichTextEditor";
-import { api } from "@/lib/api";
+import { uploadToStorage } from "@/lib/supabaseUpload";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -193,6 +194,24 @@ export default function AdminBookEditor() {
         audio_url: local.audio_url || "",
       });
 
+      // Save chapters to database
+      if (chapters && chapters.length > 0) {
+        // Delete existing chapters
+        await supabase.from("book_chapters").delete().eq("book_id", local.id);
+        // Insert all chapters
+        const chapterRows = chapters.map((ch: any, i: number) => ({
+          id: ch.id,
+          book_id: local.id,
+          title: ch.title,
+          content: ch.content,
+          sort_order: i,
+        }));
+        const { error: chErr } = await supabase.from("book_chapters").insert(chapterRows);
+        if (chErr) console.error("Chapter save error:", chErr);
+      } else {
+        await supabase.from("book_chapters").delete().eq("book_id", local.id);
+      }
+
       setDirty(false);
       setLastSavedAt(new Date());
       if (!isAuto) {
@@ -334,8 +353,8 @@ export default function AdminBookEditor() {
                       if (!file) return;
                       setUploading(true);
                       try {
-                        const data = await api.upload<{ url: string }>("/api/upload", file);
-                        updateLocal({ cover_image: data.url });
+                        const url = await uploadToStorage("site-assets", file, "book-covers");
+                        updateLocal({ cover_image: url });
                         toast({ title: "Cover uploaded" });
                       } catch (err: any) {
                         toast({ title: "Upload failed", description: err.message, variant: "destructive" });
@@ -442,8 +461,8 @@ export default function AdminBookEditor() {
                       if (!file) return;
                       setUploadingPdf(true);
                       try {
-                        const data = await api.upload<{ url: string }>("/api/upload", file);
-                        updateLocal({ pdf_url: data.url });
+                        const url = await uploadToStorage("downloads", file, "book-pdfs");
+                        updateLocal({ pdf_url: url });
                         toast({ title: "PDF uploaded" });
                       } catch (err: any) {
                         toast({ title: "Upload failed", description: err.message, variant: "destructive" });

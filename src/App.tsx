@@ -34,6 +34,7 @@ import AdminGraphics from "./pages/admin/AdminGraphics";
 import AdminBlogManager from "./pages/admin/AdminBlogManager";
 import AdminPublisher from "./pages/admin/AdminPublisher";
 import AdminAudiobooks from "./pages/admin/AdminAudiobooks";
+import AdminCRM from "./pages/admin/AdminCRM";
 import SermonDetail from "./pages/SermonDetail";
 import Blog from "./pages/Blog";
 import BlogPost from "./pages/BlogPost";
@@ -125,6 +126,7 @@ const App = () => (
               <Route path="publisher" element={<AdminPublisher />} />
               <Route path="notifications" element={<AdminNotifications />} />
               <Route path="settings" element={<AdminSettings />} />
+              <Route path="crm" element={<AdminCRM />} />
               <Route path="ai-developer" element={<AIDevDashboard />} />
               <Route path="ai-developer/console" element={<AIDevConsole />} />
               <Route path="ai-developer/scan" element={<AIDevSiteScan />} />

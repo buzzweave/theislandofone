@@ -5,7 +5,7 @@ import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { uploadToStorage } from "@/lib/supabaseUpload";
-import { Plus, Trash2, GripVertical, Upload, Eye, EyeOff, Image, X, Droplets } from "lucide-react";
+import { Plus, Trash2, GripVertical, Upload, Eye, EyeOff, Image, X, Droplets, Share2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   DndContext,
@@ -290,6 +290,77 @@ function WatermarkSection() {
   );
 }
 
+function FacebookShareImageSection() {
+  const { value: shareImageUrl, updateValue: updateShareImage } = useSiteSettings("og_share_image");
+  const { toast } = useToast();
+  const [uploading, setUploading] = useState(false);
+
+  const handleUpload = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      setUploading(true);
+      try {
+        const url = await uploadToStorage("site-assets", file, "og-images");
+        await updateShareImage(url);
+        toast({ title: "Share image updated!" });
+      } catch (err: any) {
+        toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+      } finally {
+        setUploading(false);
+      }
+    };
+    input.click();
+  };
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-5">
+      <div className="flex items-center gap-3 mb-4">
+        <Share2 className="h-5 w-5 text-primary" />
+        <div>
+          <h3 className="font-display text-sm font-semibold">Facebook Share Image</h3>
+          <p className="text-xs text-muted-foreground">
+            This is the default image Facebook uses when someone shares your site. Recommended: 1200×630px. Upload promotional book covers or branded images here.
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-4">
+        <div className="w-32 h-20 rounded-lg border border-border bg-muted flex items-center justify-center overflow-hidden shrink-0">
+          {shareImageUrl ? (
+            <img src={shareImageUrl} alt="Share preview" className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-xs text-muted-foreground text-center px-1">No image</span>
+          )}
+        </div>
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={handleUpload}
+            disabled={uploading}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            <Upload className="h-3.5 w-3.5" />
+            {uploading ? "Uploading…" : shareImageUrl ? "Replace Image" : "Upload Image"}
+          </button>
+          {shareImageUrl && (
+            <button
+              onClick={async () => {
+                await updateShareImage("");
+                toast({ title: "Share image removed" });
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-border text-sm text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-colors"
+            >
+              <X className="h-3.5 w-3.5" /> Remove Image
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminHeroBanners() {
   const { banners, isLoading } = useAdminHeroBanners();
   const queryClient = useQueryClient();
@@ -394,6 +465,7 @@ export default function AdminHeroBanners() {
   return (
     <div className="space-y-6">
       <LogoUploadSection />
+      <FacebookShareImageSection />
       <WatermarkSection />
 
       <div className="flex items-center justify-between">

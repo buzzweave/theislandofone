@@ -9,6 +9,7 @@ import { useGraphics } from "@/hooks/useGraphics";
 import HeroCarousel from "@/components/HeroCarousel";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import SubscribeForm from "@/components/SubscribeForm";
 
 
 function getYouTubeId(url: string) {
@@ -392,22 +393,7 @@ export default function Index() {
           <p className="text-muted-foreground mb-6 sm:mb-8 max-w-lg mx-auto text-sm sm:text-base">
             Get weekly devotionals, book updates, and exclusive content delivered to your inbox.
           </p>
-          <form
-            onSubmit={(e) => e.preventDefault()}
-            className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto px-2 sm:px-0"
-          >
-            <input
-              type="email"
-              placeholder="Enter your email"
-              className="flex-1 px-5 py-3 rounded-full bg-card border border-border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
-            <button
-              type="submit"
-              className="px-6 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
-            >
-              Subscribe
-            </button>
-          </form>
+          <SubscribeForm />
         </div>
       </section>
     </div>
