@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { api } from "@/lib/api";
 
 export interface Sermon {
   id: string;
@@ -55,7 +54,23 @@ export function useSermon(id: string | undefined) {
 export function useAddSermon() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (sermon: Partial<Sermon>) => api.post<Sermon>("/api/sermons", sermon),
+    mutationFn: async (sermon: Partial<Sermon>) => {
+      const payload: any = { ...sermon };
+      // Normalize booleans for DB
+      if ("featured" in payload) payload.featured = !!payload.featured;
+      if ("is_free" in payload) payload.is_free = payload.is_free === 1 || payload.is_free === true;
+      // Remove fields not in schema
+      delete payload.access_tiers;
+      delete payload.sort_order;
+      
+      const { data, error } = await supabase
+        .from("sermons")
+        .insert(payload)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return data as Sermon;
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["sermons"] }),
   });
 }
@@ -63,8 +78,27 @@ export function useAddSermon() {
 export function useUpdateSermon() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...updates }: Partial<Sermon> & { id: string }) =>
-      api.put<Sermon>(`/api/sermons/${id}`, updates),
+    mutationFn: async ({ id, ...updates }: Partial<Sermon> & { id: string }) => {
+      const payload: any = { ...updates };
+      // Normalize booleans
+      if ("featured" in payload) payload.featured = payload.featured === 1 || payload.featured === true;
+      if ("is_free" in payload) payload.is_free = payload.is_free === 1 || payload.is_free === true;
+      // Handle access_tiers - ensure it's an array
+      if ("access_tiers" in payload) {
+        if (typeof payload.access_tiers === "string") {
+          payload.access_tiers = payload.access_tiers.split(",").filter(Boolean);
+        }
+      }
+      
+      const { data, error } = await supabase
+        .from("sermons")
+        .update(payload)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return data as Sermon;
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["sermons"] }),
   });
 }
@@ -72,7 +106,10 @@ export function useUpdateSermon() {
 export function useDeleteSermon() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.delete(`/api/sermons/${id}`),
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("sermons").delete().eq("id", id);
+      if (error) throw new Error(error.message);
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["sermons"] }),
   });
 }

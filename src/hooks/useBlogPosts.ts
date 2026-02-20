@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { api } from "@/lib/api";
 
 export interface BlogPost {
   id: string;
@@ -37,7 +36,18 @@ export function useBlogPosts(publishedOnly = false) {
 export function useAddBlogPost() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (post: Partial<BlogPost>) => api.post<BlogPost>("/api/blog", post),
+    mutationFn: async (post: Partial<BlogPost>) => {
+      const payload: any = { ...post };
+      payload.is_published = payload.is_published === 1 || payload.is_published === true;
+      
+      const { data, error } = await supabase
+        .from("blog_posts")
+        .insert(payload)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return data as BlogPost;
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["blog_posts"] }),
   });
 }
@@ -45,8 +55,21 @@ export function useAddBlogPost() {
 export function useUpdateBlogPost() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...updates }: Partial<BlogPost> & { id: string }) =>
-      api.put<BlogPost>(`/api/blog/${id}`, updates),
+    mutationFn: async ({ id, ...updates }: Partial<BlogPost> & { id: string }) => {
+      const payload: any = { ...updates };
+      if ("is_published" in payload) {
+        payload.is_published = payload.is_published === 1 || payload.is_published === true;
+      }
+      
+      const { data, error } = await supabase
+        .from("blog_posts")
+        .update(payload)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return data as BlogPost;
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["blog_posts"] }),
   });
 }
@@ -54,7 +77,10 @@ export function useUpdateBlogPost() {
 export function useDeleteBlogPost() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.delete(`/api/blog/${id}`),
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("blog_posts").delete().eq("id", id);
+      if (error) throw new Error(error.message);
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["blog_posts"] }),
   });
 }

@@ -1,9 +1,10 @@
 import { useState, useRef } from "react";
-import { api } from "@/lib/api";
 import { useAdminHeroBanners, HeroBanner } from "@/hooks/useHeroBanners";
 import { useSiteLogo } from "@/hooks/useSiteLogo";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { uploadToStorage } from "@/lib/supabaseUpload";
 import { Plus, Trash2, GripVertical, Upload, Eye, EyeOff, Image, X, Droplets } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -141,8 +142,8 @@ function LogoUploadSection() {
       if (!file) return;
       setUploading(true);
       try {
-        const data = await api.upload<{ url: string }>("/api/upload", file);
-        await updateLogo(data.url);
+        const url = await uploadToStorage("site-assets", file, "logos");
+        await updateLogo(url);
         toast({ title: "Logo updated!" });
       } catch (err: any) {
         toast({ title: "Upload failed", description: err.message, variant: "destructive" });
@@ -232,8 +233,8 @@ function WatermarkSection() {
       if (!file) return;
       setUploading(true);
       try {
-        const data = await api.upload<{ url: string }>("/api/upload", file);
-        await updateWatermark(data.url);
+        const url = await uploadToStorage("site-assets", file, "watermarks");
+        await updateWatermark(url);
         toast({ title: "Watermark uploaded!" });
       } catch (err: any) {
         toast({ title: "Upload failed", description: err.message, variant: "destructive" });
@@ -303,16 +304,6 @@ export default function AdminHeroBanners() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["hero-banners"] });
 
-  const uploadImage = async (file: File): Promise<string | null> => {
-    try {
-      const data = await api.upload<{ url: string }>("/api/upload", file);
-      return data.url;
-    } catch (err: any) {
-      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
-      return null;
-    }
-  };
-
   const addBanner = async () => {
     fileInputRef.current?.click();
   };
@@ -321,20 +312,19 @@ export default function AdminHeroBanners() {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
-    const url = await uploadImage(file);
-    if (url) {
-      try {
-        await api.post("/api/hero-banners", {
-          title: "New Banner",
-          subtitle: "",
-          image_url: url,
-          sort_order: banners.length,
-        });
-        toast({ title: "Banner added" });
-        invalidate();
-      } catch (err: any) {
-        toast({ title: "Error", description: err.message, variant: "destructive" });
-      }
+    try {
+      const url = await uploadToStorage("hero-banners", file);
+      const { error } = await supabase.from("hero_banners").insert({
+        title: "New Banner",
+        subtitle: "",
+        image_url: url,
+        sort_order: banners.length,
+      });
+      if (error) throw new Error(error.message);
+      toast({ title: "Banner added" });
+      invalidate();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     }
     setUploading(false);
     e.target.value = "";
@@ -342,7 +332,8 @@ export default function AdminHeroBanners() {
 
   const updateBanner = async (id: string, updates: Partial<HeroBanner>) => {
     try {
-      await api.put(`/api/hero-banners/${id}`, updates);
+      const { error } = await supabase.from("hero_banners").update(updates).eq("id", id);
+      if (error) throw new Error(error.message);
       invalidate();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -351,7 +342,8 @@ export default function AdminHeroBanners() {
 
   const deleteBanner = async (id: string) => {
     try {
-      await api.delete(`/api/hero-banners/${id}`);
+      const { error } = await supabase.from("hero_banners").delete().eq("id", id);
+      if (error) throw new Error(error.message);
       toast({ title: "Banner deleted" });
       invalidate();
     } catch (err: any) {
@@ -367,10 +359,12 @@ export default function AdminHeroBanners() {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
       setUploading(true);
-      const url = await uploadImage(file);
-      if (url) {
+      try {
+        const url = await uploadToStorage("hero-banners", file);
         await updateBanner(id, { image_url: url });
         toast({ title: "Image updated" });
+      } catch (err: any) {
+        toast({ title: "Upload failed", description: err.message, variant: "destructive" });
       }
       setUploading(false);
     };
@@ -388,7 +382,7 @@ export default function AdminHeroBanners() {
     queryClient.setQueryData(["hero-banners"], reordered);
 
     const updates = reordered.map((b, i) =>
-      api.put(`/api/hero-banners/${b.id}`, { sort_order: i })
+      supabase.from("hero_banners").update({ sort_order: i }).eq("id", b.id)
     );
     await Promise.all(updates);
     invalidate();
@@ -413,7 +407,7 @@ export default function AdminHeroBanners() {
           className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
         >
           <Plus className="h-4 w-4" />
-          Add Banner
+          {uploading ? "Uploading…" : "Add Banner"}
         </button>
         <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelected} />
       </div>
