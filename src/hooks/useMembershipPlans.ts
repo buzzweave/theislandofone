@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface MembershipPlan {
   id: string;
@@ -15,17 +15,12 @@ export function useMembershipPlans() {
   const { data: plans = [], isLoading } = useQuery({
     queryKey: ["membership-plans"],
     queryFn: async () => {
-      const raw = await api.get<any[]>("/api/plans");
-      return raw.map((p: any) => ({
-        ...p,
-        price: Number(p.price) || 0,
-        is_featured: p.is_featured === 1 || p.is_featured === true,
-        features: Array.isArray(p.features)
-          ? p.features
-          : typeof p.features === "string"
-          ? JSON.parse(p.features)
-          : [],
-      })) as MembershipPlan[];
+      const { data, error } = await supabase
+        .from("membership_plans")
+        .select("*")
+        .order("sort_order", { ascending: true });
+      if (error) throw new Error(error.message);
+      return data as MembershipPlan[];
     },
   });
   return { plans, isLoading };

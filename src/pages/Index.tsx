@@ -7,7 +7,7 @@ import { useSermons } from "@/hooks/useSermons";
 import { useVideos } from "@/hooks/useVideos";
 import { useGraphics } from "@/hooks/useGraphics";
 import HeroCarousel from "@/components/HeroCarousel";
-import { api } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 
 
@@ -29,11 +29,14 @@ export default function Index() {
   const { data: blogPosts = [] } = useQuery({
     queryKey: ["blog_posts_homepage"],
     queryFn: async () => {
-      const posts = await api.get<any[]>("/api/blog");
-      return posts
-        .filter((p: any) => p.is_published === true || p.is_published === 1)
-        .sort((a: any, b: any) => new Date(b.published_at || b.created_at).getTime() - new Date(a.published_at || a.created_at).getTime())
-        .slice(0, 3);
+      const { data, error } = await supabase
+        .from("blog_posts")
+        .select("*")
+        .eq("is_published", true)
+        .order("published_at", { ascending: false })
+        .limit(3);
+      if (error) throw new Error(error.message);
+      return data;
     },
   });
 

@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { api } from "@/lib/api";
 
 export interface Video {
@@ -17,23 +18,18 @@ export interface Video {
   updated_at: string;
 }
 
-function normalize(raw: any[]): Video[] {
-  return raw.map((v: any) => ({
-    ...v,
-    price: Number(v.price) || 0,
-    featured: v.featured === 1 || v.featured === true,
-    is_active: v.is_active === 1 || v.is_active === true,
-    is_free: v.is_free === 1 || v.is_free === true,
-  }));
-}
-
 /** Public hook – returns active videos only */
 export function useVideos() {
   return useQuery({
     queryKey: ["videos"],
     queryFn: async () => {
-      const raw = await api.get<any[]>("/api/videos");
-      return normalize(raw).filter((v) => v.is_active);
+      const { data, error } = await supabase
+        .from("videos")
+        .select("*")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
+      if (error) throw new Error(error.message);
+      return data as Video[];
     },
   });
 }
@@ -43,8 +39,12 @@ export function useAdminVideos() {
   return useQuery({
     queryKey: ["videos", "admin"],
     queryFn: async () => {
-      const raw = await api.get<any[]>("/api/videos");
-      return normalize(raw);
+      const { data, error } = await supabase
+        .from("videos")
+        .select("*")
+        .order("sort_order", { ascending: true });
+      if (error) throw new Error(error.message);
+      return data as Video[];
     },
   });
 }
@@ -53,9 +53,8 @@ export function useAddVideo() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (video: Partial<Video>) => {
-      const { sort_order, ...rest } = video as any;
       return api.post<Video>("/api/videos", {
-        ...rest,
+        ...video,
         featured: video.featured ? 1 : 0,
         is_active: (video as any).is_active ? 1 : 0,
         is_free: video.is_free ? 1 : 0,

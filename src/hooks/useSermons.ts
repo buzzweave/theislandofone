@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { api } from "@/lib/api";
 
 export interface Sermon {
@@ -24,14 +25,29 @@ export interface Sermon {
 export function useSermons() {
   return useQuery({
     queryKey: ["sermons"],
-    queryFn: () => api.get<Sermon[]>("/api/sermons"),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sermons")
+        .select("*")
+        .order("sort_order", { ascending: true });
+      if (error) throw new Error(error.message);
+      return data as Sermon[];
+    },
   });
 }
 
 export function useSermon(id: string | undefined) {
   return useQuery({
     queryKey: ["sermons", id],
-    queryFn: () => api.get<Sermon>(`/api/sermons/${id}`),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sermons")
+        .select("*")
+        .eq("id", id!)
+        .single();
+      if (error) throw new Error(error.message);
+      return data as Sermon;
+    },
     enabled: !!id,
   });
 }

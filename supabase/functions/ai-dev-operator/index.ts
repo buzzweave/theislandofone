@@ -533,7 +533,9 @@ serve(async (req) => {
         const settingsMap = await getSettingsMap(serviceClient);
         const agentUrl = settingsMap[`${environment}_agent_url`];
         const agentToken = settingsMap[`${environment}_agent_token`];
-        if (!agentUrl || !agentToken) throw new Error(`Agent URL or token not configured for ${environment}`);
+        if (!agentUrl || !agentToken) {
+          return new Response(JSON.stringify({ error: `External agent deployment is not configured for "${environment}". This feature requires an agent URL and token to be set in AI Developer Settings. If you are not using external deployments, you can ignore this.` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
 
         try {
           const res = await fetchWithTimeout(agentUrl + "/deploy/test", {
@@ -552,7 +554,7 @@ serve(async (req) => {
             action: "deploy_connection_tested",
             details: { environment, success: false, error: fetchErr.message },
           });
-          throw new Error(`Agent connection failed: ${fetchErr.message}`);
+          return new Response(JSON.stringify({ error: `Agent connection failed: ${fetchErr.message}` }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
       }
 
@@ -563,7 +565,9 @@ serve(async (req) => {
         const settingsMap = await getSettingsMap(serviceClient);
         const agentUrl = settingsMap[`${environment}_agent_url`];
         const agentToken = settingsMap[`${environment}_agent_token`];
-        if (!agentUrl || !agentToken) throw new Error(`Agent not configured for ${environment}`);
+        if (!agentUrl || !agentToken) {
+          return new Response(JSON.stringify({ error: `External agent deployment is not configured for "${environment}". Set agent URL and token in AI Developer Settings.` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
 
         if (settingsMap.block_deploy_when_allowed_folders_empty === "true" || !settingsMap.block_deploy_when_allowed_folders_empty) {
           const allowed = (settingsMap.allowed_folders || "").split(",").map((s: string) => s.trim()).filter(Boolean);
@@ -650,7 +654,9 @@ serve(async (req) => {
         const settingsMap = await getSettingsMap(serviceClient);
         const agentUrl = settingsMap[`${environment}_agent_url`];
         const agentToken = settingsMap[`${environment}_agent_token`];
-        if (!agentUrl || !agentToken) throw new Error(`Agent not configured for ${environment}`);
+        if (!agentUrl || !agentToken) {
+          return new Response(JSON.stringify({ error: `External agent deployment is not configured for "${environment}". Set agent URL and token in AI Developer Settings.` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
 
         const { data: plan, error: pErr } = await serviceClient.from("ai_dev_plans").select("*").eq("id", plan_id).single();
         if (pErr || !plan) throw new Error("Plan not found");
@@ -751,7 +757,9 @@ serve(async (req) => {
         const settingsMap = await getSettingsMap(serviceClient);
         const agentUrl = settingsMap[`${environment}_agent_url`];
         const agentToken = settingsMap[`${environment}_agent_token`];
-        if (!agentUrl || !agentToken) throw new Error(`Agent not configured for ${environment}`);
+        if (!agentUrl || !agentToken) {
+          return new Response(JSON.stringify({ error: `External agent deployment is not configured for "${environment}". Set agent URL and token in AI Developer Settings.` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
 
         try {
           const res = await fetchWithTimeout(agentUrl + "/deploy/rollback", {
