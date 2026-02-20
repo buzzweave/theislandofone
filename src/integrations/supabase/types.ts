@@ -889,6 +889,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      user_has_book_access: {
+        Args: { _book_access_tiers: string[]; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
