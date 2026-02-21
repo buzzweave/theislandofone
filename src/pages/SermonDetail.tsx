@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import SocialShareLinks from "@/components/SocialShareLinks";
 import AudioPlayer from "@/components/AudioPlayer";
-import FacebookComments from "@/components/FacebookComments";
+import CommentsWithRating from "@/components/CommentsWithRating";
 import DOMPurify from "dompurify";
 import { exportSermonToPdf, exportSermonToEpub, exportSermonToWord, exportSermonToGoodNotesPdf } from "@/lib/sermonExport";
 import { toast } from "sonner";
@@ -313,7 +313,7 @@ export default function SermonDetail() {
           </div>
         </div>
         <div className="max-w-3xl mx-auto mt-8 pt-6 border-t border-border">
-          <FacebookComments slug={`sermons/${id}`} />
+          <CommentsWithRating contentType="sermon" contentId={id!} />
         </div>
       </div>
     </div>
