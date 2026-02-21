@@ -142,20 +142,20 @@ function stripInlineTags(text: string): string {
     .replace(/&nbsp;/g, " ");
 }
 
-// ─── PDF — 3-Page Preach Ready Layout (Landscape A4) ───────────────────
+// ─── PDF — Portrait A4 Preach Ready Layout ─────────────────────────────
 
 export function exportSermonToPdf(sermon: Sermon) {
-  const doc = new jsPDF({ unit: "pt", format: [842, 595], orientation: "landscape" });
-  const pageW = 842;
-  const pageH = 595;
+  const A4W = 595;
+  const A4H = 842;
+  const doc = new jsPDF({ unit: "pt", format: [A4W, A4H], orientation: "portrait" });
   const margin = 56;
-  const contentW = pageW - margin * 2;
+  const contentW = A4W - margin * 2;
 
   const title = sermon.title || "";
   const scripture = sermon.scripture || "";
   const manuscript = sermon.manuscript || "";
 
-  // Parse structure: detect bold headings as main points
+  // Parse structure
   const boldSegments = manuscript.includes("<") ? extractBoldSegmentsFromHtml(manuscript) : new Set<string>();
   const raw = normalizeParagraphs(manuscript);
   const lines = raw.split("\n").map(l => l.trim()).filter(l => l.length > 0);
@@ -186,84 +186,38 @@ export function exportSermonToPdf(sermon: Sermon) {
     }
   }
 
-  // Illustrations = only non-heading, non-main-point body text (before any bold heading)
-  // Main point bullets stay with their headings and are NOT duplicated into illustrations
-
   /* ─── PAGE 1: Title + Scripture ─────────────────────────────────── */
   doc.setFont("times", "bold");
-  doc.setFontSize(44);
+  doc.setFontSize(36);
   const titleLines: string[] = doc.splitTextToSize(title, contentW);
-  const titleBlockH = titleLines.length * 52;
-  let titleY = (pageH / 2) - (titleBlockH / 2) - 30;
+  const titleBlockH = titleLines.length * 44;
+  let titleY = (A4H / 2) - (titleBlockH / 2) - 30;
   if (titleY < margin) titleY = margin;
 
   for (const tl of titleLines) {
-    doc.text(tl, pageW / 2, titleY, { align: "center" });
-    titleY += 52;
+    doc.text(tl, A4W / 2, titleY, { align: "center" });
+    titleY += 44;
   }
 
   if (scripture) {
     doc.setFont("times", "italic");
-    doc.setFontSize(22);
+    doc.setFontSize(20);
     const scriptureLines: string[] = doc.splitTextToSize(scripture, contentW);
     let sY = titleY + 30;
     for (const sl of scriptureLines) {
-      doc.text(sl, pageW / 2, sY, { align: "center" });
-      sY += 28;
+      doc.text(sl, A4W / 2, sY, { align: "center" });
+      sY += 26;
     }
   }
 
-  /* ─── PAGE 2+: Main Points (numbered, each heading bold) ───────── */
-  if (mainPoints.length > 0) {
-    doc.addPage([842, 595]);
-    let y = margin;
-
-    doc.setFont("times", "bold");
-    doc.setFontSize(14);
-    doc.text("MAIN POINTS", pageW / 2, y, { align: "center" });
-    y += 36;
-
-    for (let i = 0; i < mainPoints.length; i++) {
-      const mp = mainPoints[i];
-      if (y + 60 > pageH - margin) { doc.addPage([842, 595]); y = margin; }
-
-      // Numbered heading in bold
-      doc.setFont("times", "bold");
-      doc.setFontSize(18);
-      const headingText = `${i + 1}. ${mp.heading}`;
-      const headingLines: string[] = doc.splitTextToSize(headingText, contentW - 20);
-      for (const hl of headingLines) {
-        if (y + 24 > pageH - margin) { doc.addPage([842, 595]); y = margin; }
-        doc.text(hl, margin + 10, y);
-        y += 24;
-      }
-      y += 8;
-
-      // Bullets in regular font
-      doc.setFont("times", "normal");
-      doc.setFontSize(14);
-      for (const bullet of mp.bullets) {
-        const bulletText = `• ${bullet}`;
-        const bulletLines: string[] = doc.splitTextToSize(bulletText, contentW - 40);
-        for (const bl of bulletLines) {
-          if (y + 20 > pageH - margin) { doc.addPage([842, 595]); y = margin; }
-          doc.text(bl, margin + 30, y);
-          y += 20;
-        }
-        y += 4;
-      }
-      y += 16;
-    }
-  }
-
-  /* ─── PAGE 3+: Illustrations & Notes (intro text only) ─────────── */
+  /* ─── PAGE 2: Illustrations & Notes ────────────────────────────── */
   if (illustrations.length > 0) {
-    doc.addPage([842, 595]);
+    doc.addPage([A4W, A4H]);
     let y = margin;
 
     doc.setFont("times", "bold");
     doc.setFontSize(14);
-    doc.text("ILLUSTRATIONS & NOTES", pageW / 2, y, { align: "center" });
+    doc.text("ILLUSTRATIONS & NOTES", A4W / 2, y, { align: "center" });
     y += 36;
 
     doc.setFont("times", "normal");
@@ -273,7 +227,7 @@ export function exportSermonToPdf(sermon: Sermon) {
     for (const para of illustrations) {
       const wrapped: string[] = doc.splitTextToSize(para, contentW);
       for (const wl of wrapped) {
-        if (y + lineHeight > pageH - margin) { doc.addPage([842, 595]); y = margin; }
+        if (y + lineHeight > A4H - margin) { doc.addPage([A4W, A4H]); y = margin; }
         doc.text(wl, margin, y);
         y += lineHeight;
       }
@@ -281,10 +235,42 @@ export function exportSermonToPdf(sermon: Sermon) {
     }
   }
 
+  /* ─── Each Main Point on its own page ──────────────────────────── */
+  for (let i = 0; i < mainPoints.length; i++) {
+    const mp = mainPoints[i];
+    doc.addPage([A4W, A4H]);
+    let y = margin;
+
+    // Numbered heading in bold
+    doc.setFont("times", "bold");
+    doc.setFontSize(22);
+    const headingText = `${i + 1}. ${mp.heading}`;
+    const headingLines: string[] = doc.splitTextToSize(headingText, contentW - 20);
+    for (const hl of headingLines) {
+      doc.text(hl, margin + 10, y);
+      y += 28;
+    }
+    y += 12;
+
+    // Bullets in regular font
+    doc.setFont("times", "normal");
+    doc.setFontSize(14);
+    for (const bullet of mp.bullets) {
+      const bulletText = `• ${bullet}`;
+      const bulletLines: string[] = doc.splitTextToSize(bulletText, contentW - 40);
+      for (const bl of bulletLines) {
+        if (y + 20 > A4H - margin) { doc.addPage([A4W, A4H]); y = margin; }
+        doc.text(bl, margin + 30, y);
+        y += 20;
+      }
+      y += 6;
+    }
+  }
+
   // Copyright on last page
   doc.setFont("helvetica", "italic");
   doc.setFontSize(9);
-  doc.text(COPYRIGHT(), pageW / 2, pageH - 30, { align: "center" });
+  doc.text(COPYRIGHT(), A4W / 2, A4H - 30, { align: "center" });
 
   const pdfBlob = doc.output("blob");
   triggerDownload(pdfBlob, `${safeTitle(sermon.title)}.pdf`);

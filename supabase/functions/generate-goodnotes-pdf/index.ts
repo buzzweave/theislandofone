@@ -6,8 +6,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-/* ── Types ────────────────────────────────────────────────────────────── */
-
 interface SermonPayload {
   title: string;
   scriptureReference?: string;
@@ -20,10 +18,10 @@ interface MainPoint {
   bullets: string[];
 }
 
-/* ── Constants — Landscape A4 for iPad horizontal flip ───────────────── */
+/* ── Portrait A4 ─────────────────────────────────────────────────────── */
 
-const A4_W = 842; // landscape width (pt)
-const A4_H = 595; // landscape height (pt)
+const A4_W = 595;
+const A4_H = 842;
 const MARGIN = 56;
 const CONTENT_W = A4_W - MARGIN * 2;
 
@@ -56,7 +54,7 @@ function extractBoldSegments(html: string): Set<string> {
   return bolds;
 }
 
-/* ── Parse manuscript into Main Points + body ────────────────────────── */
+/* ── Parse manuscript ────────────────────────────────────────────────── */
 
 function parseSermonStructure(manuscript: string, title: string, scripture: string): { mainPoints: MainPoint[]; illustrations: string[] } {
   const boldSegments = manuscript.includes("<") ? extractBoldSegments(manuscript) : new Set<string>();
@@ -72,11 +70,8 @@ function parseSermonStructure(manuscript: string, title: string, scripture: stri
 
   for (const line of lines) {
     const lineNorm = line.toLowerCase();
-
-    // Skip title/scripture duplicates
     if (lineNorm === titleNorm || (scriptureNorm && lineNorm === scriptureNorm)) continue;
 
-    // Check if this line was bold in original HTML → it's a main point heading
     const isBoldHeading = [...boldSegments].some(
       b => b.toLowerCase() === lineNorm || lineNorm.startsWith(b.toLowerCase())
     );
@@ -87,7 +82,6 @@ function parseSermonStructure(manuscript: string, title: string, scripture: stri
     } else if (current) {
       current.bullets.push(line);
     } else {
-      // Content before any bold heading → illustration/body text
       illustrations.push(line);
     }
   }
@@ -95,14 +89,10 @@ function parseSermonStructure(manuscript: string, title: string, scripture: stri
   return { mainPoints, illustrations };
 }
 
-/* ── PDF Generation — 3-Page Preach Ready Layout ─────────────────────── */
+/* ── PDF Generation — Portrait A4 Preach Ready ───────────────────────── */
 
 function generatePdf(data: SermonPayload): ArrayBuffer {
-  const doc = new jsPDF({ unit: "pt", format: [A4_W, A4_H], orientation: "landscape" });
-  const pageW = A4_W;
-  const pageH = A4_H;
-  const margin = MARGIN;
-  const contentW = CONTENT_W;
+  const doc = new jsPDF({ unit: "pt", format: [A4_W, A4_H], orientation: "portrait" });
 
   const manuscript = data.manuscript || "";
   const title = data.title || "";
@@ -111,90 +101,37 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
   const { mainPoints, illustrations } = parseSermonStructure(manuscript, title, scripture);
 
   /* ─── PAGE 1: Title + Scripture ─────────────────────────────────── */
-
-  // Title — bold, centered, large
   doc.setFont("times", "bold");
-  doc.setFontSize(44);
-  const titleLines: string[] = doc.splitTextToSize(title, contentW);
-  const titleBlockH = titleLines.length * 52;
-  let titleY = (pageH / 2) - (titleBlockH / 2) - 30;
-  if (titleY < margin) titleY = margin;
+  doc.setFontSize(36);
+  const titleLines: string[] = doc.splitTextToSize(title, CONTENT_W);
+  const titleBlockH = titleLines.length * 44;
+  let titleY = (A4_H / 2) - (titleBlockH / 2) - 30;
+  if (titleY < MARGIN) titleY = MARGIN;
 
   for (const line of titleLines) {
-    doc.text(line, pageW / 2, titleY, { align: "center" });
-    titleY += 52;
+    doc.text(line, A4_W / 2, titleY, { align: "center" });
+    titleY += 44;
   }
 
-  // Scripture — centered, italic, below title
   if (scripture) {
     doc.setFont("times", "italic");
-    doc.setFontSize(22);
-    const scriptureLines: string[] = doc.splitTextToSize(scripture, contentW);
+    doc.setFontSize(20);
+    const scriptureLines: string[] = doc.splitTextToSize(scripture, CONTENT_W);
     let scriptureY = titleY + 30;
     for (const line of scriptureLines) {
-      doc.text(line, pageW / 2, scriptureY, { align: "center" });
-      scriptureY += 28;
+      doc.text(line, A4_W / 2, scriptureY, { align: "center" });
+      scriptureY += 26;
     }
   }
 
-  /* ─── PAGE 2: Main Points ──────────────────────────────────────── */
-
-  if (mainPoints.length > 0) {
-    doc.addPage([A4_W, A4_H]);
-    let y = margin;
-
-    doc.setFont("times", "bold");
-    doc.setFontSize(14);
-    doc.text("MAIN POINTS", pageW / 2, y, { align: "center" });
-    y += 36;
-
-    for (let i = 0; i < mainPoints.length; i++) {
-      const mp = mainPoints[i];
-      // Check if we need a new page
-      if (y + 60 > pageH - margin) {
-        doc.addPage([A4_W, A4_H]);
-        y = margin;
-      }
-
-      // Numbered main point heading — bold
-      doc.setFont("times", "bold");
-      doc.setFontSize(18);
-      const headingText = `${i + 1}. ${mp.heading}`;
-      const headingLines: string[] = doc.splitTextToSize(headingText, contentW - 20);
-      for (const hl of headingLines) {
-        if (y + 24 > pageH - margin) { doc.addPage([A4_W, A4_H]); y = margin; }
-        doc.text(hl, margin + 10, y);
-        y += 24;
-      }
-      y += 8;
-
-      // Bullets — regular font
-      doc.setFont("times", "normal");
-      doc.setFontSize(14);
-      for (const bullet of mp.bullets) {
-        const bulletText = `• ${bullet}`;
-        const bulletLines: string[] = doc.splitTextToSize(bulletText, contentW - 40);
-        for (const bl of bulletLines) {
-          if (y + 20 > pageH - margin) { doc.addPage([A4_W, A4_H]); y = margin; }
-          doc.text(bl, margin + 30, y);
-          y += 20;
-        }
-        y += 4;
-      }
-
-      y += 16; // space between main points
-    }
-  }
-
-  /* ─── PAGE 3+: Illustrations / Intro text only ──────────────────── */
-
+  /* ─── PAGE 2: Illustrations & Notes ────────────────────────────── */
   if (illustrations.length > 0) {
     doc.addPage([A4_W, A4_H]);
-    let y = margin;
+    let y = MARGIN;
 
     doc.setFont("times", "bold");
     doc.setFontSize(14);
-    doc.text("ILLUSTRATIONS & NOTES", pageW / 2, y, { align: "center" });
+    doc.text("ILLUSTRATIONS & NOTES", A4_W / 2, y, { align: "center" });
     y += 36;
 
     doc.setFont("times", "normal");
@@ -202,16 +139,48 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
     const lineHeight = 20;
 
     for (const para of illustrations) {
-      const wrapped: string[] = doc.splitTextToSize(para, contentW);
+      const wrapped: string[] = doc.splitTextToSize(para, CONTENT_W);
       for (const line of wrapped) {
-        if (y + lineHeight > pageH - margin) {
+        if (y + lineHeight > A4_H - MARGIN) {
           doc.addPage([A4_W, A4_H]);
-          y = margin;
+          y = MARGIN;
         }
-        doc.text(line, margin, y);
+        doc.text(line, MARGIN, y);
         y += lineHeight;
       }
       y += 8;
+    }
+  }
+
+  /* ─── Each Main Point on its own page ──────────────────────────── */
+  for (let i = 0; i < mainPoints.length; i++) {
+    const mp = mainPoints[i];
+    doc.addPage([A4_W, A4_H]);
+    let y = MARGIN;
+
+    // Numbered heading in bold
+    doc.setFont("times", "bold");
+    doc.setFontSize(22);
+    const headingText = `${i + 1}. ${mp.heading}`;
+    const headingLines: string[] = doc.splitTextToSize(headingText, CONTENT_W - 20);
+    for (const hl of headingLines) {
+      doc.text(hl, MARGIN + 10, y);
+      y += 28;
+    }
+    y += 12;
+
+    // Bullets in regular font
+    doc.setFont("times", "normal");
+    doc.setFontSize(14);
+    for (const bullet of mp.bullets) {
+      const bulletText = `• ${bullet}`;
+      const bulletLines: string[] = doc.splitTextToSize(bulletText, CONTENT_W - 40);
+      for (const bl of bulletLines) {
+        if (y + 20 > A4_H - MARGIN) { doc.addPage([A4_W, A4_H]); y = MARGIN; }
+        doc.text(bl, MARGIN + 30, y);
+        y += 20;
+      }
+      y += 6;
     }
   }
 
@@ -220,8 +189,8 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
   doc.setFontSize(9);
   doc.text(
     `\u00A9 ${new Date().getFullYear()} The Island of One. All rights reserved.`,
-    pageW / 2,
-    pageH - 30,
+    A4_W / 2,
+    A4_H - 30,
     { align: "center" },
   );
 
