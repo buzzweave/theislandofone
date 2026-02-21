@@ -292,3 +292,83 @@
 .sermon-content i {
   font-style: italic;
 }
+
+/* ══════════════════════════════════════════════════════
+   SERMON FLOW — locked style for Sermons & Blog ONLY
+   Modern sans-serif, tight rhythm, mobile-first
+   ══════════════════════════════════════════════════════ */
+.sermon-flow {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-weight: 450;
+  font-size: 1.1rem;
+  line-height: 1.4;
+  max-width: 720px;
+  margin: 0 auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.sermon-flow p {
+  margin-bottom: 8px;
+  line-height: 1.4;
+  text-indent: 0;
+  font-size: 1.1rem;
+  color: hsl(var(--foreground));
+}
+
+.sermon-flow ul,
+.sermon-flow ol {
+  margin-top: 6px;
+  margin-bottom: 6px;
+  padding-left: 1.1em;
+  list-style: disc;
+}
+
+.sermon-flow li {
+  font-size: 1.1rem;
+  margin-bottom: 6px;
+  line-height: 1.4;
+  color: hsl(var(--foreground));
+}
+
+.sermon-flow li::marker {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.7em;
+}
+
+.sermon-flow h1,
+.sermon-flow h2,
+.sermon-flow h3 {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 700;
+  margin-top: 1.2em;
+  margin-bottom: 6px;
+  color: hsl(var(--foreground));
+}
+
+.sermon-flow h1 { font-size: 1.5rem; }
+.sermon-flow h2 { font-size: 1.3rem; }
+.sermon-flow h3 { font-size: 1.15rem; }
+
+.sermon-flow strong,
+.sermon-flow b {
+  font-weight: 700;
+}
+
+.sermon-flow em,
+.sermon-flow i {
+  font-style: italic;
+}
+
+/* Mobile optimization */
+@media (max-width: 640px) {
+  .sermon-flow {
+    font-size: 1.05rem;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+  .sermon-flow p {
+    font-size: 1.05rem;
+    margin-bottom: 6px;
+  }
+}
