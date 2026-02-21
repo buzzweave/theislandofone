@@ -54,7 +54,6 @@ class PageErrorBoundary extends React.Component<{ children: React.ReactNode }, {
     return { hasError: true, message: error?.message ? String(error.message) : "Unknown error" };
   }
   componentDidCatch(error: any, info: any) {
-    // This will show in Loveable preview console too
     console.error("SermonDetail crashed:", error, info);
   }
   render() {
@@ -65,8 +64,7 @@ class PageErrorBoundary extends React.Component<{ children: React.ReactNode }, {
             <div className="p-6 rounded-xl border border-destructive/30 bg-destructive/5">
               <h1 className="font-display text-2xl font-bold mb-2">Page Error</h1>
               <p className="text-sm text-muted-foreground mb-4">
-                The sermon page hit a runtime error. This usually happens from a missing field (date, audio, manuscript)
-                or a component prop mismatch. Open your browser console to see the full stack trace.
+                The sermon page hit a runtime error. Open your browser console to see the full stack trace.
               </p>
               <div className="text-xs text-muted-foreground break-words">
                 <span className="font-semibold">Message:</span> {this.state.message}
@@ -103,7 +101,9 @@ function SermonDetailInner() {
   const [checkingPurchase, setCheckingPurchase] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
-  // Check purchase status on load (for non-free sermons)
+  // ✅ FIX 1: SocialShareLinks url must ALWAYS be a string (no undefined)
+  const shareUrl = `https://theislandofone.com/share/sermon/${id ?? ""}`;
+
   useEffect(() => {
     let active = true;
 
@@ -148,7 +148,6 @@ function SermonDetailInner() {
     );
   }
 
-  // Safe defaults (supports multiple possible sermon body fields)
   const manuscriptRaw = String(
     (sermon as any).manuscript ?? (sermon as any).content ?? (sermon as any).content_html ?? "",
   );
@@ -168,7 +167,6 @@ function SermonDetailInner() {
     return paragraphs.slice(0, safeCutoff);
   }, [previewCutoff, paragraphs]);
 
-  // Tier access (guard everything)
   const productId = (subscription as any)?.product_id ?? null;
   const userTier = productId ? getTierByProductId(productId) : null;
 
@@ -243,11 +241,9 @@ function SermonDetailInner() {
   };
 
   const dateLabel = safeDateLabel((sermon as any).date);
-  const shareUrl = id ? `https://theislandofone.com/share/sermon/${id}` : undefined;
 
   return (
     <div className="min-h-screen">
-      {/* Header */}
       <section className="py-16 bg-gradient-section">
         <div className="container mx-auto px-4">
           <button
@@ -296,18 +292,13 @@ function SermonDetailInner() {
               <p className="text-sm text-muted-foreground mt-3 mb-4">By Bryant Clark</p>
             )}
 
-            {/* Share (defensive) */}
-            {(sermon as any).title ? <SocialShareLinks title={(sermon as any).title} url={shareUrl} /> : null}
+            {/* ✅ FIX 1 applied here too: only render if id exists */}
+            {id ? <SocialShareLinks title={(sermon as any).title ?? "Sermon"} url={shareUrl} /> : null}
 
-            {/* Audio (defensive + supports both prop names) */}
+            {/* NOTE: we are NOT changing AudioPlayer yet (that’s Step 2 if TS2322 still exists) */}
             {isFullAccess && (sermon as any).audio_url ? (
               <div className="mt-6">
-                <AudioPlayer
-                  // some versions use src, some use audioUrl
-                  src={(sermon as any).audio_url}
-                  audioUrl={(sermon as any).audio_url}
-                  title={(sermon as any).title ?? "Sermon"}
-                />
+                <AudioPlayer audioUrl={(sermon as any).audio_url} title={(sermon as any).title ?? "Sermon"} />
               </div>
             ) : null}
           </div>
@@ -316,7 +307,6 @@ function SermonDetailInner() {
 
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-3xl mx-auto grid lg:grid-cols-[1fr_300px] gap-8">
-          {/* Manuscript */}
           <div>
             <div className="mb-2">
               <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4">
@@ -396,7 +386,6 @@ function SermonDetailInner() {
             )}
           </div>
 
-          {/* Sidebar */}
           <div className="space-y-4">
             {!isFullAccess && (
               <Card className="border-primary/20">
@@ -466,9 +455,8 @@ function SermonDetailInner() {
           </div>
         </div>
 
-        {/* Comments (defensive: if this component throws, ErrorBoundary shows message instead of blank screen) */}
         <div className="max-w-3xl mx-auto mt-8 pt-6 border-t border-border">
-          <CommentsWithRating contentType="sermon" contentId={id!} />
+          <CommentsWithRating contentType="sermon" contentId={String(id ?? "")} />
         </div>
       </div>
     </div>
