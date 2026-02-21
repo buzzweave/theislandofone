@@ -186,11 +186,8 @@ export function exportSermonToPdf(sermon: Sermon) {
     }
   }
 
-  // Collect all body text as illustrations
-  const allIllustrations = [...illustrations];
-  for (const mp of mainPoints) {
-    allIllustrations.push(...mp.bullets);
-  }
+  // Illustrations = only non-heading, non-main-point body text (before any bold heading)
+  // Main point bullets stay with their headings and are NOT duplicated into illustrations
 
   /* ─── PAGE 1: Title + Scripture ─────────────────────────────────── */
   doc.setFont("times", "bold");
@@ -216,7 +213,7 @@ export function exportSermonToPdf(sermon: Sermon) {
     }
   }
 
-  /* ─── PAGE 2: Main Points ──────────────────────────────────────── */
+  /* ─── PAGE 2+: Main Points (numbered, each heading bold) ───────── */
   if (mainPoints.length > 0) {
     doc.addPage([842, 595]);
     let y = margin;
@@ -226,12 +223,15 @@ export function exportSermonToPdf(sermon: Sermon) {
     doc.text("MAIN POINTS", pageW / 2, y, { align: "center" });
     y += 36;
 
-    for (const mp of mainPoints) {
+    for (let i = 0; i < mainPoints.length; i++) {
+      const mp = mainPoints[i];
       if (y + 60 > pageH - margin) { doc.addPage([842, 595]); y = margin; }
 
+      // Numbered heading in bold
       doc.setFont("times", "bold");
       doc.setFontSize(18);
-      const headingLines: string[] = doc.splitTextToSize(mp.heading, contentW - 20);
+      const headingText = `${i + 1}. ${mp.heading}`;
+      const headingLines: string[] = doc.splitTextToSize(headingText, contentW - 20);
       for (const hl of headingLines) {
         if (y + 24 > pageH - margin) { doc.addPage([842, 595]); y = margin; }
         doc.text(hl, margin + 10, y);
@@ -239,6 +239,7 @@ export function exportSermonToPdf(sermon: Sermon) {
       }
       y += 8;
 
+      // Bullets in regular font
       doc.setFont("times", "normal");
       doc.setFontSize(14);
       for (const bullet of mp.bullets) {
@@ -255,30 +256,32 @@ export function exportSermonToPdf(sermon: Sermon) {
     }
   }
 
-  /* ─── PAGE 3+: Illustrations ───────────────────────────────────── */
-  doc.addPage([842, 595]);
-  let y = margin;
+  /* ─── PAGE 3+: Illustrations & Notes (intro text only) ─────────── */
+  if (illustrations.length > 0) {
+    doc.addPage([842, 595]);
+    let y = margin;
 
-  doc.setFont("times", "bold");
-  doc.setFontSize(14);
-  doc.text("ILLUSTRATIONS & NOTES", pageW / 2, y, { align: "center" });
-  y += 36;
+    doc.setFont("times", "bold");
+    doc.setFontSize(14);
+    doc.text("ILLUSTRATIONS & NOTES", pageW / 2, y, { align: "center" });
+    y += 36;
 
-  doc.setFont("times", "normal");
-  doc.setFontSize(13);
-  const lineHeight = 20;
+    doc.setFont("times", "normal");
+    doc.setFontSize(13);
+    const lineHeight = 20;
 
-  for (const para of allIllustrations) {
-    const wrapped: string[] = doc.splitTextToSize(para, contentW);
-    for (const wl of wrapped) {
-      if (y + lineHeight > pageH - margin) { doc.addPage([842, 595]); y = margin; }
-      doc.text(wl, margin, y);
-      y += lineHeight;
+    for (const para of illustrations) {
+      const wrapped: string[] = doc.splitTextToSize(para, contentW);
+      for (const wl of wrapped) {
+        if (y + lineHeight > pageH - margin) { doc.addPage([842, 595]); y = margin; }
+        doc.text(wl, margin, y);
+        y += lineHeight;
+      }
+      y += 8;
     }
-    y += 8;
   }
 
-  // Copyright
+  // Copyright on last page
   doc.setFont("helvetica", "italic");
   doc.setFontSize(9);
   doc.text(COPYRIGHT(), pageW / 2, pageH - 30, { align: "center" });

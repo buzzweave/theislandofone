@@ -92,13 +92,7 @@ function parseSermonStructure(manuscript: string, title: string, scripture: stri
     }
   }
 
-  // Collect all non-heading body text as illustrations
-  const allIllustrations = [...illustrations];
-  for (const mp of mainPoints) {
-    allIllustrations.push(...mp.bullets);
-  }
-
-  return { mainPoints, illustrations: allIllustrations };
+  return { mainPoints, illustrations };
 }
 
 /* ── PDF Generation — 3-Page Preach Ready Layout ─────────────────────── */
@@ -154,17 +148,19 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
     doc.text("MAIN POINTS", pageW / 2, y, { align: "center" });
     y += 36;
 
-    for (const mp of mainPoints) {
+    for (let i = 0; i < mainPoints.length; i++) {
+      const mp = mainPoints[i];
       // Check if we need a new page
       if (y + 60 > pageH - margin) {
         doc.addPage([A4_W, A4_H]);
         y = margin;
       }
 
-      // Main point heading — bold
+      // Numbered main point heading — bold
       doc.setFont("times", "bold");
       doc.setFontSize(18);
-      const headingLines: string[] = doc.splitTextToSize(mp.heading, contentW - 20);
+      const headingText = `${i + 1}. ${mp.heading}`;
+      const headingLines: string[] = doc.splitTextToSize(headingText, contentW - 20);
       for (const hl of headingLines) {
         if (y + 24 > pageH - margin) { doc.addPage([A4_W, A4_H]); y = margin; }
         doc.text(hl, margin + 10, y);
@@ -190,31 +186,33 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
     }
   }
 
-  /* ─── PAGE 3+: Illustrations / Full Sermon Body ────────────────── */
+  /* ─── PAGE 3+: Illustrations / Intro text only ──────────────────── */
 
-  doc.addPage([A4_W, A4_H]);
-  let y = margin;
+  if (illustrations.length > 0) {
+    doc.addPage([A4_W, A4_H]);
+    let y = margin;
 
-  doc.setFont("times", "bold");
-  doc.setFontSize(14);
-  doc.text("ILLUSTRATIONS & NOTES", pageW / 2, y, { align: "center" });
-  y += 36;
+    doc.setFont("times", "bold");
+    doc.setFontSize(14);
+    doc.text("ILLUSTRATIONS & NOTES", pageW / 2, y, { align: "center" });
+    y += 36;
 
-  doc.setFont("times", "normal");
-  doc.setFontSize(13);
-  const lineHeight = 20;
+    doc.setFont("times", "normal");
+    doc.setFontSize(13);
+    const lineHeight = 20;
 
-  for (const para of illustrations) {
-    const wrapped: string[] = doc.splitTextToSize(para, contentW);
-    for (const line of wrapped) {
-      if (y + lineHeight > pageH - margin) {
-        doc.addPage([A4_W, A4_H]);
-        y = margin;
+    for (const para of illustrations) {
+      const wrapped: string[] = doc.splitTextToSize(para, contentW);
+      for (const line of wrapped) {
+        if (y + lineHeight > pageH - margin) {
+          doc.addPage([A4_W, A4_H]);
+          y = margin;
+        }
+        doc.text(line, margin, y);
+        y += lineHeight;
       }
-      doc.text(line, margin, y);
-      y += lineHeight;
+      y += 8;
     }
-    y += 8; // paragraph spacing
   }
 
   // Copyright on last page
