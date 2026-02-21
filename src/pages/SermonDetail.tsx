@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { membershipPlans } from "@/data/content";
 import { useSermon } from "@/hooks/useSermons";
@@ -11,7 +11,12 @@ import SocialShareLinks from "@/components/SocialShareLinks";
 import AudioPlayer from "@/components/AudioPlayer";
 import CommentsWithRating from "@/components/CommentsWithRating";
 import DOMPurify from "dompurify";
-import { exportSermonToPdf, exportSermonToEpub, exportSermonToWord, exportSermonToGoodNotesPdf } from "@/lib/sermonExport";
+import {
+  exportSermonToPdf,
+  exportSermonToEpub,
+  exportSermonToWord,
+  exportSermonToGoodNotesPdf,
+} from "@/lib/sermonExport";
 import { toast } from "sonner";
 
 import {
@@ -29,12 +34,408 @@ import {
   Loader2,
 } from "lucide-react";
 
+function formatAccessLabel(level?: string) {
+  if (!level) return "Members";
+  if (level === "free") return "Free";
+  if (level === "member") return "Members";
+  if (level === "pastor") return "Pastor";
+  if (level === "inner_circle") return "Inner Circle";
+  return String(level).replace(/_/g, " ");
+}
+
 export default function SermonDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: sermon, isLoading } = useSermon(id);
   const { user, isSubscribed, subscription, checkPurchase } = useAuth();
-  const [purchased, setPurchased] = useState(false);
+
+  const [hasPurchased, setHasPurchased] = useState(false);
+  const [checkingPurchase, setCheckingPurchase] = useState(false);
+  const [downloading, setDownloading] = useState<null | "pdf" | "epub" | "word" | "goodnotes">(null);
+
+  // Determine user tier from Stripe subscription (best-effort with common shapes)
+  const productId = useMemo(() => {
+    const s: any = subscription as any;
+    return (
+      s?.product_id ||
+      s?.plan?.product ||
+      s?.items?.data?.[0]?.plan?.product ||
+      s?.subscription?.items?.data?.[0]?.plan?.product ||
+      null
+    );
+  }, [subscription]);
+
+  const userTier = useMemo(() => {
+    if (!productId) return null;
+    try {
+      return getTierByProductId(String(productId));
+    } catch {
+      return null;
+    }
+  }, [productId]);
+
+  // Compute access flags from sermon fields (supports multiple schema variations)
+  const accessLevel = useMemo(() => {
+    const s: any = sermon as any;
+    return (s?.access_level ?? "free") as string;
+  }, [sermon]);
+
+  const priceNum = useMemo(() => {
+    const s: any = sermon as any;
+    const p = Number(s?.price ?? 0);
+    return Number.isFinite(p) ? p : 0;
+  }, [sermon]);
+
+  const chargeEnabled = useMemo(() => {
+    const s: any = sermon as any;
+    // supports either charge_enabled or charge_for_sermon
+    return Boolean(s?.charge_enabled ?? s?.charge_for_sermon ?? false);
+  }, [sermon]);
+
+  const isFree = useMemo(() => {
+    const s: any = sermon as any;
+    // supports is_free and access_level
+    return Boolean(s?.is_free === true || accessLevel === "free");
+  }, [sermon, accessLevel]);
+
+  const isLockedSermon = useMemo(() => {
+    // If explicitly free -> not locked.
+    // Otherwise: locked if access_level not free OR price > 0 OR chargeEnabled true.
+    if (isFree) return false;
+    return accessLevel !== "free" || priceNum > 0 || chargeEnabled;
+  }, [isFree, accessLevel, priceNum, chargeEnabled]);
+
+  // Check one-off purchase (if your app supports purchases per sermon)
+  useEffect(() => {
+    let active = true;
+
+    async function run() {
+      if (!sermon?.id || !user || typeof checkPurchase !== "function") {
+        if (active) setHasPurchased(false);
+        return;
+      }
+      setCheckingPurchase(true);
+      try {
+        const ok = await checkPurchase((sermon as any).id);
+        if (active) setHasPurchased(!!ok);
+      } catch {
+        if (active) setHasPurchased(false);
+      } finally {
+        if (active) setCheckingPurchase(false);
+      }
+    }
+
+    run();
+    return () => {
+      active = false;
+    };
+  }, [sermon?.id, user, checkPurchase]);
+
+  // Tier entitlement check (uses your helper when available)
+  const tierAllows = useMemo(() => {
+    if (!userTier) return false;
+    try {
+      return tierHasAccess(userTier, accessLevel);
+    } catch {
+      // fallback: if subscribed and accessLevel is "member", allow
+      return false;
+    }
+  }, [userTier, accessLevel]);
+
+  const entitled = useMemo(() => {
+    // Free sermons are always readable.
+    if (!isLockedSermon) return true;
+
+    // Must be logged in for anything locked
+    if (!user) return false;
+
+    // Purchased unlocks
+    if (hasPurchased) return true;
+
+    // Tier-based unlock
+    if (tierAllows) return true;
+
+    // Basic fallback: any subscription unlocks "member" level
+    if (isSubscribed && accessLevel === "member") return true;
+
+    return false;
+  }, [isLockedSermon, user, hasPurchased, tierAllows, isSubscribed, accessLevel]);
+
+  // Content rendering (HTML sanitized)
+  const safeHtml = useMemo(() => {
+    const s: any = sermon as any;
+    const raw = s?.content_html ?? s?.content ?? s?.body ?? "";
+    return DOMPurify.sanitize(String(raw), { USE_PROFILES: { html: true } });
+  }, [sermon]);
+
+  const excerptText = useMemo(() => {
+    const s: any = sermon as any;
+    return String(s?.excerpt ?? s?.summary ?? "").trim();
+  }, [sermon]);
+
+  async function handleDownload(kind: "pdf" | "epub" | "word" | "goodnotes") {
+    if (!sermon) return;
+
+    if (isLockedSermon && !entitled) {
+      toast.error("This download is available to members.");
+      return;
+    }
+
+    try {
+      setDownloading(kind);
+
+      // Best-effort “title” and “content” fields for exporters
+      const s: any = sermon as any;
+      const title = String(s?.title ?? "Sermon");
+      const scripture = String(s?.scripture ?? "");
+      const content = String(s?.content_html ?? s?.content ?? s?.body ?? "");
+
+      if (kind === "pdf") {
+        await exportSermonToPdf({ title, scripture, content });
+        toast.success("PDF exported.");
+      } else if (kind === "epub") {
+        await exportSermonToEpub({ title, scripture, content });
+        toast.success("EPUB exported.");
+      } else if (kind === "word") {
+        await exportSermonToWord({ title, scripture, content });
+        toast.success("Word exported.");
+      } else {
+        await exportSermonToGoodNotesPdf({ title, scripture, content });
+        toast.success("GoodNotes PDF exported.");
+      }
+    } catch (e: any) {
+      toast.error(e?.message ? String(e.message) : "Export failed.");
+    } finally {
+      setDownloading(null);
+    }
+  }
+
+  // ---------- LOADING ----------
+  if (isLoading) {
+    return (
+      <div className="min-h-screen">
+        <div className="container mx-auto px-4 py-16 max-w-3xl">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading sermon…
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ---------- NOT FOUND ----------
+  if (!sermon) {
+    return (
+      <div className="min-h-screen">
+        <div className="container mx-auto px-4 py-16 max-w-3xl">
+          <Button variant="ghost" onClick={() => navigate(-1)} className="gap-2">
+            <ArrowLeft className="h-4 w-4" /> Back
+          </Button>
+          <div className="mt-10 text-muted-foreground">Sermon not found.</div>
+        </div>
+      </div>
+    );
+  }
+
+  // ---------- PAYWALL VIEW (LOCKED + NOT ENTITLED) ----------
+  if (isLockedSermon && !entitled) {
+    return (
+      <div className="min-h-screen">
+        <div className="container mx-auto px-4 py-10 max-w-3xl">
+          <button
+            onClick={() => navigate(-1)}
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6"
+          >
+            <ArrowLeft className="h-4 w-4" /> Back
+          </button>
+
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+              <Lock className="h-3 w-3 inline mr-1" />
+              {priceNum > 0 ? `$${priceNum.toFixed(2)}` : formatAccessLabel(accessLevel)}
+            </span>
+            {checkingPurchase ? (
+              <span className="text-xs text-muted-foreground inline-flex items-center gap-2">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Checking access…
+              </span>
+            ) : null}
+          </div>
+
+          <h1 className="font-display text-3xl sm:text-5xl font-bold mb-3">{(sermon as any).title}</h1>
+          {(sermon as any).scripture ? (
+            <p className="text-sm text-primary/80 mb-6">{(sermon as any).scripture}</p>
+          ) : null}
+
+          {excerptText ? (
+            <div className="text-base leading-relaxed text-muted-foreground whitespace-pre-wrap">{excerptText}</div>
+          ) : (
+            <p className="text-base leading-relaxed text-muted-foreground">
+              This sermon is available to members. Join to unlock the full manuscript.
+            </p>
+          )}
+
+          <div className="mt-8 p-6 rounded-xl border border-primary/20 bg-primary/5">
+            <div className="flex items-center gap-2 mb-2">
+              <Lock className="h-4 w-4 text-primary" />
+              <h3 className="font-semibold">Members Only</h3>
+            </div>
+
+            <p className="text-sm text-muted-foreground mb-4">
+              {priceNum > 0
+                ? `Unlock this sermon for $${priceNum.toFixed(2)} or join a membership tier for access.`
+                : `Join ${formatAccessLabel(accessLevel)} to unlock this sermon.`}
+            </p>
+
+            <div className="flex flex-wrap gap-3">
+              {!user ? (
+                <Button onClick={() => navigate("/login")} className="rounded-full">
+                  Sign In
+                </Button>
+              ) : null}
+
+              <Button onClick={() => navigate("/membership")} className="rounded-full">
+                Join Membership
+              </Button>
+
+              <Button variant="outline" onClick={() => navigate("/sermons")} className="rounded-full">
+                Browse Library
+              </Button>
+            </div>
+
+            <div className="mt-6 text-xs text-muted-foreground">
+              Tip: If you already joined, sign in with the same email you used for membership.
+            </div>
+          </div>
+
+          <div className="mt-8">
+            <SocialShareLinks title={(sermon as any).title} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ---------- FULL ACCESS VIEW ----------
+  return (
+    <div className="min-h-screen">
+      <div className="container mx-auto px-4 py-10 max-w-4xl">
+        <div className="flex items-center justify-between gap-4 mb-6">
+          <Button variant="ghost" onClick={() => navigate(-1)} className="gap-2">
+            <ArrowLeft className="h-4 w-4" /> Back
+          </Button>
+
+          <div className="flex items-center gap-2">
+            {isLockedSermon ? (
+              <span className="inline-flex items-center gap-2 text-xs px-3 py-1 rounded-full border border-primary/20 bg-primary/10 text-primary">
+                <CheckCircle2 className="h-4 w-4" />
+                Access Granted
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-2 text-xs px-3 py-1 rounded-full border border-primary/10 bg-primary/5 text-primary/80">
+                <Eye className="h-4 w-4" />
+                Free
+              </span>
+            )}
+          </div>
+        </div>
+
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="font-display text-2xl sm:text-3xl">{(sermon as any).title}</CardTitle>
+            {(sermon as any).scripture ? (
+              <p className="text-sm text-primary/80 mt-2">{(sermon as any).scripture}</p>
+            ) : null}
+          </CardHeader>
+
+          <CardContent>
+            <div className="flex flex-wrap items-center gap-2 mb-6">
+              {(sermon as any).category ? (
+                <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                  {(sermon as any).category}
+                </span>
+              ) : null}
+              {isLockedSermon ? (
+                <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                  <Lock className="h-3 w-3 inline mr-1" />
+                  {priceNum > 0 ? `$${priceNum.toFixed(2)}` : formatAccessLabel(accessLevel)}
+                </span>
+              ) : null}
+              {(sermon as any).date ? (
+                <span className="text-xs text-muted-foreground">{(sermon as any).date}</span>
+              ) : null}
+            </div>
+
+            {/* CONTENT */}
+            <div className="prose prose-invert max-w-none">
+              <div dangerouslySetInnerHTML={{ __html: safeHtml }} />
+            </div>
+
+            {/* AUDIO (optional) */}
+            {(sermon as any).audio_url ? (
+              <div className="mt-10">
+                <AudioPlayer src={(sermon as any).audio_url} title={(sermon as any).title} />
+              </div>
+            ) : null}
+
+            {/* DOWNLOADS */}
+            <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <Button
+                onClick={() => handleDownload("pdf")}
+                disabled={downloading !== null}
+                className="w-full gap-2"
+              >
+                {downloading === "pdf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                PDF
+              </Button>
+
+              <Button
+                onClick={() => handleDownload("goodnotes")}
+                disabled={downloading !== null}
+                variant="outline"
+                className="w-full gap-2"
+              >
+                {downloading === "goodnotes" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Tablet className="h-4 w-4" />}
+                GoodNotes
+              </Button>
+
+              <Button
+                onClick={() => handleDownload("word")}
+                disabled={downloading !== null}
+                variant="outline"
+                className="w-full gap-2"
+              >
+                {downloading === "word" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                Word
+              </Button>
+
+              <Button
+                onClick={() => handleDownload("epub")}
+                disabled={downloading !== null}
+                variant="outline"
+                className="w-full gap-2"
+              >
+                {downloading === "epub" ? <Loader2 className="h-4 w-4 animate-spin" /> : <BookOpen className="h-4 w-4" />}
+                EPUB
+              </Button>
+            </div>
+
+            {/* SHARE */}
+            <div className="mt-10">
+              <SocialShareLinks title={(sermon as any).title} />
+            </div>
+
+            {/* COMMENTS */}
+            <div className="mt-10">
+              <CommentsWithRating contentType="sermon" contentId={(sermon as any).id} />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}  const [purchased, setPurchased] = useState(false);
   const [checkingPurchase, setCheckingPurchase] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
