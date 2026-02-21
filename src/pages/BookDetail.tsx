@@ -7,7 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getTierByProductId, tierHasAccess } from "@/lib/stripe";
 import { supabase } from "@/integrations/supabase/client";
 import SocialShareLinks from "@/components/SocialShareLinks";
-import FacebookComments from "@/components/FacebookComments";
+import CommentsWithRating from "@/components/CommentsWithRating";
 import AudioPlayer from "@/components/AudioPlayer";
 import DOMPurify from "dompurify";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -399,7 +399,7 @@ Buy for ${Number(book.price || 0).toFixed(2)}
           </div>
 
           <div className="max-w-3xl mx-auto mt-8 pt-6 border-t border-border">
-            <FacebookComments slug={`books/${id}`} />
+            <CommentsWithRating contentType="book" contentId={id!} />
           </div>
         </div>
       </section>
