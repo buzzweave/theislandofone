@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Download, X } from "lucide-react";
+import { Download } from "lucide-react";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -8,11 +8,11 @@ interface BeforeInstallPromptEvent extends Event {
 
 export default function InstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [showIOSModal, setShowIOSModal] = useState(false);
   const [installed, setInstalled] = useState(false);
 
+  const isIOS = typeof navigator !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+
   useEffect(() => {
-    // Check if already installed
     if (window.matchMedia("(display-mode: standalone)").matches) {
       setInstalled(true);
       return;
@@ -31,9 +31,18 @@ export default function InstallPrompt() {
     };
   }, []);
 
-  if (installed) return null;
+  // Auto-trigger install prompt as soon as it's available
+  useEffect(() => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(({ outcome }) => {
+        if (outcome === "accepted") setInstalled(true);
+        setDeferredPrompt(null);
+      });
+    }
+  }, [deferredPrompt]);
 
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+  if (installed) return null;
 
   const handleClick = async () => {
     if (deferredPrompt) {
@@ -41,51 +50,18 @@ export default function InstallPrompt() {
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === "accepted") setInstalled(true);
       setDeferredPrompt(null);
-    } else if (isIOS) {
-      setShowIOSModal(true);
     }
   };
 
-  // Only show if we can install or on iOS
   if (!deferredPrompt && !isIOS) return null;
 
   return (
-    <>
-      <button
-        onClick={handleClick}
-        className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors border border-primary/20"
-      >
-        <Download className="h-3.5 w-3.5" />
-        Get App
-      </button>
-
-      {/* iOS instructions modal */}
-      {showIOSModal && (
-        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-background/80 backdrop-blur-sm">
-          <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-sm mx-auto shadow-lg">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-display text-lg font-semibold text-foreground">Install App</h3>
-              <button onClick={() => setShowIOSModal(false)} className="text-muted-foreground hover:text-foreground">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="space-y-3 text-sm text-muted-foreground">
-              <p>To install this app on your iPhone or iPad:</p>
-              <ol className="list-decimal list-inside space-y-2">
-                <li>Tap the <strong className="text-foreground">Share</strong> button in Safari (square with arrow)</li>
-                <li>Scroll down and tap <strong className="text-foreground">Add to Home Screen</strong></li>
-                <li>Tap <strong className="text-foreground">Add</strong> to confirm</li>
-              </ol>
-            </div>
-            <button
-              onClick={() => setShowIOSModal(false)}
-              className="mt-5 w-full px-4 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
-            >
-              Got it
-            </button>
-          </div>
-        </div>
-      )}
-    </>
+    <button
+      onClick={handleClick}
+      className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors border border-primary/20"
+    >
+      <Download className="h-3.5 w-3.5" />
+      Get App
+    </button>
   );
 }
