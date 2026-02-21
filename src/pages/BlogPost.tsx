@@ -6,7 +6,7 @@ import { ArrowLeft, Calendar, User } from "lucide-react";
 import { format } from "date-fns";
 import { extractParagraphs } from "@/lib/textFormat";
 import SocialShareLinks from "@/components/SocialShareLinks";
-import FacebookComments from "@/components/FacebookComments";
+import FacebookCommentsWithRating from "@/components/FacebookCommentsWithRating";
 import { cn } from "@/lib/utils";
 
 export default function BlogPost() {
@@ -122,7 +122,11 @@ export default function BlogPost() {
           />
         </div>
         <div className="mt-6 pt-6 border-t border-border">
-          <FacebookComments slug={slug!} />
+          <FacebookCommentsWithRating
+            contentType="blog"
+            contentId={post.id}
+            slug={slug}
+          />
         </div>
       </article>
     </div>
