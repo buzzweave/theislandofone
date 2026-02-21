@@ -31,17 +31,6 @@ export default function InstallPrompt() {
     };
   }, []);
 
-  // Auto-trigger install prompt as soon as it's available
-  useEffect(() => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      deferredPrompt.userChoice.then(({ outcome }) => {
-        if (outcome === "accepted") setInstalled(true);
-        setDeferredPrompt(null);
-      });
-    }
-  }, [deferredPrompt]);
-
   if (installed) return null;
 
   const handleClick = async () => {
