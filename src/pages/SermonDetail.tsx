@@ -1,90 +1,27 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { membershipPlans } from "@/data/content";
 import { useSermon } from "@/hooks/useSermons";
 import { useAuth } from "@/contexts/AuthContext";
 import { getTierByProductId, tierHasAccess } from "@/lib/stripe";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import DOMPurify from "dompurify";
 import { toast } from "sonner";
 
-import {
-  ArrowLeft,
-  Lock,
-  Eye,
-  ShoppingCart,
-  Download,
-  FileText,
-  BookOpen,
-  FileDown,
-  CheckCircle2,
-  Crown,
-  Tablet,
-  Loader2,
-} from "lucide-react";
+import { ArrowLeft, Lock, Eye, ShoppingCart, Crown, Loader2 } from "lucide-react";
 
-function safeDateLabel(value: any) {
-  try {
-    if (!value) return "";
-    const d = new Date(value);
-    if (isNaN(d.getTime())) return "";
-    return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-  } catch {
-    return "";
-  }
+function safeMoney(n: any) {
+  const v = Number(n ?? 0);
+  return Number.isFinite(v) ? v : 0;
 }
 
-class PageErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; message: string }> {
-  constructor(props: any) {
-    super(props);
-    this.state = { hasError: false, message: "" };
-  }
-  static getDerivedStateFromError(error: any) {
-    return { hasError: true, message: error?.message ? String(error.message) : "Unknown error" };
-  }
-  componentDidCatch(error: any, info: any) {
-    console.error("SermonDetail crashed:", error, info);
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen">
-          <div className="container mx-auto px-4 py-16 max-w-2xl">
-            <div className="p-6 rounded-xl border border-destructive/30 bg-destructive/5">
-              <h1 className="font-display text-2xl font-bold mb-2">Page Error</h1>
-              <p className="text-sm text-muted-foreground mb-4">
-                This page hit a runtime error. Open your browser console to see the full stack trace.
-              </p>
-              <div className="text-xs text-muted-foreground break-words">
-                <span className="font-semibold">Message:</span> {this.state.message}
-              </div>
-              <div className="mt-6">
-                <Link to="/sermons" className="text-primary text-sm font-semibold hover:underline">
-                  Back to Sermon Library
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children as any;
-  }
+function safeText(v: any) {
+  return String(v ?? "").trim();
 }
 
 export default function SermonDetail() {
-  return (
-    <PageErrorBoundary>
-      <SermonDetailInner />
-    </PageErrorBoundary>
-  );
-}
-
-function SermonDetailInner() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+
   const { data: sermon, isLoading } = useSermon(id);
   const { user, isSubscribed, subscription, checkPurchase } = useAuth();
 
@@ -92,106 +29,106 @@ function SermonDetailInner() {
   const [checkingPurchase, setCheckingPurchase] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
+  // Sermon fields (support variations)
+  const title = safeText((sermon as any)?.title);
+  const scripture = safeText((sermon as any)?.scripture);
+  const excerpt = safeText((sermon as any)?.excerpt ?? (sermon as any)?.summary);
+  const accessLevel = safeText((sermon as any)?.access_level || "free");
+  const isFreeFlag = Boolean((sermon as any)?.is_free === true);
+  const chargeEnabled = Boolean((sermon as any)?.charge_enabled ?? (sermon as any)?.charge_for_sermon ?? false);
+  const price = safeMoney((sermon as any)?.price);
+
+  // Determine if sermon should be locked
+  const isLocked = useMemo(() => {
+    if (isFreeFlag || accessLevel === "free") return false;
+    // If price is set or charge toggle is on, lock it.
+    if (price > 0 || chargeEnabled) return true;
+    // Otherwise still locked if access level requires it
+    return accessLevel !== "free";
+  }, [isFreeFlag, accessLevel, price, chargeEnabled]);
+
+  // Check one-time purchase for this sermon
   useEffect(() => {
-    let active = true;
+    let alive = true;
 
     async function run() {
-      if (!user || !id || !sermon || (sermon as any).is_free) return;
-
+      if (!user || !id || !sermon || !isLocked) {
+        if (alive) setPurchased(false);
+        return;
+      }
       setCheckingPurchase(true);
       try {
-        const result = await checkPurchase("sermon", id);
-        if (active) setPurchased(!!result);
+        // Your auth context signature previously: checkPurchase("sermon", id)
+        const ok = await checkPurchase("sermon", id);
+        if (alive) setPurchased(!!ok);
       } catch {
-        if (active) setPurchased(false);
+        if (alive) setPurchased(false);
       } finally {
-        if (active) setCheckingPurchase(false);
+        if (alive) setCheckingPurchase(false);
       }
     }
 
     run();
     return () => {
-      active = false;
+      alive = false;
     };
-  }, [user, id, sermon, checkPurchase]);
+  }, [user, id, sermon, isLocked, checkPurchase]);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground animate-pulse">Loading sermon…</p>
-      </div>
-    );
-  }
+  // Tier access (membership tiers)
+  const productId =
+    (subscription as any)?.product_id ??
+    (subscription as any)?.plan?.product ??
+    (subscription as any)?.items?.data?.[0]?.plan?.product ??
+    null;
 
-  if (!sermon) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <p className="text-muted-foreground">Sermon not found.</p>
-          <Button variant="outline" onClick={() => navigate("/sermons")}>
-            <ArrowLeft className="h-4 w-4 mr-2" /> Back to Library
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  const manuscriptRaw = String(
-    (sermon as any).manuscript ?? (sermon as any).content ?? (sermon as any).content_html ?? "",
-  );
-  const previewCutoff = Number((sermon as any).preview_cutoff ?? 0);
-
-  const paragraphs = useMemo(() => {
-    const parts = manuscriptRaw
-      .split(/\n\s*\n/g)
-      .map((p) => p.trim())
-      .filter(Boolean);
-    return parts.length > 0 ? parts : [manuscriptRaw];
-  }, [manuscriptRaw]);
-
-  const previewParagraphs = useMemo(() => {
-    const cutoff = Number.isFinite(previewCutoff) ? previewCutoff : 0;
-    const safeCutoff = Math.max(0, Math.min(cutoff + 1, paragraphs.length));
-    return paragraphs.slice(0, safeCutoff);
-  }, [previewCutoff, paragraphs]);
-
-  const productId = (subscription as any)?.product_id ?? null;
-  const userTier = productId ? getTierByProductId(productId) : null;
-
-  const accessTiers = (sermon as any).access_tiers ?? [];
-  const accessLevel = (sermon as any).access_level ?? "free";
+  const userTier = useMemo(() => {
+    try {
+      return productId ? getTierByProductId(String(productId)) : null;
+    } catch {
+      return null;
+    }
+  }, [productId]);
 
   const tierAccess = useMemo(() => {
     try {
-      if (Array.isArray(accessTiers) && accessTiers.length > 0) {
-        return userTier ? tierHasAccess(userTier, accessTiers) : false;
-      }
       if (!userTier) return false;
+      const accessTiers = (sermon as any)?.access_tiers;
+      if (Array.isArray(accessTiers) && accessTiers.length > 0) {
+        return tierHasAccess(userTier, accessTiers);
+      }
       return tierHasAccess(userTier, accessLevel);
     } catch {
       return false;
     }
-  }, [userTier, accessTiers, accessLevel]);
+  }, [userTier, sermon, accessLevel]);
 
-  const isFullAccess = Boolean((sermon as any).is_free || purchased || isSubscribed || tierAccess);
+  const isFullAccess = useMemo(() => {
+    if (!isLocked) return true;
+    if (!user) return false;
+    if (purchased) return true;
+    if (isSubscribed) return true;
+    if (tierAccess) return true;
+    return false;
+  }, [isLocked, user, purchased, isSubscribed, tierAccess]);
 
-  const dateLabel = safeDateLabel((sermon as any).date);
+  // Manuscript / content
+  const manuscriptRaw = useMemo(() => {
+    const s: any = sermon as any;
+    return safeText(s?.manuscript ?? s?.content ?? s?.content_html ?? s?.body ?? "");
+  }, [sermon]);
 
-  const renderContent = (content: string) => {
-    const isHtml = content?.includes("<") && content?.includes(">");
-    if (isHtml) {
-      return (
-        <div
-          className="sermon-flow [&_*]:!text-foreground"
-          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }}
-        />
-      );
-    }
-    return <div className="sermon-flow whitespace-pre-wrap">{content}</div>;
-  };
+  const sanitizedHtml = useMemo(() => {
+    // Render as HTML if it looks like HTML, else render as pre-wrap text
+    const looksHtml = manuscriptRaw.includes("<") && manuscriptRaw.includes(">");
+    if (!looksHtml) return null;
+    return DOMPurify.sanitize(manuscriptRaw);
+  }, [manuscriptRaw]);
 
-  const handlePurchase = async () => {
-    if (!id) return;
+  // Preview: excerpt ONLY (hard stop) when locked and not entitled
+  const shouldShowPaywall = isLocked && !isFullAccess;
+
+  async function handlePurchase() {
+    if (!id || !sermon) return;
 
     if (!user) {
       navigate("/auth", { state: { from: `/sermons/${id}` } });
@@ -204,234 +141,121 @@ function SermonDetailInner() {
         body: {
           type: "sermon",
           itemId: id,
-          priceAmount: (sermon as any).price,
-          itemTitle: (sermon as any).title,
+          priceAmount: price,
+          itemTitle: title || "Sermon",
         },
       });
 
       if (error) throw error;
-      if (data?.url) window.open(data.url, "_blank");
-      else toast.error("Checkout link not returned.");
+
+      if (data?.url) {
+        window.location.href = data.url; // go to Stripe
+      } else {
+        toast.error("Checkout URL not returned.");
+      }
     } catch (err: any) {
       toast.error(err?.message || "Failed to start checkout");
     } finally {
       setCheckoutLoading(false);
     }
-  };
+  }
 
-  const handleDownload = (format: string) => {
-    // Safe mode: disable downloads until we confirm the page is stable
-    toast.message(`Downloads temporarily disabled in safe mode (${format}).`);
-  };
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading sermon…</div>;
+  }
+
+  if (!sermon) {
+    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Sermon not found.</div>;
+  }
 
   return (
-    <div className="min-h-screen">
-      <section className="py-16 bg-gradient-section">
-        <div className="container mx-auto px-4">
-          <button
-            onClick={() => navigate("/sermons")}
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-8"
-          >
-            <ArrowLeft className="h-4 w-4" /> Back to Sermon Library
-          </button>
+    <div className="min-h-screen py-10">
+      <div className="container mx-auto px-4 max-w-3xl">
+        <button
+          onClick={() => navigate("/sermons")}
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-8"
+        >
+          <ArrowLeft className="h-4 w-4" /> Back to Sermons
+        </button>
 
-          <div className="max-w-3xl">
-            <div className="flex items-center gap-3 mb-3">
-              <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-                {(sermon as any).category ?? "Sermon"}
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            {isLocked ? (
+              <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                <Lock className="h-3 w-3" />
+                {price > 0 ? `$${price.toFixed(2)}` : "Members"}
               </span>
-
-              {!(sermon as any).is_free && !isFullAccess && (
-                <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                  <Lock className="h-2.5 w-2.5" /> {String(accessLevel)}
-                </span>
-              )}
-
-              {(sermon as any).is_free && (
-                <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/5 text-primary/70 border border-primary/10">
-                  Free
-                </span>
-              )}
-
-              {checkingPurchase && (
-                <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-                  <Loader2 className="h-3 w-3 animate-spin" /> Checking access…
-                </span>
-              )}
-            </div>
-
-            <h1 className="font-display text-4xl md:text-5xl font-bold mb-3">{(sermon as any).title ?? "Sermon"}</h1>
-
-            {(sermon as any).scripture ? (
-              <p className="text-lg text-primary/80 mb-2">{(sermon as any).scripture}</p>
-            ) : null}
-
-            {(sermon as any).excerpt ? <p className="text-muted-foreground">{(sermon as any).excerpt}</p> : null}
-
-            {dateLabel ? (
-              <p className="text-sm text-muted-foreground mt-3 mb-4">
-                Published {dateLabel} {" · "}By Bryant Clark
-              </p>
             ) : (
-              <p className="text-sm text-muted-foreground mt-3 mb-4">By Bryant Clark</p>
+              <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/5 text-primary/70 border border-primary/10">
+                <Eye className="h-3 w-3" />
+                Free
+              </span>
             )}
-          </div>
-        </div>
-      </section>
 
-      <div className="container mx-auto px-4 py-12">
-        <div className="max-w-3xl mx-auto grid lg:grid-cols-[1fr_300px] gap-8">
-          <div>
-            <div className="mb-2">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4">
-                <Eye className="h-3.5 w-3.5" />
-                {isFullAccess ? "Full Manuscript" : "Preview"}
-              </div>
+            {checkingPurchase ? (
+              <span className="text-xs text-muted-foreground inline-flex items-center gap-2">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Checking access…
+              </span>
+            ) : null}
+          </div>
+
+          <h1 className="font-display text-3xl sm:text-5xl font-bold mb-2">{title || "Sermon"}</h1>
+
+          {scripture ? <p className="text-sm text-primary/80">{scripture}</p> : null}
+        </div>
+
+        {/* PAYWALL VIEW */}
+        {shouldShowPaywall ? (
+          <div className="rounded-xl border border-primary/20 bg-primary/5 p-6">
+            <p className="text-sm text-muted-foreground mb-4">
+              {excerpt
+                ? excerpt
+                : "This sermon is available to members. Join or purchase to unlock the full manuscript."}
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={handlePurchase}
+                disabled={checkoutLoading}
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold"
+              >
+                {checkoutLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShoppingCart className="h-4 w-4" />}
+                Buy for ${price.toFixed(2)}
+              </button>
+
+              <Link
+                to="/membership"
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full border border-primary/30 font-semibold"
+              >
+                <Crown className="h-4 w-4" />
+                Join Membership
+              </Link>
+
+              {!user ? (
+                <Link
+                  to="/auth"
+                  className="inline-flex items-center justify-center px-5 py-2.5 rounded-full border border-border font-semibold"
+                >
+                  Sign In
+                </Link>
+              ) : null}
             </div>
 
-            <article className="sermon-flow max-w-none">
-              {(isFullAccess ? paragraphs : previewParagraphs).map((p, i) => (
-                <div key={i}>{renderContent(p)}</div>
-              ))}
-            </article>
-
-            {!isFullAccess && (
-              <div className="relative mt-0">
-                <div className="absolute inset-x-0 -top-32 h-32 bg-gradient-to-b from-transparent to-background pointer-events-none" />
-                <div className="pt-8 pb-4 text-center space-y-4">
-                  <Lock className="h-8 w-8 text-primary mx-auto" />
-                  <p className="font-display text-xl font-semibold">Continue Reading</p>
-                  <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                    Purchase this sermon to read the full manuscript and download.
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                    <Button size="lg" onClick={handlePurchase} disabled={checkoutLoading}>
-                      {checkoutLoading ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <ShoppingCart className="h-4 w-4 mr-2" />
-                      )}
-                      Buy for ${Number((sermon as any).price ?? 0).toFixed(2)}
-                    </Button>
-
-                    <Button variant="outline" size="lg" asChild>
-                      <Link to="/membership">
-                        <Crown className="h-4 w-4 mr-2" />
-                        Subscribe &amp; Get All
-                      </Link>
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {isFullAccess && (
-              <div className="mt-12 pt-8 border-t border-border">
-                <h3 className="font-display text-lg font-semibold mb-4 flex items-center gap-2">
-                  <Download className="h-5 w-5 text-primary" />
-                  Download This Sermon
-                </h3>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {[
-                    { format: "GoodNotes", icon: Tablet, desc: "iPad pulpit format (A4)" },
-                    { format: "PDF", icon: FileText, desc: "Print-ready pulpit format" },
-                    { format: "EPUB", icon: BookOpen, desc: "Kindle compatible" },
-                    { format: "Word", icon: FileDown, desc: "Editable pulpit format" },
-                  ].map(({ format, icon: Icon, desc }) => (
-                    <button
-                      key={format}
-                      onClick={() => handleDownload(format)}
-                      className="flex items-center gap-3 p-4 rounded-lg border border-border bg-card hover:border-primary/40 hover:bg-card/80 transition-all group"
-                    >
-                      <Icon className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
-                      <div className="text-left">
-                        <p className="text-sm font-medium">{format}</p>
-                        <p className="text-xs text-muted-foreground">{desc}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-
-                <p className="text-xs text-muted-foreground mt-3">
-                  Safe mode is enabled. After the page is stable, we will re-enable real exports.
-                </p>
-              </div>
+            <p className="text-xs text-muted-foreground mt-4">
+              After purchase, refresh this page (or return from Stripe) and the full sermon will unlock.
+            </p>
+          </div>
+        ) : (
+          /* FULL VIEW */
+          <div className="prose prose-invert max-w-none">
+            {sanitizedHtml ? (
+              <div dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />
+            ) : (
+              <div className="whitespace-pre-wrap">{manuscriptRaw}</div>
             )}
           </div>
-
-          <div className="space-y-4">
-            {!isFullAccess && (
-              <Card className="border-primary/20">
-                <CardHeader className="pb-3">
-                  <CardTitle className="font-display text-lg">Get This Sermon</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="text-3xl font-bold text-primary">
-                    ${Number((sermon as any).price ?? 0).toFixed(2)}
-                  </div>
-                  <p className="text-xs text-muted-foreground">One-time purchase.</p>
-                  <Button className="w-full" onClick={handlePurchase} disabled={checkoutLoading}>
-                    {checkoutLoading ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <ShoppingCart className="h-4 w-4 mr-2" />
-                    )}
-                    Purchase
-                  </Button>
-                  <div className="text-center">
-                    <span className="text-xs text-muted-foreground">or</span>
-                  </div>
-                  <Button variant="outline" className="w-full" asChild>
-                    <Link to="/membership">
-                      <Crown className="h-4 w-4 mr-2" /> Subscribe
-                    </Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-
-            {isFullAccess && !(sermon as any).is_free && (
-              <Card className="border-primary/30">
-                <CardContent className="pt-6 text-center space-y-3">
-                  <CheckCircle2 className="h-10 w-10 text-primary mx-auto" />
-                  <p className="font-display text-lg font-semibold">
-                    {isSubscribed ? "Subscriber Access" : "Purchased!"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Full manuscript unlocked.</p>
-                </CardContent>
-              </Card>
-            )}
-
-            <Card>
-              <CardContent className="pt-6 space-y-3">
-                <Crown className="h-6 w-6 text-primary" />
-                <p className="font-display text-sm font-semibold">Unlock All Sermons</p>
-                <p className="text-xs text-muted-foreground">
-                  Subscribe to get unlimited access to the entire sermon library.
-                </p>
-                <div className="space-y-1.5">
-                  {membershipPlans.slice(0, 2).map((plan) => (
-                    <div
-                      key={plan.id}
-                      className="flex items-center justify-between text-xs p-2 rounded bg-secondary/30"
-                    >
-                      <span className="font-medium">{plan.name}</span>
-                      <span className="text-primary font-semibold">${plan.price}/mo</span>
-                    </div>
-                  ))}
-                </div>
-                <Button variant="outline" size="sm" className="w-full" asChild>
-                  <Link to="/membership">View Plans</Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        <p className="mt-10 text-xs text-muted-foreground text-center">
-          © {new Date().getFullYear()} The Island of One Ministries. All rights reserved.
-        </p>
+        )}
       </div>
     </div>
   );
