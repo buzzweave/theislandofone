@@ -29,13 +29,13 @@ import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import Contact from "./pages/Contact";
+import NotFound from "./pages/NotFound";
 import Copyright from "./pages/Copyright";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Community from "./pages/Community";
 import ForumCategory from "./pages/ForumCategory";
 import ForumThread from "./pages/ForumThread";
-import NotFound from "./pages/NotFound";
 
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminBookEditor from "./pages/admin/AdminBookEditor";
@@ -89,6 +89,7 @@ const App = () => {
             <GlobalCopyProtection>
               <BrowserRouter>
                 <Routes>
+                  {/* Public routes */}
                   <Route
                     path="/"
                     element={
@@ -266,8 +267,10 @@ const App = () => {
                     }
                   />
 
+                  {/* Admin login (public) */}
                   <Route path="/admin/login" element={<AdminLogin />} />
 
+                  {/* Protected admin routes */}
                   <Route
                     path="/admin"
                     element={
