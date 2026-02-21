@@ -111,12 +111,20 @@ export default function SermonDetail() {
     if (isHtml) {
       return (
         <div
-          className="sermon-content [&_*]:!text-white"
+          className="sermon-flow [&_*]:!text-foreground"
           dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }}
         />
       );
     }
-    return <p className="text-white leading-relaxed whitespace-pre-wrap" style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontSize: '20px', lineHeight: 1.7 }}>{content}</p>;
+    // Plain text: preserve every line exactly as pasted
+    const lines = content.split(/\n/).map(l => l.trim()).filter(l => l.length > 0);
+    return (
+      <div className="sermon-flow">
+        {lines.map((line, i) => (
+          <p key={i}>{line}</p>
+        ))}
+      </div>
+    );
   };
 
   return (
@@ -175,9 +183,9 @@ export default function SermonDetail() {
               </div>
             </div>
 
-            <article className="sermon-content max-w-none">
+            <article className="sermon-flow max-w-none">
               {(isFullAccess ? paragraphs : previewParagraphs).map((p, i) => (
-                <div key={i} className="text-white leading-relaxed">
+                <div key={i}>
                   {renderContent(p)}
                 </div>
               ))}

@@ -7,7 +7,7 @@ import { format } from "date-fns";
 import { extractParagraphs } from "@/lib/textFormat";
 import SocialShareLinks from "@/components/SocialShareLinks";
 import CommentsWithRating from "@/components/CommentsWithRating";
-import { cn } from "@/lib/utils";
+
 
 export default function BlogPost() {
   const { slug } = useParams<{ slug: string }>();
@@ -62,7 +62,7 @@ export default function BlogPost() {
     );
   }
 
-  let paragraphs = extractParagraphs(post.content || "");
+  let paragraphs = extractParagraphs(post.content || "", true);
 
   // Skip first paragraph if it just repeats the post title
   if (paragraphs.length > 1) {
@@ -105,9 +105,9 @@ export default function BlogPost() {
             {format(new Date(post.published_at || post.created_at), "MMMM d, yyyy")}
           </span>
         </div>
-        <div className="blog-post-prose">
+        <div className="sermon-flow">
           {paragraphs.map((text, index) => (
-            <p key={index} className={cn(index === 0 && "blog-drop-cap")}>
+            <p key={index}>
               {text}
             </p>
           ))}

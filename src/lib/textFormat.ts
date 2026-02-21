@@ -44,7 +44,13 @@ function smartGroup(units: string[]): string[] {
   return units;
 }
 
-export function extractParagraphs(content: string): string[] {
+/**
+ * Extract paragraphs from content.
+ * @param content  The raw HTML or plain text
+ * @param raw      If true, preserve every line break as-is (SERMON FLOW mode).
+ *                 No smart-grouping or sentence merging will be applied.
+ */
+export function extractParagraphs(content: string, raw = false): string[] {
   const isHtml = content?.includes("<") && content?.includes(">");
 
   if (isHtml) {
@@ -59,19 +65,25 @@ export function extractParagraphs(content: string): string[] {
         .map((p) => (p.textContent || "").trim())
         .filter((t) => t.length > 0);
 
+      if (raw) return units.map(fixPunctuation);
       return smartGroup(units).map(fixPunctuation);
     }
 
     const plainText = doc.body.textContent || "";
-    return formatPlainText(plainText);
+    return formatPlainText(plainText, raw);
   }
 
-  return formatPlainText(content);
+  return formatPlainText(content, raw);
 }
 
-export function formatPlainText(rawText: string): string[] {
+export function formatPlainText(rawText: string, raw = false): string[] {
   const cleaned = fixPunctuation(rawText);
   const normalized = cleaned.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+
+  if (raw) {
+    // SERMON FLOW: preserve every single line break as its own paragraph
+    return normalized.split(/\n/).map((p) => p.trim()).filter((p) => p.length > 0).map(fixPunctuation);
+  }
 
   let paragraphs = normalized.split(/\n{2,}/);
 
