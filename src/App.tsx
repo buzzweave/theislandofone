@@ -1,3 +1,4 @@
+// src/App.tsx
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,7 +9,7 @@ import AdminLayout from "./components/admin/AdminLayout";
 import AdminGuard from "./components/admin/AdminGuard";
 import { AdminAuthProvider } from "./contexts/AdminAuthContext";
 import { AuthProvider } from "./contexts/AuthContext";
-import GlobalCopyProtection from "./components/GlobalCopyProtection"; // ✅ ADDED
+import GlobalCopyProtection from "./components/GlobalCopyProtection";
 
 import Index from "./pages/Index";
 import Books from "./pages/Books";
@@ -67,7 +68,7 @@ const queryClient = new QueryClient({
     queries: {
       retry: 3,
       retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
-      staleTime: 5 * 60 * 1000,
+      staleTime: 5 * 60 * 1000, // 5 minutes
       refetchOnWindowFocus: false,
     },
   },
@@ -80,7 +81,6 @@ const App = () => (
       <Sonner />
       <AuthProvider>
         <AdminAuthProvider>
-          {/* ✅ GLOBAL COPY PROTECTION WRAPPER */}
           <GlobalCopyProtection>
             <BrowserRouter>
               <Routes>
@@ -262,7 +262,7 @@ const App = () => (
                   }
                 />
 
-                {/* Admin login */}
+                {/* Admin login (public) */}
                 <Route path="/admin/login" element={<AdminLogin />} />
 
                 {/* Protected admin routes */}
