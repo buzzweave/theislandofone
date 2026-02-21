@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { membershipPlans } from "@/data/content";
 import { useSermon } from "@/hooks/useSermons";
@@ -45,7 +45,55 @@ function safeDateLabel(value: any) {
   }
 }
 
+class PageErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; message: string }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, message: "" };
+  }
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, message: error?.message ? String(error.message) : "Unknown error" };
+  }
+  componentDidCatch(error: any, info: any) {
+    // This will show in Loveable preview console too
+    console.error("SermonDetail crashed:", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen">
+          <div className="container mx-auto px-4 py-16 max-w-2xl">
+            <div className="p-6 rounded-xl border border-destructive/30 bg-destructive/5">
+              <h1 className="font-display text-2xl font-bold mb-2">Page Error</h1>
+              <p className="text-sm text-muted-foreground mb-4">
+                The sermon page hit a runtime error. This usually happens from a missing field (date, audio, manuscript)
+                or a component prop mismatch. Open your browser console to see the full stack trace.
+              </p>
+              <div className="text-xs text-muted-foreground break-words">
+                <span className="font-semibold">Message:</span> {this.state.message}
+              </div>
+              <div className="mt-6">
+                <Link to="/sermons" className="text-primary text-sm font-semibold hover:underline">
+                  Back to Sermon Library
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children as any;
+  }
+}
+
 export default function SermonDetail() {
+  return (
+    <PageErrorBoundary>
+      <SermonDetailInner />
+    </PageErrorBoundary>
+  );
+}
+
+function SermonDetailInner() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: sermon, isLoading } = useSermon(id);
@@ -120,7 +168,7 @@ export default function SermonDetail() {
     return paragraphs.slice(0, safeCutoff);
   }, [previewCutoff, paragraphs]);
 
-  // Tier access
+  // Tier access (guard everything)
   const productId = (subscription as any)?.product_id ?? null;
   const userTier = productId ? getTierByProductId(productId) : null;
 
@@ -195,6 +243,7 @@ export default function SermonDetail() {
   };
 
   const dateLabel = safeDateLabel((sermon as any).date);
+  const shareUrl = id ? `https://theislandofone.com/share/sermon/${id}` : undefined;
 
   return (
     <div className="min-h-screen">
@@ -211,7 +260,7 @@ export default function SermonDetail() {
           <div className="max-w-3xl">
             <div className="flex items-center gap-3 mb-3">
               <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-                {(sermon as any).category}
+                {(sermon as any).category ?? "Sermon"}
               </span>
 
               {!(sermon as any).is_free && !isFullAccess && (
@@ -233,9 +282,11 @@ export default function SermonDetail() {
               )}
             </div>
 
-            <h1 className="font-display text-4xl md:text-5xl font-bold mb-3">{(sermon as any).title}</h1>
-            <p className="text-lg text-primary/80 mb-2">{(sermon as any).scripture}</p>
-            <p className="text-muted-foreground">{(sermon as any).excerpt}</p>
+            <h1 className="font-display text-4xl md:text-5xl font-bold mb-3">{(sermon as any).title ?? "Sermon"}</h1>
+            {(sermon as any).scripture ? (
+              <p className="text-lg text-primary/80 mb-2">{(sermon as any).scripture}</p>
+            ) : null}
+            {(sermon as any).excerpt ? <p className="text-muted-foreground">{(sermon as any).excerpt}</p> : null}
 
             {dateLabel ? (
               <p className="text-sm text-muted-foreground mt-3 mb-4">
@@ -245,13 +296,20 @@ export default function SermonDetail() {
               <p className="text-sm text-muted-foreground mt-3 mb-4">By Bryant Clark</p>
             )}
 
-            <SocialShareLinks title={(sermon as any).title} url={`https://theislandofone.com/share/sermon/${id}`} />
+            {/* Share (defensive) */}
+            {(sermon as any).title ? <SocialShareLinks title={(sermon as any).title} url={shareUrl} /> : null}
 
-            {isFullAccess && (sermon as any).audio_url && (
+            {/* Audio (defensive + supports both prop names) */}
+            {isFullAccess && (sermon as any).audio_url ? (
               <div className="mt-6">
-                <AudioPlayer audioUrl={(sermon as any).audio_url} title={(sermon as any).title} />
+                <AudioPlayer
+                  // some versions use src, some use audioUrl
+                  src={(sermon as any).audio_url}
+                  audioUrl={(sermon as any).audio_url}
+                  title={(sermon as any).title ?? "Sermon"}
+                />
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       </section>
@@ -408,6 +466,7 @@ export default function SermonDetail() {
           </div>
         </div>
 
+        {/* Comments (defensive: if this component throws, ErrorBoundary shows message instead of blank screen) */}
         <div className="max-w-3xl mx-auto mt-8 pt-6 border-t border-border">
           <CommentsWithRating contentType="sermon" contentId={id!} />
         </div>
