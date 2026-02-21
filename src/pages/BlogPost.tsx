@@ -3,8 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowLeft, Calendar, User } from "lucide-react";
+import DOMPurify from "dompurify";
 import { format } from "date-fns";
-import { extractParagraphs } from "@/lib/textFormat";
 import SocialShareLinks from "@/components/SocialShareLinks";
 import CommentsWithRating from "@/components/CommentsWithRating";
 
@@ -62,14 +62,19 @@ export default function BlogPost() {
     );
   }
 
-  let paragraphs = extractParagraphs(post.content || "", true);
+  // EXACT PASTE MODE: detect HTML vs plain text
+  const isHtml = post.content?.includes("<") && post.content?.includes(">");
+  let blogContent = post.content || "";
 
-  // Skip first paragraph if it just repeats the post title
-  if (paragraphs.length > 1) {
-    const first = paragraphs[0].toLowerCase().replace(/[^a-z]/g, "");
-    const postTitle = post.title.toLowerCase().replace(/[^a-z]/g, "");
-    if (first === postTitle || first.length <= 2) {
-      paragraphs = paragraphs.slice(1);
+  // For plain text: skip first line if it repeats the title
+  if (!isHtml) {
+    const lines = blogContent.split("\n");
+    if (lines.length > 1) {
+      const first = lines[0].toLowerCase().replace(/[^a-z]/g, "");
+      const postTitle = post.title.toLowerCase().replace(/[^a-z]/g, "");
+      if (first === postTitle || first.length <= 2) {
+        blogContent = lines.slice(1).join("\n");
+      }
     }
   }
 
@@ -105,13 +110,14 @@ export default function BlogPost() {
             {format(new Date(post.published_at || post.created_at), "MMMM d, yyyy")}
           </span>
         </div>
-        <div className="sermon-flow">
-          {paragraphs.map((text, index) => (
-            <p key={index}>
-              {text}
-            </p>
-          ))}
-        </div>
+        {isHtml ? (
+          <div
+            className="sermon-flow [&_*]:!text-foreground"
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(blogContent) }}
+          />
+        ) : (
+          <div className="sermon-flow">{blogContent}</div>
+        )}
         <p className="mt-10 text-xs text-muted-foreground text-center">
           © {new Date().getFullYear()} The Island of One Ministries. All rights reserved. For personal use only.
         </p>
