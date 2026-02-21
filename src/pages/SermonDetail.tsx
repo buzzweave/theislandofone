@@ -116,14 +116,9 @@ export default function SermonDetail() {
         />
       );
     }
-    // Plain text: preserve every line exactly as pasted
-    const lines = content.split(/\n/).map(l => l.trim()).filter(l => l.length > 0);
+    // EXACT PASTE MODE: render as-is with pre-wrap whitespace preservation
     return (
-      <div className="sermon-flow">
-        {lines.map((line, i) => (
-          <p key={i}>{line}</p>
-        ))}
-      </div>
+      <div className="sermon-flow">{content}</div>
     );
   };
 

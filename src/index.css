@@ -294,8 +294,10 @@
 }
 
 /* ══════════════════════════════════════════════════════
-   SERMON FLOW — locked style for Sermons & Blog ONLY
-   Modern sans-serif, tight rhythm, mobile-first
+   SERMON FLOW — EXACT PASTE MODE
+   Locked style for Sermons & Blog ONLY.
+   Preserves pasted text with zero formatting changes.
+   white-space: pre-wrap for paste-to-publish accuracy.
    ══════════════════════════════════════════════════════ */
 .sermon-flow {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -304,16 +306,33 @@
   line-height: 1.4;
   max-width: 720px;
   margin: 0 auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Disable all smart formatting */
+  text-rendering: optimizeLegibility;
+  font-variant-ligatures: none;
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Style isolation — prevent theme overrides inside sermon-flow */
+.sermon-flow * {
+  font-family: inherit;
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
 }
 
 .sermon-flow p {
   margin-bottom: 8px;
   line-height: 1.4;
   text-indent: 0;
-  font-size: 1.1rem;
+  font-size: inherit;
   color: hsl(var(--foreground));
+  white-space: pre-wrap;
 }
 
 .sermon-flow ul,
@@ -322,10 +341,11 @@
   margin-bottom: 6px;
   padding-left: 1.1em;
   list-style: disc;
+  white-space: normal;
 }
 
 .sermon-flow li {
-  font-size: 1.1rem;
+  font-size: inherit;
   margin-bottom: 6px;
   line-height: 1.4;
   color: hsl(var(--foreground));
@@ -344,6 +364,7 @@
   margin-top: 1.2em;
   margin-bottom: 6px;
   color: hsl(var(--foreground));
+  white-space: pre-wrap;
 }
 
 .sermon-flow h1 { font-size: 1.5rem; }
@@ -360,15 +381,10 @@
   font-style: italic;
 }
 
-/* Mobile optimization */
+/* Mobile — no responsive scaling, preserve exact rhythm */
 @media (max-width: 640px) {
   .sermon-flow {
-    font-size: 1.05rem;
     padding-left: 4px;
     padding-right: 4px;
-  }
-  .sermon-flow p {
-    font-size: 1.05rem;
-    margin-bottom: 6px;
   }
 }
