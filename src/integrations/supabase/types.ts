@@ -449,6 +449,42 @@ export type Database = {
         }
         Relationships: []
       }
+      content_reviews: {
+        Row: {
+          comment: string
+          content_id: string
+          content_type: string
+          created_at: string
+          fb_user_id: string
+          id: string
+          rating: number
+          user_avatar: string
+          user_name: string
+        }
+        Insert: {
+          comment: string
+          content_id: string
+          content_type: string
+          created_at?: string
+          fb_user_id: string
+          id?: string
+          rating: number
+          user_avatar?: string
+          user_name: string
+        }
+        Update: {
+          comment?: string
+          content_id?: string
+          content_type?: string
+          created_at?: string
+          fb_user_id?: string
+          id?: string
+          rating?: number
+          user_avatar?: string
+          user_name?: string
+        }
+        Relationships: []
+      }
       email_campaigns: {
         Row: {
           content: string

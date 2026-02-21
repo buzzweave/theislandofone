@@ -3,16 +3,15 @@ import { Star, MessageSquare, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
-declare global {
-  interface Window {
-    FB?: {
-      XFBML: { parse: (el?: HTMLElement) => void };
-      login: (cb: (response: any) => void, options?: object) => void;
-      getLoginStatus: (cb: (response: any) => void) => void;
-      api: (path: string, cb: (response: any) => void) => void;
-    };
-  }
-}
+// FB SDK type - extended version (FacebookComments.tsx has a simpler one)
+type FBSdk = {
+  XFBML: { parse: (el?: HTMLElement) => void };
+  login: (cb: (response: any) => void, options?: object) => void;
+  getLoginStatus: (cb: (response: any) => void) => void;
+  api: (path: string, cb: (response: any) => void) => void;
+};
+
+const getFB = (): FBSdk | undefined => (window as any).FB;
 
 interface Props {
   contentType: "book" | "blog" | "sermon";
@@ -53,7 +52,7 @@ export default function FacebookCommentsWithRating({
   // Load reviews
   const loadReviews = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("content_reviews")
         .select("*")
         .eq("content_type", contentType)
@@ -94,22 +93,23 @@ export default function FacebookCommentsWithRating({
   // Check FB login status on mount
   useEffect(() => {
     const checkFB = () => {
-      if (window.FB) {
-        window.FB.getLoginStatus((response) => {
+      const fb = getFB();
+      if (fb) {
+        fb.getLoginStatus((response) => {
           if (response.status === "connected") {
             fetchFBProfile();
           }
         });
       }
     };
-    // FB SDK may load async
     const timer = setTimeout(checkFB, 1500);
     return () => clearTimeout(timer);
   }, []);
 
   const fetchFBProfile = () => {
-    if (!window.FB) return;
-    window.FB.api("/me?fields=id,name,picture.width(80).height(80)", (response: any) => {
+    const fb = getFB();
+    if (!fb) return;
+    fb.api("/me?fields=id,name,picture.width(80).height(80)", (response: any) => {
       if (response && !response.error) {
         setFbUser({
           id: response.id,
@@ -121,12 +121,13 @@ export default function FacebookCommentsWithRating({
   };
 
   const handleFBLogin = () => {
-    if (!window.FB) {
+    const fb = getFB();
+    if (!fb) {
       toast({ title: "Facebook SDK not loaded", description: "Please refresh and try again.", variant: "destructive" });
       return;
     }
     setFbLoading(true);
-    window.FB.login(
+    fb.login(
       (response) => {
         if (response.authResponse) {
           fetchFBProfile();
@@ -153,7 +154,7 @@ export default function FacebookCommentsWithRating({
 
     setSubmitting(true);
     try {
-      const { error } = await supabase.from("content_reviews").insert({
+      const { error } = await (supabase as any).from("content_reviews").insert({
         content_type: contentType,
         content_id: contentId,
         user_name: fbUser.name,
@@ -184,8 +185,9 @@ export default function FacebookCommentsWithRating({
   const pageUrl = `${siteUrl}/${contentType === "blog" ? "blog" : contentType === "book" ? "books" : "sermons"}/${slug || contentId}`;
 
   useEffect(() => {
-    if (window.FB && containerRef.current) {
-      window.FB.XFBML.parse(containerRef.current);
+    const fb = getFB();
+    if (fb && containerRef.current) {
+      fb.XFBML.parse(containerRef.current);
     }
   }, [slug, contentId]);
 
