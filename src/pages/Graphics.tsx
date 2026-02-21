@@ -34,10 +34,17 @@ export default function Graphics() {
   const categories = ["All", ...Array.from(new Set(graphics.map((g) => g.category)))];
   const filtered = graphics.filter((g) => {
     const matchesCategory = activeCategory === "All" || g.category === activeCategory;
-    const matchesSearch = g.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (g.description || "").toLowerCase().includes(searchQuery.toLowerCase());
+    const lq = searchQuery.toLowerCase();
+    const matchesSearch = g.title.toLowerCase().includes(lq) ||
+      (g.description || "").toLowerCase().includes(lq);
     return matchesCategory && matchesSearch;
   });
+
+  // Pagination for performance
+  const PAGE_SIZE = 12;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const visibleGraphics = filtered.slice(0, visibleCount);
+  const hasMore = visibleCount < filtered.length;
 
   const handleBuy = async (graphic: typeof graphics[0]) => {
     setBuyingId(graphic.id);
