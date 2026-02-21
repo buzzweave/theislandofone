@@ -34,6 +34,17 @@ import {
   Loader2,
 } from "lucide-react";
 
+function safeDateLabel(value: any) {
+  try {
+    if (!value) return "";
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  } catch {
+    return "";
+  }
+}
+
 export default function SermonDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -49,7 +60,7 @@ export default function SermonDetail() {
     let active = true;
 
     async function run() {
-      if (!user || !id || !sermon || sermon.is_free) return;
+      if (!user || !id || !sermon || (sermon as any).is_free) return;
 
       setCheckingPurchase(true);
       try {
@@ -89,14 +100,13 @@ export default function SermonDetail() {
     );
   }
 
-  // Safe defaults
+  // Safe defaults (supports multiple possible sermon body fields)
   const manuscriptRaw = String(
     (sermon as any).manuscript ?? (sermon as any).content ?? (sermon as any).content_html ?? "",
   );
   const previewCutoff = Number((sermon as any).preview_cutoff ?? 0);
 
   const paragraphs = useMemo(() => {
-    // Split by blank line; fall back to single block if no blank lines
     const parts = manuscriptRaw
       .split(/\n\s*\n/g)
       .map((p) => p.trim())
@@ -111,20 +121,17 @@ export default function SermonDetail() {
   }, [previewCutoff, paragraphs]);
 
   // Tier access
-  const productId = (subscription as any)?.product_id;
+  const productId = (subscription as any)?.product_id ?? null;
   const userTier = productId ? getTierByProductId(productId) : null;
 
-  // access_tiers may be stored as array; fallback to access_level (string)
   const accessTiers = (sermon as any).access_tiers ?? [];
   const accessLevel = (sermon as any).access_level ?? "free";
 
   const tierAccess = useMemo(() => {
     try {
-      // If access_tiers is an array of tiers, use it.
       if (Array.isArray(accessTiers) && accessTiers.length > 0) {
         return userTier ? tierHasAccess(userTier, accessTiers) : false;
       }
-      // Otherwise, allow by access_level (free/member/pastor/inner_circle)
       if (!userTier) return false;
       return tierHasAccess(userTier, accessLevel);
     } catch {
@@ -132,7 +139,7 @@ export default function SermonDetail() {
     }
   }, [userTier, accessTiers, accessLevel]);
 
-  const isFullAccess = Boolean(sermon.is_free || purchased || isSubscribed || tierAccess);
+  const isFullAccess = Boolean((sermon as any).is_free || purchased || isSubscribed || tierAccess);
 
   const handlePurchase = async () => {
     if (!id) return;
@@ -187,6 +194,8 @@ export default function SermonDetail() {
     return <div className="sermon-flow whitespace-pre-wrap">{content}</div>;
   };
 
+  const dateLabel = safeDateLabel((sermon as any).date);
+
   return (
     <div className="min-h-screen">
       {/* Header */}
@@ -205,13 +214,13 @@ export default function SermonDetail() {
                 {(sermon as any).category}
               </span>
 
-              {!sermon.is_free && !isFullAccess && (
+              {!(sermon as any).is_free && !isFullAccess && (
                 <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                  <Lock className="h-2.5 w-2.5" /> {accessLevel}
+                  <Lock className="h-2.5 w-2.5" /> {String(accessLevel)}
                 </span>
               )}
 
-              {sermon.is_free && (
+              {(sermon as any).is_free && (
                 <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/5 text-primary/70 border border-primary/10">
                   Free
                 </span>
@@ -228,15 +237,13 @@ export default function SermonDetail() {
             <p className="text-lg text-primary/80 mb-2">{(sermon as any).scripture}</p>
             <p className="text-muted-foreground">{(sermon as any).excerpt}</p>
 
-            <p className="text-sm text-muted-foreground mt-3 mb-4">
-              Published{" "}
-              {new Date((sermon as any).date).toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
-              {" · "}By Bryant Clark
-            </p>
+            {dateLabel ? (
+              <p className="text-sm text-muted-foreground mt-3 mb-4">
+                Published {dateLabel} {" · "}By Bryant Clark
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground mt-3 mb-4">By Bryant Clark</p>
+            )}
 
             <SocialShareLinks title={(sermon as any).title} url={`https://theislandofone.com/share/sermon/${id}`} />
 
@@ -292,7 +299,7 @@ export default function SermonDetail() {
                     <Button variant="outline" size="lg" asChild>
                       <Link to="/membership">
                         <Crown className="h-4 w-4 mr-2" />
-                        Subscribe & Get All
+                        Subscribe &amp; Get All
                       </Link>
                     </Button>
                   </div>
@@ -363,7 +370,7 @@ export default function SermonDetail() {
               </Card>
             )}
 
-            {isFullAccess && !sermon.is_free && (
+            {isFullAccess && !(sermon as any).is_free && (
               <Card className="border-primary/30">
                 <CardContent className="pt-6 text-center space-y-3">
                   <CheckCircle2 className="h-10 w-10 text-primary mx-auto" />
