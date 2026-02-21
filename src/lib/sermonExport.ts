@@ -142,124 +142,161 @@ function stripInlineTags(text: string): string {
     .replace(/&nbsp;/g, " ");
 }
 
-// ─── PDF — WYSIWYG Document ────────────────────────────────────────────
+// ─── PDF — 3-Page Preach Ready Layout (Landscape A4) ───────────────────
 
 export function exportSermonToPdf(sermon: Sermon) {
-  const doc = new jsPDF({ unit: "pt", format: "a4" });
-  const pageW = 595;
-  const pageH = 842;
-  const margin = 72;
+  const doc = new jsPDF({ unit: "pt", format: [842, 595], orientation: "landscape" });
+  const pageW = 842;
+  const pageH = 595;
+  const margin = 56;
   const contentW = pageW - margin * 2;
-  let y = margin;
 
-  const newPage = () => { doc.addPage(); y = margin; };
-  const checkPage = (needed: number) => { if (y + needed > pageH - margin) newPage(); };
+  const title = sermon.title || "";
+  const scripture = sermon.scripture || "";
+  const manuscript = sermon.manuscript || "";
 
-  // Parse manuscript HTML into styled segments
-  const paragraphs = parseHtmlToSegments(sermon.manuscript);
+  // Parse structure: detect bold headings as main points
+  const boldSegments = manuscript.includes("<") ? extractBoldSegmentsFromHtml(manuscript) : new Set<string>();
+  const raw = normalizeParagraphs(manuscript);
+  const lines = raw.split("\n").map(l => l.trim()).filter(l => l.length > 0);
 
-  for (const segments of paragraphs) {
-    if (segments.length === 1 && segments[0].text === "") {
-      // Empty line / line break
-      y += 12;
-      continue;
-    }
+  const titleNorm = title.trim().toLowerCase();
+  const scriptureNorm = scripture.trim().toLowerCase();
 
-    // Determine font size based on heading level
-    const headingLevel = segments[0]?.heading || 0;
-    let fontSize = 13; // body 13pt
-    let lineHeight = 13 * 1.7; // ~22pt
-    let fontFamily = "times";
+  interface MainPoint { heading: string; bullets: string[]; }
+  const mainPoints: MainPoint[] = [];
+  const illustrations: string[] = [];
+  let current: MainPoint | null = null;
 
-    if (headingLevel === 1) { fontSize = 28; lineHeight = 36; fontFamily = "times"; }
-    else if (headingLevel === 2) { fontSize = 16; lineHeight = 16 * 1.5; fontFamily = "times"; }
-    else if (headingLevel === 3) { fontSize = 14; lineHeight = 14 * 1.5; fontFamily = "times"; }
-    else if (headingLevel >= 4) { fontSize = 13; lineHeight = 13 * 1.5; fontFamily = "times"; }
+  for (const line of lines) {
+    const lineNorm = line.toLowerCase();
+    if (lineNorm === titleNorm || (scriptureNorm && lineNorm === scriptureNorm)) continue;
 
-    // Concatenate all segment text to measure line wrapping
-    const fullText = segments.map(s => s.text).join("");
-    doc.setFontSize(fontSize);
-    doc.setFont(fontFamily, "normal");
-    const wrappedLines: string[] = doc.splitTextToSize(fullText, contentW);
+    const isBoldHeading = [...boldSegments].some(
+      b => b.toLowerCase() === lineNorm || lineNorm.startsWith(b.toLowerCase())
+    );
 
-    // For simple single-style paragraphs, render directly
-    const isSingleStyle = segments.length === 1;
-
-    if (isSingleStyle) {
-      const seg = segments[0];
-      const style = seg.bold && seg.italic ? "bolditalic" : seg.bold ? "bold" : seg.italic ? "italic" : "normal";
-      doc.setFont(fontFamily, style);
-      doc.setFontSize(fontSize);
-
-      for (const line of wrappedLines) {
-        checkPage(lineHeight);
-        doc.text(line, margin, y);
-        y += lineHeight;
-      }
+    if (isBoldHeading) {
+      current = { heading: line, bullets: [] };
+      mainPoints.push(current);
+    } else if (current) {
+      current.bullets.push(line);
     } else {
-      // Mixed formatting — render segment by segment per wrapped line
-      // For simplicity, render the full text with dominant style
-      // then overlay bold/italic segments
-      for (const line of wrappedLines) {
-        checkPage(lineHeight);
-        
-        // Find which segments contribute to this line
-        let xPos = margin;
-        let remainingLine = line;
-        let segIdx = 0;
-        let charOffset = 0;
-
-        // Simple approach: render each segment's portion
-        for (const seg of segments) {
-          if (remainingLine.length === 0) break;
-          
-          const segText = seg.text.substring(charOffset);
-          const overlap = findOverlap(remainingLine, segText);
-          
-          if (overlap) {
-            const style = seg.bold && seg.italic ? "bolditalic" : seg.bold ? "bold" : seg.italic ? "italic" : "normal";
-            doc.setFont(fontFamily, style);
-            doc.setFontSize(fontSize);
-            doc.text(overlap, xPos, y);
-            xPos += doc.getTextWidth(overlap);
-            remainingLine = remainingLine.substring(overlap.length);
-            
-            if (overlap.length < segText.length) {
-              charOffset += overlap.length;
-            } else {
-              charOffset = 0;
-              segIdx++;
-            }
-          } else {
-            charOffset = 0;
-            segIdx++;
-          }
-        }
-
-        // Fallback: if overlap logic missed content, render remaining
-        if (remainingLine.length > 0) {
-          doc.setFont(fontFamily, "normal");
-          doc.text(remainingLine, xPos, y);
-        }
-
-        y += lineHeight;
-      }
+      illustrations.push(line);
     }
-
-    // Paragraph spacing — sermon breathing room
-    if (headingLevel === 1) y += 20;       // title spacing
-    else if (headingLevel === 2) y += 26;  // main point: 2em above
-    else if (headingLevel >= 3) y += 14;
-    else y += 14;                          // body: ~1.1em
   }
 
-  // Copyright on last page
+  // Collect all body text as illustrations
+  const allIllustrations = [...illustrations];
+  for (const mp of mainPoints) {
+    allIllustrations.push(...mp.bullets);
+  }
+
+  /* ─── PAGE 1: Title + Scripture ─────────────────────────────────── */
+  doc.setFont("times", "bold");
+  doc.setFontSize(44);
+  const titleLines: string[] = doc.splitTextToSize(title, contentW);
+  const titleBlockH = titleLines.length * 52;
+  let titleY = (pageH / 2) - (titleBlockH / 2) - 30;
+  if (titleY < margin) titleY = margin;
+
+  for (const tl of titleLines) {
+    doc.text(tl, pageW / 2, titleY, { align: "center" });
+    titleY += 52;
+  }
+
+  if (scripture) {
+    doc.setFont("times", "italic");
+    doc.setFontSize(22);
+    const scriptureLines: string[] = doc.splitTextToSize(scripture, contentW);
+    let sY = titleY + 30;
+    for (const sl of scriptureLines) {
+      doc.text(sl, pageW / 2, sY, { align: "center" });
+      sY += 28;
+    }
+  }
+
+  /* ─── PAGE 2: Main Points ──────────────────────────────────────── */
+  if (mainPoints.length > 0) {
+    doc.addPage([842, 595]);
+    let y = margin;
+
+    doc.setFont("times", "bold");
+    doc.setFontSize(14);
+    doc.text("MAIN POINTS", pageW / 2, y, { align: "center" });
+    y += 36;
+
+    for (const mp of mainPoints) {
+      if (y + 60 > pageH - margin) { doc.addPage([842, 595]); y = margin; }
+
+      doc.setFont("times", "bold");
+      doc.setFontSize(18);
+      const headingLines: string[] = doc.splitTextToSize(mp.heading, contentW - 20);
+      for (const hl of headingLines) {
+        if (y + 24 > pageH - margin) { doc.addPage([842, 595]); y = margin; }
+        doc.text(hl, margin + 10, y);
+        y += 24;
+      }
+      y += 8;
+
+      doc.setFont("times", "normal");
+      doc.setFontSize(14);
+      for (const bullet of mp.bullets) {
+        const bulletText = `• ${bullet}`;
+        const bulletLines: string[] = doc.splitTextToSize(bulletText, contentW - 40);
+        for (const bl of bulletLines) {
+          if (y + 20 > pageH - margin) { doc.addPage([842, 595]); y = margin; }
+          doc.text(bl, margin + 30, y);
+          y += 20;
+        }
+        y += 4;
+      }
+      y += 16;
+    }
+  }
+
+  /* ─── PAGE 3+: Illustrations ───────────────────────────────────── */
+  doc.addPage([842, 595]);
+  let y = margin;
+
+  doc.setFont("times", "bold");
+  doc.setFontSize(14);
+  doc.text("ILLUSTRATIONS & NOTES", pageW / 2, y, { align: "center" });
+  y += 36;
+
+  doc.setFont("times", "normal");
+  doc.setFontSize(13);
+  const lineHeight = 20;
+
+  for (const para of allIllustrations) {
+    const wrapped: string[] = doc.splitTextToSize(para, contentW);
+    for (const wl of wrapped) {
+      if (y + lineHeight > pageH - margin) { doc.addPage([842, 595]); y = margin; }
+      doc.text(wl, margin, y);
+      y += lineHeight;
+    }
+    y += 8;
+  }
+
+  // Copyright
   doc.setFont("helvetica", "italic");
   doc.setFontSize(9);
-  doc.text(COPYRIGHT(), pageW / 2, pageH - 40, { align: "center" });
+  doc.text(COPYRIGHT(), pageW / 2, pageH - 30, { align: "center" });
 
   const pdfBlob = doc.output("blob");
   triggerDownload(pdfBlob, `${safeTitle(sermon.title)}.pdf`);
+}
+
+/** Extract bold text segments from HTML for main point detection */
+function extractBoldSegmentsFromHtml(html: string): Set<string> {
+  const bolds = new Set<string>();
+  const re = /<(?:strong|b)(?:\s[^>]*)?>(.+?)<\/(?:strong|b)>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    const text = m[1].replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").trim();
+    if (text.length > 0) bolds.add(text);
+  }
+  return bolds;
 }
 
 function findOverlap(line: string, segText: string): string {
