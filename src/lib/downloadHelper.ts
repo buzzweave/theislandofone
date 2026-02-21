@@ -1,8 +1,8 @@
 /**
  * Universal mobile-safe download helper.
- * Uploads the blob to cloud storage and triggers download via a real HTTPS URL.
- * This ensures iPad/iPhone Safari triggers its native download sheet and files
- * appear in the Files app.
+ * Desktop: uses blob URLs (fast, no upload needed).
+ * iOS: uploads to cloud storage for a real HTTPS URL so Safari's native
+ *       download sheet triggers and files appear in the Files app.
  */
 
 import { supabase } from "@/integrations/supabase/client";
@@ -33,10 +33,32 @@ function getMimeType(filename: string): string {
 }
 
 export async function triggerDownload(blob: Blob, filename: string) {
+  if (isIOS()) {
+    // iOS Safari needs a real HTTPS URL to trigger the native download sheet
+    await iosStorageDownload(blob, filename);
+  } else {
+    // Desktop / Android: blob URL works reliably
+    blobDownload(blob, filename);
+  }
+}
+
+/** Desktop / Android: simple blob URL download */
+function blobDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+/** iOS: upload to public storage bucket and navigate to the HTTPS URL */
+async function iosStorageDownload(blob: Blob, filename: string) {
   const uniquePath = `${crypto.randomUUID()}/${filename}`;
   const contentType = getMimeType(filename);
 
-  // Upload to the public downloads bucket with the correct content type
   const { error } = await supabase.storage
     .from("downloads")
     .upload(uniquePath, blob, {
@@ -47,8 +69,8 @@ export async function triggerDownload(blob: Blob, filename: string) {
 
   if (error) {
     console.error("Storage upload failed, falling back to blob URL:", error);
-    // Fallback: try the old blob-URL method for desktop at least
-    fallbackBlobDownload(blob, filename);
+    // Fallback: try blob URL anyway (may not work on all iOS versions)
+    blobDownload(blob, filename);
     return;
   }
 
@@ -56,34 +78,11 @@ export async function triggerDownload(blob: Blob, filename: string) {
     .from("downloads")
     .getPublicUrl(uniquePath);
 
-  const publicUrl = urlData.publicUrl;
-
-  if (isIOS()) {
-    // Force Safari's native download sheet – file appears in Files app
-    window.location.href = publicUrl;
-  } else {
-    const a = document.createElement("a");
-    a.href = publicUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  }
+  // Force Safari's native download sheet — file appears in Files app
+  window.location.href = urlData.publicUrl;
 
   // Clean up the temporary file after a delay (best-effort)
   setTimeout(async () => {
     await supabase.storage.from("downloads").remove([uniquePath]);
   }, 60_000);
-}
-
-/** Fallback for when storage upload fails */
-function fallbackBlobDownload(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
