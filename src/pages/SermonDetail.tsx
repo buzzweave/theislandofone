@@ -7,16 +7,7 @@ import { getTierByProductId, tierHasAccess } from "@/lib/stripe";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import SocialShareLinks from "@/components/SocialShareLinks";
-import AudioPlayer from "@/components/AudioPlayer";
-import CommentsWithRating from "@/components/CommentsWithRating";
 import DOMPurify from "dompurify";
-import {
-  exportSermonToPdf,
-  exportSermonToEpub,
-  exportSermonToWord,
-  exportSermonToGoodNotesPdf,
-} from "@/lib/sermonExport";
 import { toast } from "sonner";
 
 import {
@@ -64,7 +55,7 @@ class PageErrorBoundary extends React.Component<{ children: React.ReactNode }, {
             <div className="p-6 rounded-xl border border-destructive/30 bg-destructive/5">
               <h1 className="font-display text-2xl font-bold mb-2">Page Error</h1>
               <p className="text-sm text-muted-foreground mb-4">
-                The sermon page hit a runtime error. Open your browser console to see the full stack trace.
+                This page hit a runtime error. Open your browser console to see the full stack trace.
               </p>
               <div className="text-xs text-muted-foreground break-words">
                 <span className="font-semibold">Message:</span> {this.state.message}
@@ -100,9 +91,6 @@ function SermonDetailInner() {
   const [purchased, setPurchased] = useState(false);
   const [checkingPurchase, setCheckingPurchase] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
-
-  // ✅ FIX 1: SocialShareLinks url must ALWAYS be a string (no undefined)
-  const shareUrl = `https://theislandofone.com/share/sermon/${id ?? ""}`;
 
   useEffect(() => {
     let active = true;
@@ -187,6 +175,21 @@ function SermonDetailInner() {
 
   const isFullAccess = Boolean((sermon as any).is_free || purchased || isSubscribed || tierAccess);
 
+  const dateLabel = safeDateLabel((sermon as any).date);
+
+  const renderContent = (content: string) => {
+    const isHtml = content?.includes("<") && content?.includes(">");
+    if (isHtml) {
+      return (
+        <div
+          className="sermon-flow [&_*]:!text-foreground"
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }}
+        />
+      );
+    }
+    return <div className="sermon-flow whitespace-pre-wrap">{content}</div>;
+  };
+
   const handlePurchase = async () => {
     if (!id) return;
 
@@ -217,30 +220,9 @@ function SermonDetailInner() {
   };
 
   const handleDownload = (format: string) => {
-    if (!isFullAccess) {
-      toast.error("You must unlock this sermon to download.");
-      return;
-    }
-    if (format === "PDF") exportSermonToPdf(sermon as any);
-    else if (format === "EPUB") exportSermonToEpub(sermon as any);
-    else if (format === "Word") exportSermonToWord(sermon as any);
-    else if (format === "GoodNotes") exportSermonToGoodNotesPdf(sermon as any);
+    // Safe mode: disable downloads until we confirm the page is stable
+    toast.message(`Downloads temporarily disabled in safe mode (${format}).`);
   };
-
-  const renderContent = (content: string) => {
-    const isHtml = content?.includes("<") && content?.includes(">");
-    if (isHtml) {
-      return (
-        <div
-          className="sermon-flow [&_*]:!text-foreground"
-          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }}
-        />
-      );
-    }
-    return <div className="sermon-flow whitespace-pre-wrap">{content}</div>;
-  };
-
-  const dateLabel = safeDateLabel((sermon as any).date);
 
   return (
     <div className="min-h-screen">
@@ -279,9 +261,11 @@ function SermonDetailInner() {
             </div>
 
             <h1 className="font-display text-4xl md:text-5xl font-bold mb-3">{(sermon as any).title ?? "Sermon"}</h1>
+
             {(sermon as any).scripture ? (
               <p className="text-lg text-primary/80 mb-2">{(sermon as any).scripture}</p>
             ) : null}
+
             {(sermon as any).excerpt ? <p className="text-muted-foreground">{(sermon as any).excerpt}</p> : null}
 
             {dateLabel ? (
@@ -291,16 +275,6 @@ function SermonDetailInner() {
             ) : (
               <p className="text-sm text-muted-foreground mt-3 mb-4">By Bryant Clark</p>
             )}
-
-            {/* ✅ FIX 1 applied here too: only render if id exists */}
-            {id ? <SocialShareLinks title={(sermon as any).title ?? "Sermon"} url={shareUrl} /> : null}
-
-            {/* NOTE: we are NOT changing AudioPlayer yet (that’s Step 2 if TS2322 still exists) */}
-            {isFullAccess && (sermon as any).audio_url ? (
-              <div className="mt-6">
-                <AudioPlayer audioUrl={(sermon as any).audio_url} title={(sermon as any).title ?? "Sermon"} />
-              </div>
-            ) : null}
           </div>
         </div>
       </section>
@@ -321,10 +295,6 @@ function SermonDetailInner() {
               ))}
             </article>
 
-            <p className="mt-8 text-xs text-muted-foreground text-center">
-              © {new Date().getFullYear()} The Island of One Ministries. All rights reserved. For personal use only.
-            </p>
-
             {!isFullAccess && (
               <div className="relative mt-0">
                 <div className="absolute inset-x-0 -top-32 h-32 bg-gradient-to-b from-transparent to-background pointer-events-none" />
@@ -332,7 +302,7 @@ function SermonDetailInner() {
                   <Lock className="h-8 w-8 text-primary mx-auto" />
                   <p className="font-display text-xl font-semibold">Continue Reading</p>
                   <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                    Purchase this sermon to read the full manuscript and download in PDF, EPUB, or Word format.
+                    Purchase this sermon to read the full manuscript and download.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-3 justify-center">
                     <Button size="lg" onClick={handlePurchase} disabled={checkoutLoading}>
@@ -382,6 +352,10 @@ function SermonDetailInner() {
                     </button>
                   ))}
                 </div>
+
+                <p className="text-xs text-muted-foreground mt-3">
+                  Safe mode is enabled. After the page is stable, we will re-enable real exports.
+                </p>
               </div>
             )}
           </div>
@@ -396,7 +370,7 @@ function SermonDetailInner() {
                   <div className="text-3xl font-bold text-primary">
                     ${Number((sermon as any).price ?? 0).toFixed(2)}
                   </div>
-                  <p className="text-xs text-muted-foreground">One-time purchase. Download in PDF, EPUB, and Word.</p>
+                  <p className="text-xs text-muted-foreground">One-time purchase.</p>
                   <Button className="w-full" onClick={handlePurchase} disabled={checkoutLoading}>
                     {checkoutLoading ? (
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -410,7 +384,7 @@ function SermonDetailInner() {
                   </div>
                   <Button variant="outline" className="w-full" asChild>
                     <Link to="/membership">
-                      <Crown className="h-4 w-4 mr-2" /> Subscribe from $9.99/mo
+                      <Crown className="h-4 w-4 mr-2" /> Subscribe
                     </Link>
                   </Button>
                 </CardContent>
@@ -424,7 +398,7 @@ function SermonDetailInner() {
                   <p className="font-display text-lg font-semibold">
                     {isSubscribed ? "Subscriber Access" : "Purchased!"}
                   </p>
-                  <p className="text-xs text-muted-foreground">Full manuscript unlocked. Download below.</p>
+                  <p className="text-xs text-muted-foreground">Full manuscript unlocked.</p>
                 </CardContent>
               </Card>
             )}
@@ -434,7 +408,7 @@ function SermonDetailInner() {
                 <Crown className="h-6 w-6 text-primary" />
                 <p className="font-display text-sm font-semibold">Unlock All Sermons</p>
                 <p className="text-xs text-muted-foreground">
-                  Subscribe to get unlimited access to our entire sermon library plus exclusive resources.
+                  Subscribe to get unlimited access to the entire sermon library.
                 </p>
                 <div className="space-y-1.5">
                   {membershipPlans.slice(0, 2).map((plan) => (
@@ -455,9 +429,9 @@ function SermonDetailInner() {
           </div>
         </div>
 
-        <div className="max-w-3xl mx-auto mt-8 pt-6 border-t border-border">
-          <CommentsWithRating contentType="sermon" contentId={String(id ?? "")} />
-        </div>
+        <p className="mt-10 text-xs text-muted-foreground text-center">
+          © {new Date().getFullYear()} The Island of One Ministries. All rights reserved.
+        </p>
       </div>
     </div>
   );
