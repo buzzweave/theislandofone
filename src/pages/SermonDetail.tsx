@@ -29,129 +29,25 @@ function safeMoney(v: any) {
   return Number.isFinite(n) ? n : 0;
 }
 
-function isHttpUrl(v: string) {
-  return /^https?:\/\//i.test(v);
-}
-
-function openFile(url: string) {
-  window.open(url, "_blank", "noopener,noreferrer");
-}
-
-async function resolveSupabaseStorageUrl(pathOrUrl: string) {
-  const v = safeText(pathOrUrl);
-  if (!v) return "";
-
-  if (isHttpUrl(v)) return v;
-
-  const parts = v.split("/");
-  if (parts.length >= 2) {
-    const maybeBucket = parts[0];
-    const maybePath = parts.slice(1).join("/");
-
-    try {
-      const { data, error } = await (supabase as any).storage.from(maybeBucket).createSignedUrl(maybePath, 60 * 15);
-      if (!error && data?.signedUrl) return data.signedUrl;
-    } catch {}
-
-    try {
-      const { data } = await (supabase as any).storage.from(maybeBucket).getPublicUrl(maybePath);
-      const publicUrl = data?.publicUrl || "";
-      if (publicUrl) return publicUrl;
-    } catch {}
-  }
-
-  const bucketCandidates = ["sermons", "downloads", "files", "public"];
-
-  for (const bucket of bucketCandidates) {
-    try {
-      const { data, error } = await (supabase as any).storage.from(bucket).createSignedUrl(v, 60 * 15);
-      if (!error && data?.signedUrl) return data.signedUrl;
-    } catch {}
-
-    try {
-      const { data } = await (supabase as any).storage.from(bucket).getPublicUrl(v);
-      const publicUrl = data?.publicUrl || "";
-      if (publicUrl) return publicUrl;
-    } catch {}
-  }
-
-  return "";
-}
-
-function looksLikeFileUrl(kind: "pdf" | "epub" | "word" | "goodnotes", value: string) {
-  const v = value.toLowerCase();
-  if (!v) return false;
-
-  if (kind === "pdf") return v.includes(".pdf") || v.includes("pdf");
-  if (kind === "epub") return v.includes(".epub") || v.includes("epub");
-  if (kind === "word") return v.includes(".docx") || v.includes(".doc") || v.includes("docx") || v.includes("word");
-  return v.includes("goodnotes") || v.includes("good-notes") || v.includes("good_notes") || v.includes(".pdf");
-}
-
-function findDownloadValue(sermon: any, kind: "pdf" | "epub" | "word" | "goodnotes") {
-  if (!sermon || typeof sermon !== "object") return "";
-
-  const preferredKeys =
-    kind === "pdf"
-      ? ["pdf_url", "pdf", "pdfUrl", "pdf_path", "pdfPath", "download_pdf", "downloadPdf"]
-      : kind === "epub"
-        ? ["epub_url", "epub", "epubUrl", "epub_path", "epubPath", "download_epub", "downloadEpub"]
-        : kind === "word"
-          ? ["docx_url", "word_url", "doc_url", "docx", "word", "docxUrl", "wordUrl", "docx_path", "word_path"]
-          : ["goodnotes_url", "goodnotes", "goodnotes_pdf_url", "goodnotesUrl", "goodnotes_path", "good_notes"];
-
-  for (const k of preferredKeys) {
-    const val = sermon?.[k];
-    if (typeof val === "string" && safeText(val)) return safeText(val);
-    if (val && typeof val === "object") {
-      const u = val?.url || val?.href || val?.signedUrl || val?.publicUrl;
-      if (typeof u === "string" && safeText(u)) return safeText(u);
-    }
-  }
-
-  const entries = Object.entries(sermon);
-  for (const [key, val] of entries) {
-    const k = String(key).toLowerCase();
-    if (kind === "goodnotes") {
-      if (!k.includes("good")) continue;
-    } else {
-      if (!k.includes(kind)) continue;
-    }
-
-    if (typeof val === "string" && safeText(val) && looksLikeFileUrl(kind, val)) {
-      return safeText(val);
-    }
-    if (val && typeof val === "object") {
-      const u = (val as any)?.url || (val as any)?.href || (val as any)?.signedUrl || (val as any)?.publicUrl;
-      if (typeof u === "string" && safeText(u) && looksLikeFileUrl(kind, u)) return safeText(u);
-    }
-  }
-
-  for (const [, val] of entries) {
-    if (typeof val === "string" && safeText(val) && looksLikeFileUrl(kind, val)) {
-      return safeText(val);
-    }
-  }
-
-  return "";
-}
-
 export default function SermonDetail() {
   const params = useParams<{ id: string }>();
   const id = params.id ?? "";
   const navigate = useNavigate();
 
+  // Important: always pass a string to the hook
   const { data: sermon, isLoading } = useSermon(id);
 
+  // Cast auth to any so TS doesn’t block build if your context types differ
   const auth: any = useAuth();
   const user = auth?.user ?? null;
   const isSubscribed = Boolean(auth?.isSubscribed);
-  const checkPurchase = auth?.checkPurchase;
+  const checkPurchase = auth?.checkPurchase; // may be undefined or different signature
 
   const [purchased, setPurchased] = useState(false);
   const [checkingPurchase, setCheckingPurchase] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
+  // Normalize sermon fields
   const title = safeText((sermon as any)?.title) || "Sermon";
   const scripture = safeText((sermon as any)?.scripture);
   const excerpt = safeText((sermon as any)?.excerpt ?? (sermon as any)?.summary);
@@ -168,12 +64,14 @@ export default function SermonDetail() {
   const chargeEnabled = Boolean((sermon as any)?.charge_enabled ?? (sermon as any)?.charge_for_sermon ?? false);
   const price = safeMoney((sermon as any)?.price);
 
+  // Decide if this sermon is locked
   const isLocked = useMemo(() => {
     if (isFreeFlag || accessLevel === "free") return false;
     if (price > 0 || chargeEnabled) return true;
     return accessLevel !== "free";
   }, [isFreeFlag, accessLevel, price, chargeEnabled]);
 
+  // Check purchase status (best-effort)
   useEffect(() => {
     let alive = true;
 
@@ -194,6 +92,9 @@ export default function SermonDetail() {
       setCheckingPurchase(true);
 
       try {
+        // Support BOTH signatures:
+        // 1) checkPurchase("sermon", id)
+        // 2) checkPurchase(id)
         let result: any;
         try {
           result = await (checkPurchase as any)("sermon", id);
@@ -238,6 +139,7 @@ export default function SermonDetail() {
 
     setCheckoutLoading(true);
     try {
+      // Use any-cast to avoid TS typing build failures
       const fn: any = (supabase as any).functions;
 
       const { data, error } = await fn.invoke("create-checkout", {
@@ -264,27 +166,21 @@ export default function SermonDetail() {
     }
   }
 
+  // DOWNLOADS: call the Edge Function so it works for ALL existing sermons
   async function handleDownload(kind: "pdf" | "epub" | "word" | "goodnotes") {
+    if (!id) return;
+
     if (!isFullAccess) {
       toast.error("Please unlock this sermon to download.");
       return;
     }
 
-    const raw = findDownloadValue(sermon, kind);
+    const fnBase = (supabase as any)?.functions?.url || `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
 
-    if (!raw) {
-      toast.error("No download file found for this sermon yet.");
-      return;
-    }
+    const format = kind === "word" ? "docx" : kind;
 
-    const finalUrl = await resolveSupabaseStorageUrl(raw);
-
-    if (!finalUrl) {
-      toast.error("Download link could not be resolved. The stored value is not a valid URL or storage path.");
-      return;
-    }
-
-    openFile(finalUrl);
+    const url = `${fnBase}/download-sermon?id=${encodeURIComponent(id)}&format=${encodeURIComponent(format)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
   }
 
   if (isLoading) {
@@ -332,6 +228,7 @@ export default function SermonDetail() {
           <h1 className="font-display text-3xl sm:text-5xl font-bold mb-2">{title}</h1>
           {scripture ? <p className="text-sm text-primary/80">{scripture}</p> : null}
 
+          {/* DOWNLOAD BUTTONS */}
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <button
               onClick={() => handleDownload("pdf")}
