@@ -7,7 +7,19 @@ import { useSermon } from "@/hooks/useSermons";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
-import { ArrowLeft, Lock, Eye, ShoppingCart, Crown, Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Lock,
+  Eye,
+  ShoppingCart,
+  Crown,
+  Loader2,
+  Download,
+  FileText,
+  BookOpen,
+  File,
+  NotebookPen,
+} from "lucide-react";
 
 function safeText(v: any) {
   return String(v ?? "").trim();
@@ -16,6 +28,10 @@ function safeText(v: any) {
 function safeMoney(v: any) {
   const n = Number(v ?? 0);
   return Number.isFinite(n) ? n : 0;
+}
+
+function openFile(url: string) {
+  window.open(url, "_blank", "noopener,noreferrer");
 }
 
 export default function SermonDetail() {
@@ -52,6 +68,26 @@ export default function SermonDetail() {
   const accessLevel = safeText((sermon as any)?.access_level || "free");
   const chargeEnabled = Boolean((sermon as any)?.charge_enabled ?? (sermon as any)?.charge_for_sermon ?? false);
   const price = safeMoney((sermon as any)?.price);
+
+  // Download links (supports multiple possible field names so it "just works")
+  const pdfUrl = safeText((sermon as any)?.pdf_url ?? (sermon as any)?.pdf ?? (sermon as any)?.pdfUrl ?? "");
+  const epubUrl = safeText((sermon as any)?.epub_url ?? (sermon as any)?.epub ?? (sermon as any)?.epubUrl ?? "");
+  const wordUrl = safeText(
+    (sermon as any)?.docx_url ??
+      (sermon as any)?.word_url ??
+      (sermon as any)?.doc_url ??
+      (sermon as any)?.docx ??
+      (sermon as any)?.word ??
+      (sermon as any)?.docxUrl ??
+      "",
+  );
+  const goodnotesUrl = safeText(
+    (sermon as any)?.goodnotes_url ??
+      (sermon as any)?.goodnotes ??
+      (sermon as any)?.goodnotes_pdf_url ??
+      (sermon as any)?.goodnotesUrl ??
+      "",
+  );
 
   // Decide if this sermon is locked
   const isLocked = useMemo(() => {
@@ -155,6 +191,22 @@ export default function SermonDetail() {
     }
   }
 
+  function handleDownload(kind: "pdf" | "epub" | "word" | "goodnotes") {
+    if (!isFullAccess) {
+      toast.error("Please unlock this sermon to download.");
+      return;
+    }
+
+    const url = kind === "pdf" ? pdfUrl : kind === "epub" ? epubUrl : kind === "word" ? wordUrl : goodnotesUrl;
+
+    if (!url) {
+      toast.error("This download is not available yet.");
+      return;
+    }
+
+    openFile(url);
+  }
+
   if (isLoading) {
     return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading sermon…</div>;
   }
@@ -199,6 +251,70 @@ export default function SermonDetail() {
 
           <h1 className="font-display text-3xl sm:text-5xl font-bold mb-2">{title}</h1>
           {scripture ? <p className="text-sm text-primary/80">{scripture}</p> : null}
+
+          {/* DOWNLOAD BUTTONS (ADDED) */}
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => handleDownload("pdf")}
+              disabled={!isFullAccess || !pdfUrl}
+              className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold ${
+                !isFullAccess || !pdfUrl
+                  ? "bg-muted text-muted-foreground cursor-not-allowed"
+                  : "bg-primary text-primary-foreground"
+              }`}
+              title={!isFullAccess ? "Unlock to download" : !pdfUrl ? "Not available yet" : "Download PDF"}
+            >
+              <Download className="h-4 w-4" />
+              Download PDF
+            </button>
+
+            <button
+              onClick={() => handleDownload("epub")}
+              disabled={!isFullAccess || !epubUrl}
+              className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full border font-semibold ${
+                !isFullAccess || !epubUrl
+                  ? "border-border text-muted-foreground cursor-not-allowed"
+                  : "border-primary/30"
+              }`}
+              title={!isFullAccess ? "Unlock to download" : !epubUrl ? "Not available yet" : "Download EPUB"}
+            >
+              <BookOpen className="h-4 w-4" />
+              Download EPUB
+            </button>
+
+            <button
+              onClick={() => handleDownload("word")}
+              disabled={!isFullAccess || !wordUrl}
+              className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full border font-semibold ${
+                !isFullAccess || !wordUrl
+                  ? "border-border text-muted-foreground cursor-not-allowed"
+                  : "border-primary/30"
+              }`}
+              title={!isFullAccess ? "Unlock to download" : !wordUrl ? "Not available yet" : "Download Word"}
+            >
+              <File className="h-4 w-4" />
+              Download Word
+            </button>
+
+            <button
+              onClick={() => handleDownload("goodnotes")}
+              disabled={!isFullAccess || !goodnotesUrl}
+              className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full border font-semibold ${
+                !isFullAccess || !goodnotesUrl
+                  ? "border-border text-muted-foreground cursor-not-allowed"
+                  : "border-primary/30"
+              }`}
+              title={!isFullAccess ? "Unlock to download" : !goodnotesUrl ? "Not available yet" : "Download GoodNotes"}
+            >
+              <NotebookPen className="h-4 w-4" />
+              Download GoodNotes
+            </button>
+          </div>
+
+          {/* Optional helper row */}
+          <div className="mt-2 text-xs text-muted-foreground">
+            {!isFullAccess ? "Unlock this sermon to enable downloads." : null}
+          </div>
         </div>
 
         {showPaywall ? (
