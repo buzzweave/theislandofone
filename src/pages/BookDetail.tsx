@@ -218,7 +218,7 @@ export default function BookDetail() {
                 {!book.is_free && !purchased && ` · Preview first chapter free`}
               </p>
 
-              <SocialShareLinks title={book.title} url={`https://theislandofone.com/share/book/${id}`} />
+              <SocialShareLinks title={book.title} url={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/share-book?id=${encodeURIComponent(id || '')}`} />
 
               {canRead && book.audio_url && (
                 <div className="mt-6">
