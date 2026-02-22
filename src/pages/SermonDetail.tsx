@@ -4,6 +4,7 @@ import DOMPurify from "dompurify";
 import { toast } from "sonner";
 
 import { useSermon } from "@/hooks/useSermons";
+import { exportSermonToPdf, exportSermonToEpub, exportSermonToWord, exportSermonToGoodNotesPdf } from "@/lib/sermonExport";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -166,21 +167,27 @@ export default function SermonDetail() {
     }
   }
 
-  // DOWNLOADS: call the Edge Function so it works for ALL existing sermons
+  // DOWNLOADS: use client-side export functions
   async function handleDownload(kind: "pdf" | "epub" | "word" | "goodnotes") {
-    if (!id) return;
+    if (!sermon) return;
 
     if (!isFullAccess) {
       toast.error("Please unlock this sermon to download.");
       return;
     }
 
-    const fnBase = (supabase as any)?.functions?.url || `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
-
-    const format = kind === "word" ? "docx" : kind;
-
-    const url = `${fnBase}/download-sermon?id=${encodeURIComponent(id)}&format=${encodeURIComponent(format)}`;
-    window.open(url, "_blank", "noopener,noreferrer");
+    try {
+      switch (kind) {
+        case "pdf": exportSermonToPdf(sermon); break;
+        case "epub": exportSermonToEpub(sermon); break;
+        case "word": exportSermonToWord(sermon); break;
+        case "goodnotes": await exportSermonToGoodNotesPdf(sermon); break;
+      }
+      toast.success("Download started!");
+    } catch (err) {
+      console.error("Download failed:", err);
+      toast.error("Download failed. Please try again.");
+    }
   }
 
   if (isLoading) {
