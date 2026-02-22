@@ -41,23 +41,18 @@ async function resolveSupabaseStorageUrl(pathOrUrl: string) {
   const v = safeText(pathOrUrl);
   if (!v) return "";
 
-  // Already a full URL
   if (isHttpUrl(v)) return v;
 
-  // If they stored something like "bucket/path/to/file.pdf"
-  // we’ll try to detect bucket prefix
   const parts = v.split("/");
   if (parts.length >= 2) {
     const maybeBucket = parts[0];
     const maybePath = parts.slice(1).join("/");
 
-    // Try signed first (works for private + public)
     try {
       const { data, error } = await (supabase as any).storage.from(maybeBucket).createSignedUrl(maybePath, 60 * 15);
       if (!error && data?.signedUrl) return data.signedUrl;
     } catch {}
 
-    // Try public URL
     try {
       const { data } = await (supabase as any).storage.from(maybeBucket).getPublicUrl(maybePath);
       const publicUrl = data?.publicUrl || "";
@@ -65,23 +60,77 @@ async function resolveSupabaseStorageUrl(pathOrUrl: string) {
     } catch {}
   }
 
-  // If they stored ONLY a path like "sermons/goodness.pdf" without bucket,
-  // try common buckets (you can change these to your real bucket names)
   const bucketCandidates = ["sermons", "downloads", "files", "public"];
 
   for (const bucket of bucketCandidates) {
-    // Signed URL attempt
     try {
       const { data, error } = await (supabase as any).storage.from(bucket).createSignedUrl(v, 60 * 15);
       if (!error && data?.signedUrl) return data.signedUrl;
     } catch {}
 
-    // Public URL attempt
     try {
       const { data } = await (supabase as any).storage.from(bucket).getPublicUrl(v);
       const publicUrl = data?.publicUrl || "";
       if (publicUrl) return publicUrl;
     } catch {}
+  }
+
+  return "";
+}
+
+function looksLikeFileUrl(kind: "pdf" | "epub" | "word" | "goodnotes", value: string) {
+  const v = value.toLowerCase();
+  if (!v) return false;
+
+  if (kind === "pdf") return v.includes(".pdf") || v.includes("pdf");
+  if (kind === "epub") return v.includes(".epub") || v.includes("epub");
+  if (kind === "word") return v.includes(".docx") || v.includes(".doc") || v.includes("docx") || v.includes("word");
+  return v.includes("goodnotes") || v.includes("good-notes") || v.includes("good_notes") || v.includes(".pdf");
+}
+
+function findDownloadValue(sermon: any, kind: "pdf" | "epub" | "word" | "goodnotes") {
+  if (!sermon || typeof sermon !== "object") return "";
+
+  const preferredKeys =
+    kind === "pdf"
+      ? ["pdf_url", "pdf", "pdfUrl", "pdf_path", "pdfPath", "download_pdf", "downloadPdf"]
+      : kind === "epub"
+        ? ["epub_url", "epub", "epubUrl", "epub_path", "epubPath", "download_epub", "downloadEpub"]
+        : kind === "word"
+          ? ["docx_url", "word_url", "doc_url", "docx", "word", "docxUrl", "wordUrl", "docx_path", "word_path"]
+          : ["goodnotes_url", "goodnotes", "goodnotes_pdf_url", "goodnotesUrl", "goodnotes_path", "good_notes"];
+
+  for (const k of preferredKeys) {
+    const val = sermon?.[k];
+    if (typeof val === "string" && safeText(val)) return safeText(val);
+    if (val && typeof val === "object") {
+      const u = val?.url || val?.href || val?.signedUrl || val?.publicUrl;
+      if (typeof u === "string" && safeText(u)) return safeText(u);
+    }
+  }
+
+  const entries = Object.entries(sermon);
+  for (const [key, val] of entries) {
+    const k = String(key).toLowerCase();
+    if (kind === "goodnotes") {
+      if (!k.includes("good")) continue;
+    } else {
+      if (!k.includes(kind)) continue;
+    }
+
+    if (typeof val === "string" && safeText(val) && looksLikeFileUrl(kind, val)) {
+      return safeText(val);
+    }
+    if (val && typeof val === "object") {
+      const u = (val as any)?.url || (val as any)?.href || (val as any)?.signedUrl || (val as any)?.publicUrl;
+      if (typeof u === "string" && safeText(u) && looksLikeFileUrl(kind, u)) return safeText(u);
+    }
+  }
+
+  for (const [, val] of entries) {
+    if (typeof val === "string" && safeText(val) && looksLikeFileUrl(kind, val)) {
+      return safeText(val);
+    }
   }
 
   return "";
@@ -103,7 +152,6 @@ export default function SermonDetail() {
   const [checkingPurchase, setCheckingPurchase] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
-  // Normalize sermon fields
   const title = safeText((sermon as any)?.title) || "Sermon";
   const scripture = safeText((sermon as any)?.scripture);
   const excerpt = safeText((sermon as any)?.excerpt ?? (sermon as any)?.summary);
@@ -120,34 +168,12 @@ export default function SermonDetail() {
   const chargeEnabled = Boolean((sermon as any)?.charge_enabled ?? (sermon as any)?.charge_for_sermon ?? false);
   const price = safeMoney((sermon as any)?.price);
 
-  // Download links (supports multiple possible field names)
-  const pdfUrlRaw = safeText((sermon as any)?.pdf_url ?? (sermon as any)?.pdf ?? (sermon as any)?.pdfUrl ?? "");
-  const epubUrlRaw = safeText((sermon as any)?.epub_url ?? (sermon as any)?.epub ?? (sermon as any)?.epubUrl ?? "");
-  const wordUrlRaw = safeText(
-    (sermon as any)?.docx_url ??
-      (sermon as any)?.word_url ??
-      (sermon as any)?.doc_url ??
-      (sermon as any)?.docx ??
-      (sermon as any)?.word ??
-      (sermon as any)?.docxUrl ??
-      "",
-  );
-  const goodnotesUrlRaw = safeText(
-    (sermon as any)?.goodnotes_url ??
-      (sermon as any)?.goodnotes ??
-      (sermon as any)?.goodnotes_pdf_url ??
-      (sermon as any)?.goodnotesUrl ??
-      "",
-  );
-
-  // Decide if this sermon is locked
   const isLocked = useMemo(() => {
     if (isFreeFlag || accessLevel === "free") return false;
     if (price > 0 || chargeEnabled) return true;
     return accessLevel !== "free";
   }, [isFreeFlag, accessLevel, price, chargeEnabled]);
 
-  // Check purchase status (best-effort)
   useEffect(() => {
     let alive = true;
 
@@ -244,19 +270,17 @@ export default function SermonDetail() {
       return;
     }
 
-    const raw =
-      kind === "pdf" ? pdfUrlRaw : kind === "epub" ? epubUrlRaw : kind === "word" ? wordUrlRaw : goodnotesUrlRaw;
+    const raw = findDownloadValue(sermon, kind);
 
     if (!raw) {
-      toast.error("This download is not available yet.");
+      toast.error("No download file found for this sermon yet.");
       return;
     }
 
-    // FIX: Support BOTH full URLs and Supabase Storage paths
     const finalUrl = await resolveSupabaseStorageUrl(raw);
 
     if (!finalUrl) {
-      toast.error("Download link could not be resolved. Check the file URL/path stored for this sermon.");
+      toast.error("Download link could not be resolved. The stored value is not a valid URL or storage path.");
       return;
     }
 
@@ -308,17 +332,16 @@ export default function SermonDetail() {
           <h1 className="font-display text-3xl sm:text-5xl font-bold mb-2">{title}</h1>
           {scripture ? <p className="text-sm text-primary/80">{scripture}</p> : null}
 
-          {/* DOWNLOAD BUTTONS */}
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <button
               onClick={() => handleDownload("pdf")}
-              disabled={!isFullAccess || !pdfUrlRaw}
+              disabled={!isFullAccess}
               className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold ${
-                !isFullAccess || !pdfUrlRaw
+                !isFullAccess
                   ? "bg-muted text-muted-foreground cursor-not-allowed"
                   : "bg-primary text-primary-foreground"
               }`}
-              title={!isFullAccess ? "Unlock to download" : !pdfUrlRaw ? "Not available yet" : "Download PDF"}
+              title={!isFullAccess ? "Unlock to download" : "Download PDF"}
             >
               <Download className="h-4 w-4" />
               Download PDF
@@ -326,13 +349,11 @@ export default function SermonDetail() {
 
             <button
               onClick={() => handleDownload("epub")}
-              disabled={!isFullAccess || !epubUrlRaw}
+              disabled={!isFullAccess}
               className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full border font-semibold ${
-                !isFullAccess || !epubUrlRaw
-                  ? "border-border text-muted-foreground cursor-not-allowed"
-                  : "border-primary/30"
+                !isFullAccess ? "border-border text-muted-foreground cursor-not-allowed" : "border-primary/30"
               }`}
-              title={!isFullAccess ? "Unlock to download" : !epubUrlRaw ? "Not available yet" : "Download EPUB"}
+              title={!isFullAccess ? "Unlock to download" : "Download EPUB"}
             >
               <BookOpen className="h-4 w-4" />
               Download EPUB
@@ -340,13 +361,11 @@ export default function SermonDetail() {
 
             <button
               onClick={() => handleDownload("word")}
-              disabled={!isFullAccess || !wordUrlRaw}
+              disabled={!isFullAccess}
               className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full border font-semibold ${
-                !isFullAccess || !wordUrlRaw
-                  ? "border-border text-muted-foreground cursor-not-allowed"
-                  : "border-primary/30"
+                !isFullAccess ? "border-border text-muted-foreground cursor-not-allowed" : "border-primary/30"
               }`}
-              title={!isFullAccess ? "Unlock to download" : !wordUrlRaw ? "Not available yet" : "Download Word"}
+              title={!isFullAccess ? "Unlock to download" : "Download Word"}
             >
               <File className="h-4 w-4" />
               Download Word
@@ -354,15 +373,11 @@ export default function SermonDetail() {
 
             <button
               onClick={() => handleDownload("goodnotes")}
-              disabled={!isFullAccess || !goodnotesUrlRaw}
+              disabled={!isFullAccess}
               className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full border font-semibold ${
-                !isFullAccess || !goodnotesUrlRaw
-                  ? "border-border text-muted-foreground cursor-not-allowed"
-                  : "border-primary/30"
+                !isFullAccess ? "border-border text-muted-foreground cursor-not-allowed" : "border-primary/30"
               }`}
-              title={
-                !isFullAccess ? "Unlock to download" : !goodnotesUrlRaw ? "Not available yet" : "Download GoodNotes"
-              }
+              title={!isFullAccess ? "Unlock to download" : "Download GoodNotes"}
             >
               <NotebookPen className="h-4 w-4" />
               Download GoodNotes
