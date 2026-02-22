@@ -124,7 +124,7 @@ export default function BlogPost() {
         <div className="mt-4 pt-6 border-t border-border">
           <SocialShareLinks
             title={post.title}
-            url={`https://theislandofone.com/share/blog/${slug}`}
+            url={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/share-blog?slug=${encodeURIComponent(slug || '')}`}
           />
         </div>
         <div className="mt-6 pt-6 border-t border-border">

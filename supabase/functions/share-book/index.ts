@@ -63,6 +63,7 @@ Deno.serve(async (req: Request) => {
 <meta property="og:url" content="${esc(link)}" />
 <meta property="og:type" content="book" />
 <meta property="fb:app_id" content="${esc(fbAppId)}" />
+<meta property="og:app_id" content="${esc(fbAppId)}" />
 <meta property="og:site_name" content="The Island of One" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="${esc(t)}" />

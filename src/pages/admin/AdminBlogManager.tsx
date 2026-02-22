@@ -169,7 +169,7 @@ export default function AdminBlogManager() {
   };
 
   const getShareUrl = (post: BlogPost) =>
-    `https://theislandofone.com/share/blog/${post.slug}`;
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/share-blog?slug=${encodeURIComponent(post.slug)}`;
 
   const shareToFacebook = (post: BlogPost) => {
     const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(getShareUrl(post))}&quote=${encodeURIComponent(post.excerpt || post.title)}`;
