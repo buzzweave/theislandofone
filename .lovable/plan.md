@@ -1,27 +1,33 @@
 
 
-# Fix Sermon Downloads
+# Fix Facebook Sharing Debugger: Add og:app_id Tag
 
 ## Problem
-The download buttons in `SermonDetail.tsx` (line 170-184) try to open a URL to a `download-sermon` edge function that **does not exist**. The actual working export functions (`exportSermonToPdf`, `exportSermonToEpub`, `exportSermonToWord`, `exportSermonToGoodNotesPdf`) are already built in `src/lib/sermonExport.ts` but are never called.
+The `share-blog` edge function already includes `fb:app_id` and reads the saved Facebook App ID from `site_settings`. However, it is missing the `og:app_id` meta tag, which Facebook's debugger also looks for.
 
 ## Solution
-Replace the `handleDownload` function in `SermonDetail.tsx` to directly call the client-side export functions from `sermonExport.ts` instead of opening a non-existent edge function URL.
+Add one line to the `share-blog` edge function's HTML output:
 
-## Technical Changes
+```
+<meta property="og:app_id" content="${fbAppId}" />
+```
 
-### File: `src/pages/SermonDetail.tsx`
+This goes right after the existing `fb:app_id` line.
 
-1. **Add import** for the export functions at the top:
-   - `importsermonExport.ts` exports: `exportSermonToPdf`, `exportSermonToEpub`, `exportSermonToWord`, `exportSermonToGoodNotesPdf`
+## Technical Details
 
-2. **Rewrite `handleDownload`** (lines 170-184) to call the correct function based on format:
-   - `"pdf"` calls `exportSermonToPdf(sermon)`
-   - `"epub"` calls `exportSermonToEpub(sermon)`
-   - `"word"` calls `exportSermonToWord(sermon)`
-   - `"goodnotes"` calls `exportSermonToGoodNotesPdf(sermon)`
+### File: `supabase/functions/share-blog/index.ts`
 
-3. **Remove unused references** to the edge function URL construction and `window.open` call.
+Add `<meta property="og:app_id" content="${esc(fbAppId)}" />` immediately after the existing `fb:app_id` meta tag (around line 43 of the current file).
 
-No database changes, no new edge functions, no new dependencies needed. The export logic and download helper already handle all platforms (iOS, Android, desktop).
+No other changes needed -- the function already:
+- Reads `fb_app_id` from `site_settings`
+- Falls back to `1169014871775113` if not set
+- Includes `fb:app_id`
+- Preserves all other OG tags and redirect behavior
+
+### Scope
+- Only affects `/share/blog/:slug` responses
+- No changes to books, sermons, or client-side code
+- Edge function will auto-deploy after edit
 
