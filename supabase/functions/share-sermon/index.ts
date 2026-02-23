@@ -67,10 +67,10 @@ Deno.serve(async (req: Request) => {
 <meta name="twitter:title" content="${esc(t)}" />
 <meta name="twitter:description" content="${esc(desc)}" />
 <meta name="twitter:image" content="${esc(fallbackImg)}" />
-<meta http-equiv="refresh" content="2;url=${esc(link)}" />
 <style>body{font:17px/1.8 Georgia,serif;max-width:700px;margin:80px auto;padding:0 20px;text-align:center;color:#666}</style>
 </head><body>
 <p>Redirecting to The Island of One&hellip;</p>
+<script>window.location.replace("${link.replace(/"/g, '\\"')}");</script>
 </body></html>`;
 
     return new Response(page, {
