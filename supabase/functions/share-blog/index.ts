@@ -6,6 +6,9 @@ const corsHeaders = {
 const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+const stripHtml = (s: string) =>
+  s.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -42,7 +45,7 @@ Deno.serve(async (req: Request) => {
     const fallbackImg = `${site}/logo.png`;
     const rawImg = post.image_url || fallbackImg;
     const img = rawImg.replace(/^http:\/\//i, "https://");
-    const desc = post.excerpt || "Faith, healing, and belonging for the ones who felt alone.";
+    const desc = stripHtml(post.excerpt || post.content || "Faith, healing, and belonging for the ones who felt alone.");
     const t = post.title;
 
     const page = `<!DOCTYPE html><html><head>

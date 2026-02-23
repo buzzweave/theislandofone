@@ -6,6 +6,9 @@ const corsHeaders = {
 const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+const stripHtml = (s: string) =>
+  s.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -49,7 +52,7 @@ Deno.serve(async (req: Request) => {
     const rawImg = book.cover_image || fallbackImg;
     const img = rawImg.replace(/^http:\/\//i, "https://");
     const t = book.title || "Book";
-    const desc = book.description || book.subtitle || "A book from The Island of One Ministries.";
+    const desc = stripHtml(book.description || book.subtitle || "A book from The Island of One Ministries.");
 
     const page = `<!DOCTYPE html><html><head>
 <meta charset="UTF-8">
