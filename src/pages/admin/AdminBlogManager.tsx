@@ -7,11 +7,12 @@ import { Textarea } from "@/components/ui/textarea";
 import RichTextEditor from "@/components/admin/RichTextEditor";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, PenLine, Upload, Eye, EyeOff, Facebook, RefreshCw, Download, Settings, Save } from "lucide-react";
+import { Plus, Pencil, Trash2, PenLine, Upload, Eye, EyeOff, Facebook, RefreshCw, Download, Settings, Save, Maximize2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { uploadToStorage } from "@/lib/supabaseUpload";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import ImageResizeDialog from "@/components/admin/ImageResizeDialog";
 
 type PostForm = {
   title: string;
@@ -82,6 +83,7 @@ export default function AdminBlogManager() {
   const [fbAppId, setFbAppId] = useState("");
   const [fbSaving, setFbSaving] = useState(false);
   const [fbOpen, setFbOpen] = useState(false);
+  const [resizePost, setResizePost] = useState<BlogPost | null>(null);
 
   useEffect(() => {
     supabase.from("site_settings").select("value").eq("key", "fb_app_id").single().then(({ data }) => {
@@ -304,6 +306,9 @@ export default function AdminBlogManager() {
             </Badge>
             <div className="flex gap-1 shrink-0">
               <Button variant="ghost" size="icon" onClick={() => openEdit(post)}><Pencil className="h-4 w-4" /></Button>
+              {post.image_url && (
+                <Button variant="ghost" size="icon" onClick={() => setResizePost(post)} title="Resize for Social Media"><Maximize2 className="h-4 w-4" /></Button>
+              )}
               {post.is_published && (
                 <>
                   <Button variant="ghost" size="icon" onClick={() => shareToFacebook(post)} title="Share to Facebook"><Facebook className="h-4 w-4 text-primary" /></Button>
@@ -315,6 +320,12 @@ export default function AdminBlogManager() {
           </div>
         ))}
       </div>
+      <ImageResizeDialog
+        title={resizePost?.title || ""}
+        imageUrl={resizePost?.image_url || null}
+        open={!!resizePost}
+        onClose={() => setResizePost(null)}
+      />
     </div>
   );
 }
