@@ -1,10 +1,15 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import DOMPurify from "dompurify";
 import { toast } from "sonner";
 
 import { useSermon } from "@/hooks/useSermons";
-import { exportSermonToPdf, exportSermonToEpub, exportSermonToWord, exportSermonToGoodNotesPdf } from "@/lib/sermonExport";
+import {
+  exportSermonToPdf,
+  exportSermonToEpub,
+  exportSermonToWord,
+  exportSermonToGoodNotesPdf,
+} from "@/lib/sermonExport";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -30,6 +35,149 @@ function safeMoney(v: any) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function escapeHtml(s: string) {
+  return s
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function wrapPlainTextAsHtmlPages(title: string, scriptureRef: string, raw: string) {
+  const safe = escapeHtml(raw)
+    .replace(/\n{2,}/g, "\n\n")
+    .replace(/\n/g, "<br/>");
+
+  // Page 1 Title only
+  const page1 = `
+<section class="pdf-page title-page">
+  <div class="title-wrap">
+    <h1>${escapeHtml(title)}</h1>
+    ${scriptureRef ? `<p class="subtitle">${escapeHtml(scriptureRef)}</p>` : ""}
+  </div>
+</section>`.trim();
+
+  // Page 2 Scripture + Illustration (we don’t have reliable markers in plain text)
+  // So we put the full text on Page 2 if it’s plain text. For locked paging, store HTML with headings or wrappers.
+  const page2 = `
+<section class="pdf-page scripture-illustration-page">
+  <p>${safe}</p>
+</section>`.trim();
+
+  return `${page1}\n${page2}`;
+}
+
+function buildPagedHtmlFromHtml(title: string, scriptureRef: string, html: string) {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+
+  // If already wrapped, use as-is
+  const existingPages = doc.querySelectorAll("section.pdf-page");
+  if (existingPages.length > 0) return html;
+
+  const bodyNodes = Array.from(doc.body.childNodes).filter((n) => {
+    if (n.nodeType === Node.TEXT_NODE) return (n.textContent ?? "").trim().length > 0;
+    return true;
+  });
+
+  const isHeading = (node: ChildNode) => {
+    if (!(node instanceof HTMLElement)) return false;
+    const tag = node.tagName.toLowerCase();
+    return tag === "h1" || tag === "h2" || tag === "h3";
+  };
+
+  const headingText = (node: ChildNode) => {
+    if (!(node instanceof HTMLElement)) return "";
+    return (node.textContent ?? "").trim().toUpperCase();
+  };
+
+  const isMainPointHeading = (node: ChildNode) => isHeading(node) && headingText(node).startsWith("MAIN POINT");
+  const isClosingHeading = (node: ChildNode) => {
+    if (!isHeading(node)) return false;
+    const t = headingText(node);
+    return t.startsWith("CLOSING") || t.startsWith("ALTAR CALL") || t.startsWith("INVITATION");
+  };
+
+  const mainPointIndexes: number[] = [];
+  let closingIndex = -1;
+
+  bodyNodes.forEach((n, i) => {
+    if (isMainPointHeading(n)) mainPointIndexes.push(i);
+    if (closingIndex === -1 && isClosingHeading(n)) closingIndex = i;
+  });
+
+  // Page 1 Title only (always generated)
+  const page1 = `
+<section class="pdf-page title-page">
+  <div class="title-wrap">
+    <h1>${escapeHtml(title)}</h1>
+    ${scriptureRef ? `<p class="subtitle">${escapeHtml(scriptureRef)}</p>` : ""}
+  </div>
+</section>`.trim();
+
+  // If no main points detected, put everything on page 2 (scripture + illustration page)
+  if (mainPointIndexes.length === 0) {
+    const temp = document.createElement("div");
+    bodyNodes.forEach((n) => temp.appendChild(n.cloneNode(true)));
+    const page2 = `
+<section class="pdf-page scripture-illustration-page">
+  ${temp.innerHTML}
+</section>`.trim();
+    return `${page1}\n${page2}`;
+  }
+
+  // Page 2: everything before first MAIN POINT (Scripture + Illustration together)
+  const firstMP = mainPointIndexes[0];
+  const beforeMP = bodyNodes.slice(0, firstMP);
+
+  const beforeWrap = document.createElement("div");
+  beforeMP.forEach((n) => beforeWrap.appendChild(n.cloneNode(true)));
+
+  const page2 = `
+<section class="pdf-page scripture-illustration-page">
+  ${beforeWrap.innerHTML}
+</section>`.trim();
+
+  // Main points pages
+  const pages: string[] = [page1, page2];
+
+  const endForMainPoints = closingIndex !== -1 ? closingIndex : bodyNodes.length;
+
+  for (let i = 0; i < mainPointIndexes.length; i++) {
+    const start = mainPointIndexes[i];
+    const nextStart = i + 1 < mainPointIndexes.length ? mainPointIndexes[i + 1] : endForMainPoints;
+
+    if (start >= endForMainPoints) break;
+
+    const chunkNodes = bodyNodes.slice(start, nextStart);
+    const chunkWrap = document.createElement("div");
+    chunkNodes.forEach((n) => chunkWrap.appendChild(n.cloneNode(true)));
+
+    pages.push(
+      `
+<section class="pdf-page point-page">
+  ${chunkWrap.innerHTML}
+</section>`.trim(),
+    );
+  }
+
+  // Closing page (everything from closing heading to end)
+  if (closingIndex !== -1) {
+    const closingNodes = bodyNodes.slice(closingIndex);
+    const closingWrap = document.createElement("div");
+    closingNodes.forEach((n) => closingWrap.appendChild(n.cloneNode(true)));
+
+    pages.push(
+      `
+<section class="pdf-page closing-page">
+  ${closingWrap.innerHTML}
+</section>`.trim(),
+    );
+  }
+
+  return pages.join("\n");
+}
+
 export default function SermonDetail() {
   const params = useParams<{ id: string }>();
   const id = params.id ?? "";
@@ -47,6 +195,10 @@ export default function SermonDetail() {
   const [purchased, setPurchased] = useState(false);
   const [checkingPurchase, setCheckingPurchase] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+
+  const sermonRef = useRef<HTMLDivElement | null>(null);
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copyHtml, setCopyHtml] = useState("");
 
   // Normalize sermon fields
   const title = safeText((sermon as any)?.title) || "Sermon";
@@ -130,6 +282,48 @@ export default function SermonDetail() {
     return DOMPurify.sanitize(manuscriptRaw);
   }, [manuscriptRaw]);
 
+  // Build the locked pages HTML:
+  // - If sermon already contains <section class="pdf-page"> wrappers -> use as-is
+  // - If it’s HTML without wrappers -> auto-wrap into Title / Scripture+Illustration / Main Points / Closing
+  // - If plain text -> minimal wrapper (best possible), but true locked paging needs HTML headings or wrappers in storage
+  const pagedHtml = useMemo(() => {
+    if (sanitizedHtml) return buildPagedHtmlFromHtml(title, scripture, sanitizedHtml);
+    return wrapPlainTextAsHtmlPages(title, scripture, manuscriptRaw);
+  }, [sanitizedHtml, manuscriptRaw, title, scripture]);
+
+  const printCss = useMemo(() => {
+    return `
+@media print {
+  @page { size: A4 portrait; margin: 0.75in; }
+
+  .sermon-content .pdf-page {
+    page-break-after: always;
+    break-after: page;
+    page-break-inside: avoid;
+    break-inside: avoid-page;
+  }
+
+  .sermon-content h1,
+  .sermon-content h2,
+  .sermon-content h3,
+  .sermon-content p,
+  .sermon-content ul,
+  .sermon-content li {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .sermon-content h1,
+  .sermon-content h2,
+  .sermon-content h3 {
+    page-break-after: avoid;
+  }
+
+  .sermon-ui { display: none !important; }
+}
+    `.trim();
+  }, []);
+
   async function handlePurchase() {
     if (!id) return;
 
@@ -178,15 +372,44 @@ export default function SermonDetail() {
 
     try {
       switch (kind) {
-        case "pdf": exportSermonToPdf(sermon); break;
-        case "epub": exportSermonToEpub(sermon); break;
-        case "word": exportSermonToWord(sermon); break;
-        case "goodnotes": await exportSermonToGoodNotesPdf(sermon); break;
+        case "pdf":
+          exportSermonToPdf(sermon);
+          break;
+        case "epub":
+          exportSermonToEpub(sermon);
+          break;
+        case "word":
+          exportSermonToWord(sermon);
+          break;
+        case "goodnotes":
+          await exportSermonToGoodNotesPdf(sermon);
+          break;
       }
       toast.success("Download started!");
     } catch (err) {
       console.error("Download failed:", err);
       toast.error("Download failed. Please try again.");
+    }
+  }
+
+  async function handleCopyForGoodNotes() {
+    const root = sermonRef.current;
+    if (!root) return;
+
+    const html = root.innerHTML;
+    setCopyHtml(html);
+    setCopyOpen(true);
+
+    try {
+      const blob = new Blob([html], { type: "text/html" });
+      const item = new ClipboardItem({ "text/html": blob });
+      await navigator.clipboard.write([item]);
+      toast.success("Copied for GoodNotes!");
+    } catch {
+      const tmp = document.createElement("div");
+      tmp.innerHTML = html;
+      await navigator.clipboard.writeText(tmp.innerText);
+      toast.success("Copied (text fallback)!");
     }
   }
 
@@ -286,6 +509,17 @@ export default function SermonDetail() {
               <NotebookPen className="h-4 w-4" />
               Download GoodNotes
             </button>
+
+            {isFullAccess ? (
+              <button
+                onClick={handleCopyForGoodNotes}
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full border font-semibold border-primary/30"
+                title="Copy paged sermon for GoodNotes"
+              >
+                <NotebookPen className="h-4 w-4" />
+                Copy for GoodNotes
+              </button>
+            ) : null}
           </div>
 
           <div className="mt-2 text-xs text-muted-foreground">
@@ -332,13 +566,127 @@ export default function SermonDetail() {
             </p>
           </div>
         ) : (
-          <div className="prose prose-invert max-w-none">
-            {sanitizedHtml ? (
-              <div dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />
-            ) : (
-              <div className="whitespace-pre-wrap">{manuscriptRaw}</div>
-            )}
-          </div>
+          <>
+            <style>{printCss}</style>
+
+            <style>{`
+/* Each wrapper becomes a page */
+.sermon-content .pdf-page{
+  page-break-after: always;
+  break-after: page;
+  page-break-inside: avoid;
+  break-inside: avoid-page;
+}
+
+/* Web view: show page cards */
+@media screen{
+  .sermon-content .pdf-page{
+    padding: 34px;
+    margin: 18px 0;
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 12px;
+    background: rgba(0,0,0,0.15);
+  }
+}
+
+/* GoodNotes big fonts */
+.sermon-content h1{
+  font-size: 44px;
+  line-height: 1.05;
+  margin: 0 0 14px 0;
+}
+
+.sermon-content h2{
+  font-size: 26px;
+  line-height: 1.15;
+  margin: 18px 0 12px 0;
+}
+
+.sermon-content p{
+  font-size: 18px;
+  line-height: 1.6;
+  margin: 0 0 12px 0;
+}
+
+.sermon-content .point-page h2,
+.sermon-content .point-page h3{
+  font-size: 30px;
+  line-height: 1.1;
+  margin: 0 0 14px 0;
+  font-weight: 800;
+}
+
+.sermon-content ul{
+  margin: 0;
+  padding-left: 24px;
+}
+
+.sermon-content li{
+  font-size: 20px;
+  line-height: 1.5;
+  margin: 0 0 12px 0;
+}
+
+/* Title page alignment */
+.sermon-content .title-page .title-wrap{
+  text-align: center;
+  padding-top: 40px;
+}
+
+.sermon-content .title-page .subtitle{
+  font-size: 20px;
+  opacity: 0.85;
+}
+            `}</style>
+
+            <div className="prose prose-invert max-w-none">
+              <article className="sermon-content" ref={sermonRef}>
+                <div dangerouslySetInnerHTML={{ __html: pagedHtml }} />
+              </article>
+            </div>
+
+            {copyOpen ? (
+              <div
+                className="sermon-ui"
+                onClick={() => setCopyOpen(false)}
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  background: "rgba(0,0,0,0.6)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: 18,
+                  zIndex: 9999,
+                }}
+              >
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    width: "min(900px, 95vw)",
+                    maxHeight: "85vh",
+                    overflow: "auto",
+                    background: "#0b0b0b",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    borderRadius: 14,
+                    padding: 16,
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="font-semibold">Copy Preview (already copied)</div>
+                    <button
+                      onClick={() => setCopyOpen(false)}
+                      className="px-4 py-2 rounded-full border border-border font-semibold"
+                    >
+                      Close
+                    </button>
+                  </div>
+
+                  <div className="mt-4" dangerouslySetInnerHTML={{ __html: copyHtml }} />
+                </div>
+              </div>
+            ) : null}
+          </>
         )}
       </div>
     </div>
