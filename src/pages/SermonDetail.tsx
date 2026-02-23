@@ -46,15 +46,18 @@ function escapeHtml(s) {
 }
 
 /*
-LOCKED PAGE RULE:
+LOCKED PAGE RULE (GoodNotes/PDF/Word):
 PAGE 1: Title only
-PAGE 2: Scripture + Illustration together
-PAGES 3+: One MAIN POINT per page
-FINAL: Closing on one page
+PAGE 2: Scripture section only (if SCRIPTURE heading exists)
+PAGE 3: Illustration section only (if ILLUSTRATION heading exists)
+PAGES 4+: MAIN POINTS
+  - One MAIN POINT per page
+  - If a MAIN POINT has more than 5 bullets, split into extra pages of 5 bullets each (same MAIN POINT heading repeated)
+FINAL: Closing/Altar Call page (if present)
 
-If manuscript already has <section class="pdf-page"> wrappers, we keep it.
-If manuscript is HTML without wrappers, we auto-wrap using headings MAIN POINT / CLOSING markers.
-If manuscript is plain text, we wrap Title + one page (best possible), because true point splitting needs HTML headings.
+If manuscript already has <section class="pdf-page"> wrappers, keep as-is.
+If manuscript is HTML without wrappers, auto-wrap using headings.
+If manuscript is plain text, wrap Title + one content page (best possible).
 */
 function wrapPlainTextAsHtmlPages(title, scriptureRef, raw) {
   const safe = escapeHtml(raw)
@@ -69,8 +72,9 @@ function wrapPlainTextAsHtmlPages(title, scriptureRef, raw) {
   </div>
 </section>`.trim();
 
+  // Plain text: best effort (cannot reliably split Scripture/Illustration/Main Points)
   const page2 = `
-<section class="pdf-page scripture-illustration-page">
+<section class="pdf-page body-page">
   <p>${safe}</p>
 </section>`.trim();
 
@@ -78,6 +82,11 @@ function wrapPlainTextAsHtmlPages(title, scriptureRef, raw) {
 }
 
 function buildPagedHtmlFromHtml(title, scriptureRef, html) {
+  // Build-safe for environments that might pre-render
+  if (typeof window === "undefined") {
+    return wrapPlainTextAsHtmlPages(title, scriptureRef, html);
+  }
+
   const doc = new DOMParser().parseFromString(html, "text/html");
 
   // If already wrapped, use as-is
@@ -85,20 +94,21 @@ function buildPagedHtmlFromHtml(title, scriptureRef, html) {
   if (existingPages.length > 0) return html;
 
   const bodyNodes = Array.from(doc.body.childNodes).filter((n) => {
-    if (n.nodeType === Node.TEXT_NODE) return (n.textContent ?? "").trim().length > 0;
+    const isText = n && n.nodeType === 3; // TEXT_NODE
+    if (isText) return (n.textContent ?? "").trim().length > 0;
     return true;
   });
 
   const isHeading = (node) => {
-    if (!(node instanceof HTMLElement)) return false;
-    const tag = node.tagName.toLowerCase();
+    if (!node || !node.tagName) return false;
+    const tag = String(node.tagName).toLowerCase();
     return tag === "h1" || tag === "h2" || tag === "h3";
   };
 
-  const headingText = (node) => {
-    if (!(node instanceof HTMLElement)) return "";
-    return (node.textContent ?? "").trim().toUpperCase();
-  };
+  const headingText = (node) =>
+    String(node?.textContent ?? "")
+      .trim()
+      .toUpperCase();
 
   const isMainPointHeading = (node) => isHeading(node) && headingText(node).startsWith("MAIN POINT");
   const isClosingHeading = (node) => {
@@ -106,6 +116,21 @@ function buildPagedHtmlFromHtml(title, scriptureRef, html) {
     const t = headingText(node);
     return t.startsWith("CLOSING") || t.startsWith("ALTAR CALL") || t.startsWith("INVITATION");
   };
+  const isScriptureHeading = (node) => {
+    if (!isHeading(node)) return false;
+    const t = headingText(node);
+    return t === "SCRIPTURE" || t.startsWith("SCRIPTURE");
+  };
+  const isIllustrationHeading = (node) => {
+    if (!isHeading(node)) return false;
+    const t = headingText(node);
+    return t === "ILLUSTRATION" || t.startsWith("OPENING ILLUSTRATION") || t.startsWith("ILLUSTRATION");
+  };
+
+  const findFirstIndex = (pred) => bodyNodes.findIndex((n) => pred(n));
+
+  const scriptureIndex = findFirstIndex(isScriptureHeading);
+  const illustrationIndex = findFirstIndex(isIllustrationHeading);
 
   const mainPointIndexes = [];
   let closingIndex = -1;
@@ -115,6 +140,9 @@ function buildPagedHtmlFromHtml(title, scriptureRef, html) {
     if (closingIndex === -1 && isClosingHeading(n)) closingIndex = i;
   });
 
+  const firstMP = mainPointIndexes.length > 0 ? mainPointIndexes[0] : -1;
+  const endBeforeMainPoints = firstMP !== -1 ? firstMP : closingIndex !== -1 ? closingIndex : bodyNodes.length;
+
   const page1 = `
 <section class="pdf-page title-page">
   <div class="title-wrap">
@@ -123,60 +151,111 @@ function buildPagedHtmlFromHtml(title, scriptureRef, html) {
   </div>
 </section>`.trim();
 
-  if (mainPointIndexes.length === 0) {
-    const temp = document.createElement("div");
-    bodyNodes.forEach((n) => temp.appendChild(n.cloneNode(true)));
-    const page2 = `
-<section class="pdf-page scripture-illustration-page">
-  ${temp.innerHTML}
+  const pages = [page1];
+
+  const wrapRangeAsPage = (start, end, className) => {
+    const wrap = doc.createElement("div");
+    bodyNodes.slice(start, end).forEach((n) => wrap.appendChild(n.cloneNode(true)));
+    return `
+<section class="pdf-page ${className}">
+  ${wrap.innerHTML}
 </section>`.trim();
-    return `${page1}\n${page2}`;
+  };
+
+  const hasScripture = scriptureIndex !== -1 && scriptureIndex < endBeforeMainPoints;
+  const hasIllustration = illustrationIndex !== -1 && illustrationIndex < endBeforeMainPoints;
+
+  // PAGE 2: Scripture, PAGE 3: Illustration (when headings exist)
+  if (hasScripture && hasIllustration) {
+    const sStart = scriptureIndex;
+    const sEnd = illustrationIndex > scriptureIndex ? illustrationIndex : endBeforeMainPoints;
+    const iStart = illustrationIndex;
+    const iEnd = endBeforeMainPoints;
+
+    pages.push(wrapRangeAsPage(sStart, sEnd, "scripture-page"));
+    pages.push(wrapRangeAsPage(iStart, iEnd, "illustration-page"));
+  } else if (hasScripture && !hasIllustration) {
+    pages.push(wrapRangeAsPage(scriptureIndex, endBeforeMainPoints, "scripture-page"));
+  } else if (!hasScripture && hasIllustration) {
+    if (illustrationIndex > 0) pages.push(wrapRangeAsPage(0, illustrationIndex, "scripture-page"));
+    pages.push(wrapRangeAsPage(illustrationIndex, endBeforeMainPoints, "illustration-page"));
+  } else {
+    // Fallback: everything before MAIN POINT becomes Scripture page
+    if (endBeforeMainPoints > 0) pages.push(wrapRangeAsPage(0, endBeforeMainPoints, "scripture-page"));
   }
 
-  const firstMP = mainPointIndexes[0];
-  const beforeMP = bodyNodes.slice(0, firstMP);
-
-  const beforeWrap = document.createElement("div");
-  beforeMP.forEach((n) => beforeWrap.appendChild(n.cloneNode(true)));
-
-  const page2 = `
-<section class="pdf-page scripture-illustration-page">
-  ${beforeWrap.innerHTML}
-</section>`.trim();
-
-  const pages = [page1, page2];
-
+  // MAIN POINT pages: split bullets into groups of 5
   const endForMainPoints = closingIndex !== -1 ? closingIndex : bodyNodes.length;
+
+  const buildPointPages = (nodes) => {
+    const container = doc.createElement("div");
+    nodes.forEach((n) => container.appendChild(n.cloneNode(true)));
+
+    const listEl = container.querySelector("ul,ol");
+    const headingEl = Array.from(container.children).find((el) => {
+      const tag = String(el.tagName || "").toLowerCase();
+      return tag === "h1" || tag === "h2" || tag === "h3";
+    });
+
+    // No list => one page
+    if (!listEl) {
+      return [
+        `
+<section class="pdf-page point-page">
+  ${container.innerHTML}
+</section>`.trim(),
+      ];
+    }
+
+    const liEls = Array.from(listEl.querySelectorAll(":scope > li"));
+    const groups = [];
+    for (let i = 0; i < liEls.length; i += 5) groups.push(liEls.slice(i, i + 5));
+
+    // Preface = everything except the big list (kept on first bullet page only)
+    const preface = doc.createElement("div");
+    Array.from(container.childNodes).forEach((child) => {
+      if (child && child.nodeType === 1) {
+        const tag = String(child.tagName || "").toLowerCase();
+        if ((tag === "ul" || tag === "ol") && child === listEl) return;
+      }
+      preface.appendChild(child.cloneNode(true));
+    });
+
+    const listTag = String(listEl.tagName || "ul").toLowerCase();
+
+    return groups.map((group, idx) => {
+      const pageWrap = doc.createElement("div");
+
+      if (idx === 0) {
+        pageWrap.innerHTML = preface.innerHTML;
+      } else if (headingEl) {
+        pageWrap.appendChild(headingEl.cloneNode(true));
+      }
+
+      const newList = doc.createElement(listTag);
+      group.forEach((li) => newList.appendChild(li.cloneNode(true)));
+      pageWrap.appendChild(newList);
+
+      return `
+<section class="pdf-page point-page">
+  ${pageWrap.innerHTML}
+</section>`.trim();
+    });
+  };
 
   for (let i = 0; i < mainPointIndexes.length; i++) {
     const start = mainPointIndexes[i];
     const nextStart = i + 1 < mainPointIndexes.length ? mainPointIndexes[i + 1] : endForMainPoints;
-
     if (start >= endForMainPoints) break;
 
     const chunkNodes = bodyNodes.slice(start, nextStart);
-    const chunkWrap = document.createElement("div");
-    chunkNodes.forEach((n) => chunkWrap.appendChild(n.cloneNode(true)));
-
-    pages.push(
-      `
-<section class="pdf-page point-page">
-  ${chunkWrap.innerHTML}
-</section>`.trim(),
-    );
+    const pointPages = buildPointPages(chunkNodes);
+    pointPages.forEach((p) => pages.push(p));
   }
 
+  // Closing page
   if (closingIndex !== -1) {
-    const closingNodes = bodyNodes.slice(closingIndex);
-    const closingWrap = document.createElement("div");
-    closingNodes.forEach((n) => closingWrap.appendChild(n.cloneNode(true)));
-
-    pages.push(
-      `
-<section class="pdf-page closing-page">
-  ${closingWrap.innerHTML}
-</section>`.trim(),
-    );
+    pages.push(wrapRangeAsPage(closingIndex, bodyNodes.length, "closing-page"));
   }
 
   return pages.join("\n");
@@ -198,7 +277,6 @@ export default function SermonDetail() {
   const [checkingPurchase, setCheckingPurchase] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
-  // BUILD-SAFE ref (no generics)
   const sermonRef = useRef(null);
   const [copyOpen, setCopyOpen] = useState(false);
   const [copyHtml, setCopyHtml] = useState("");
@@ -268,9 +346,18 @@ export default function SermonDetail() {
   }, [isLocked, user, purchased, isSubscribed]);
 
   const sanitizedHtml = useMemo(() => {
+    // Build-safe
+    if (typeof window === "undefined") return null;
+
     const looksHtml = manuscriptRaw.includes("<") && manuscriptRaw.includes(">");
     if (!looksHtml) return null;
-    return DOMPurify.sanitize(manuscriptRaw);
+
+    // DOMPurify is safe in browser; we keep it guarded for build
+    try {
+      return DOMPurify.sanitize(manuscriptRaw);
+    } catch {
+      return null;
+    }
   }, [manuscriptRaw]);
 
   const pagedHtml = useMemo(() => {
@@ -283,7 +370,14 @@ export default function SermonDetail() {
 @media print {
   @page { size: A4 portrait; margin: 0.75in; }
 
-  .sermon-content .pdf-page {
+  /* Fill printable area so each wrapper becomes one “real page” */
+  .sermon-content .pdf-page{
+    /* 11.69in - 1.5in margins = 10.19in usable height */
+    min-height: 10.19in;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+
     page-break-after: always;
     break-after: page;
     page-break-inside: avoid;
@@ -295,6 +389,7 @@ export default function SermonDetail() {
   .sermon-content h3,
   .sermon-content p,
   .sermon-content ul,
+  .sermon-content ol,
   .sermon-content li {
     page-break-inside: avoid;
     break-inside: avoid;
@@ -304,6 +399,12 @@ export default function SermonDetail() {
   .sermon-content h2,
   .sermon-content h3 {
     page-break-after: avoid;
+  }
+
+  .sermon-content ul,
+  .sermon-content ol {
+    orphans: 99;
+    widows: 99;
   }
 
   .sermon-ui { display: none !important; }
@@ -369,6 +470,8 @@ export default function SermonDetail() {
         case "goodnotes":
           await exportSermonToGoodNotesPdf(sermon);
           break;
+        default:
+          break;
       }
       toast.success("Download started!");
     } catch (err) {
@@ -377,7 +480,6 @@ export default function SermonDetail() {
     }
   }
 
-  // BUILD-SAFE clipboard copy
   async function handleCopyForGoodNotes() {
     const root = sermonRef.current;
     if (!root) return;
@@ -590,33 +692,39 @@ export default function SermonDetail() {
   margin: 0 0 14px 0;
 }
 .sermon-content h2{
+  font-size: 28px;
+  line-height: 1.15;
+  margin: 18px 0 12px 0;
+}
+.sermon-content h3{
   font-size: 26px;
   line-height: 1.15;
   margin: 18px 0 12px 0;
 }
 .sermon-content p{
-  font-size: 18px;
-  line-height: 1.6;
+  font-size: 19px;
+  line-height: 1.65;
+  margin: 0 0 12px 0;
+}
+
+.sermon-content ul,
+.sermon-content ol{
+  margin: 0;
+  padding-left: 26px;
+}
+.sermon-content li{
+  font-size: 21px;
+  line-height: 1.55;
   margin: 0 0 12px 0;
 }
 
 /* Main point page heading big bold */
 .sermon-content .point-page h2,
 .sermon-content .point-page h3{
-  font-size: 30px;
-  line-height: 1.1;
+  font-size: 32px;
+  line-height: 1.08;
   margin: 0 0 14px 0;
   font-weight: 800;
-}
-
-.sermon-content ul{
-  margin: 0;
-  padding-left: 24px;
-}
-.sermon-content li{
-  font-size: 20px;
-  line-height: 1.5;
-  margin: 0 0 12px 0;
 }
 
 /* Title page alignment */
