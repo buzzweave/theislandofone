@@ -26,30 +26,41 @@ import {
   NotebookPen,
 } from "lucide-react";
 
-function safeText(v: any) {
+function safeText(v) {
   return String(v ?? "").trim();
 }
 
-function safeMoney(v: any) {
+function safeMoney(v) {
   const n = Number(v ?? 0);
   return Number.isFinite(n) ? n : 0;
 }
 
-function escapeHtml(s: string) {
-  return s
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+/* BUILD-SAFE (no replaceAll) */
+function escapeHtml(s) {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
-function wrapPlainTextAsHtmlPages(title: string, scriptureRef: string, raw: string) {
+/*
+LOCKED PAGE RULE:
+PAGE 1: Title only
+PAGE 2: Scripture + Illustration together
+PAGES 3+: One MAIN POINT per page
+FINAL: Closing on one page
+
+If manuscript already has <section class="pdf-page"> wrappers, we keep it.
+If manuscript is HTML without wrappers, we auto-wrap using headings MAIN POINT / CLOSING markers.
+If manuscript is plain text, we wrap Title + one page (best possible), because true point splitting needs HTML headings.
+*/
+function wrapPlainTextAsHtmlPages(title, scriptureRef, raw) {
   const safe = escapeHtml(raw)
     .replace(/\n{2,}/g, "\n\n")
     .replace(/\n/g, "<br/>");
 
-  // Page 1 Title only
   const page1 = `
 <section class="pdf-page title-page">
   <div class="title-wrap">
@@ -58,8 +69,6 @@ function wrapPlainTextAsHtmlPages(title: string, scriptureRef: string, raw: stri
   </div>
 </section>`.trim();
 
-  // Page 2 Scripture + Illustration (we don’t have reliable markers in plain text)
-  // So we put the full text on Page 2 if it’s plain text. For locked paging, store HTML with headings or wrappers.
   const page2 = `
 <section class="pdf-page scripture-illustration-page">
   <p>${safe}</p>
@@ -68,7 +77,7 @@ function wrapPlainTextAsHtmlPages(title: string, scriptureRef: string, raw: stri
   return `${page1}\n${page2}`;
 }
 
-function buildPagedHtmlFromHtml(title: string, scriptureRef: string, html: string) {
+function buildPagedHtmlFromHtml(title, scriptureRef, html) {
   const doc = new DOMParser().parseFromString(html, "text/html");
 
   // If already wrapped, use as-is
@@ -80,25 +89,25 @@ function buildPagedHtmlFromHtml(title: string, scriptureRef: string, html: strin
     return true;
   });
 
-  const isHeading = (node: ChildNode) => {
+  const isHeading = (node) => {
     if (!(node instanceof HTMLElement)) return false;
     const tag = node.tagName.toLowerCase();
     return tag === "h1" || tag === "h2" || tag === "h3";
   };
 
-  const headingText = (node: ChildNode) => {
+  const headingText = (node) => {
     if (!(node instanceof HTMLElement)) return "";
     return (node.textContent ?? "").trim().toUpperCase();
   };
 
-  const isMainPointHeading = (node: ChildNode) => isHeading(node) && headingText(node).startsWith("MAIN POINT");
-  const isClosingHeading = (node: ChildNode) => {
+  const isMainPointHeading = (node) => isHeading(node) && headingText(node).startsWith("MAIN POINT");
+  const isClosingHeading = (node) => {
     if (!isHeading(node)) return false;
     const t = headingText(node);
     return t.startsWith("CLOSING") || t.startsWith("ALTAR CALL") || t.startsWith("INVITATION");
   };
 
-  const mainPointIndexes: number[] = [];
+  const mainPointIndexes = [];
   let closingIndex = -1;
 
   bodyNodes.forEach((n, i) => {
@@ -106,7 +115,6 @@ function buildPagedHtmlFromHtml(title: string, scriptureRef: string, html: strin
     if (closingIndex === -1 && isClosingHeading(n)) closingIndex = i;
   });
 
-  // Page 1 Title only (always generated)
   const page1 = `
 <section class="pdf-page title-page">
   <div class="title-wrap">
@@ -115,7 +123,6 @@ function buildPagedHtmlFromHtml(title: string, scriptureRef: string, html: strin
   </div>
 </section>`.trim();
 
-  // If no main points detected, put everything on page 2 (scripture + illustration page)
   if (mainPointIndexes.length === 0) {
     const temp = document.createElement("div");
     bodyNodes.forEach((n) => temp.appendChild(n.cloneNode(true)));
@@ -126,7 +133,6 @@ function buildPagedHtmlFromHtml(title: string, scriptureRef: string, html: strin
     return `${page1}\n${page2}`;
   }
 
-  // Page 2: everything before first MAIN POINT (Scripture + Illustration together)
   const firstMP = mainPointIndexes[0];
   const beforeMP = bodyNodes.slice(0, firstMP);
 
@@ -138,8 +144,7 @@ function buildPagedHtmlFromHtml(title: string, scriptureRef: string, html: strin
   ${beforeWrap.innerHTML}
 </section>`.trim();
 
-  // Main points pages
-  const pages: string[] = [page1, page2];
+  const pages = [page1, page2];
 
   const endForMainPoints = closingIndex !== -1 ? closingIndex : bodyNodes.length;
 
@@ -161,7 +166,6 @@ function buildPagedHtmlFromHtml(title: string, scriptureRef: string, html: strin
     );
   }
 
-  // Closing page (everything from closing heading to end)
   if (closingIndex !== -1) {
     const closingNodes = bodyNodes.slice(closingIndex);
     const closingWrap = document.createElement("div");
@@ -179,52 +183,42 @@ function buildPagedHtmlFromHtml(title: string, scriptureRef: string, html: strin
 }
 
 export default function SermonDetail() {
-  const params = useParams<{ id: string }>();
+  const params = useParams();
   const id = params.id ?? "";
   const navigate = useNavigate();
 
-  // Important: always pass a string to the hook
   const { data: sermon, isLoading } = useSermon(id);
 
-  // Cast auth to any so TS doesn’t block build if your context types differ
-  const auth: any = useAuth();
+  const auth = useAuth();
   const user = auth?.user ?? null;
   const isSubscribed = Boolean(auth?.isSubscribed);
-  const checkPurchase = auth?.checkPurchase; // may be undefined or different signature
+  const checkPurchase = auth?.checkPurchase;
 
   const [purchased, setPurchased] = useState(false);
   const [checkingPurchase, setCheckingPurchase] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
-  const sermonRef = useRef<HTMLDivElement | null>(null);
+  // BUILD-SAFE ref (no generics)
+  const sermonRef = useRef(null);
   const [copyOpen, setCopyOpen] = useState(false);
   const [copyHtml, setCopyHtml] = useState("");
 
-  // Normalize sermon fields
-  const title = safeText((sermon as any)?.title) || "Sermon";
-  const scripture = safeText((sermon as any)?.scripture);
-  const excerpt = safeText((sermon as any)?.excerpt ?? (sermon as any)?.summary);
-  const manuscriptRaw = safeText(
-    (sermon as any)?.manuscript ??
-      (sermon as any)?.content ??
-      (sermon as any)?.content_html ??
-      (sermon as any)?.body ??
-      "",
-  );
+  const title = safeText(sermon?.title) || "Sermon";
+  const scripture = safeText(sermon?.scripture);
+  const excerpt = safeText(sermon?.excerpt ?? sermon?.summary);
+  const manuscriptRaw = safeText(sermon?.manuscript ?? sermon?.content ?? sermon?.content_html ?? sermon?.body ?? "");
 
-  const isFreeFlag = Boolean((sermon as any)?.is_free === true);
-  const accessLevel = safeText((sermon as any)?.access_level || "free");
-  const chargeEnabled = Boolean((sermon as any)?.charge_enabled ?? (sermon as any)?.charge_for_sermon ?? false);
-  const price = safeMoney((sermon as any)?.price);
+  const isFreeFlag = Boolean(sermon?.is_free === true);
+  const accessLevel = safeText(sermon?.access_level || "free");
+  const chargeEnabled = Boolean(sermon?.charge_enabled ?? sermon?.charge_for_sermon ?? false);
+  const price = safeMoney(sermon?.price);
 
-  // Decide if this sermon is locked
   const isLocked = useMemo(() => {
     if (isFreeFlag || accessLevel === "free") return false;
     if (price > 0 || chargeEnabled) return true;
     return accessLevel !== "free";
   }, [isFreeFlag, accessLevel, price, chargeEnabled]);
 
-  // Check purchase status (best-effort)
   useEffect(() => {
     let alive = true;
 
@@ -245,14 +239,11 @@ export default function SermonDetail() {
       setCheckingPurchase(true);
 
       try {
-        // Support BOTH signatures:
-        // 1) checkPurchase("sermon", id)
-        // 2) checkPurchase(id)
-        let result: any;
+        let result;
         try {
-          result = await (checkPurchase as any)("sermon", id);
+          result = await checkPurchase("sermon", id);
         } catch {
-          result = await (checkPurchase as any)(id);
+          result = await checkPurchase(id);
         }
         if (alive) setPurchased(Boolean(result));
       } catch {
@@ -282,10 +273,6 @@ export default function SermonDetail() {
     return DOMPurify.sanitize(manuscriptRaw);
   }, [manuscriptRaw]);
 
-  // Build the locked pages HTML:
-  // - If sermon already contains <section class="pdf-page"> wrappers -> use as-is
-  // - If it’s HTML without wrappers -> auto-wrap into Title / Scripture+Illustration / Main Points / Closing
-  // - If plain text -> minimal wrapper (best possible), but true locked paging needs HTML headings or wrappers in storage
   const pagedHtml = useMemo(() => {
     if (sanitizedHtml) return buildPagedHtmlFromHtml(title, scripture, sanitizedHtml);
     return wrapPlainTextAsHtmlPages(title, scripture, manuscriptRaw);
@@ -334,8 +321,7 @@ export default function SermonDetail() {
 
     setCheckoutLoading(true);
     try {
-      // Use any-cast to avoid TS typing build failures
-      const fn: any = (supabase as any).functions;
+      const fn = supabase.functions;
 
       const { data, error } = await fn.invoke("create-checkout", {
         body: {
@@ -354,15 +340,14 @@ export default function SermonDetail() {
       }
 
       toast.error("Checkout URL not returned.");
-    } catch (err: any) {
+    } catch (err) {
       toast.error(err?.message || "Failed to start checkout");
     } finally {
       setCheckoutLoading(false);
     }
   }
 
-  // DOWNLOADS: use client-side export functions
-  async function handleDownload(kind: "pdf" | "epub" | "word" | "goodnotes") {
+  async function handleDownload(kind) {
     if (!sermon) return;
 
     if (!isFullAccess) {
@@ -392,6 +377,7 @@ export default function SermonDetail() {
     }
   }
 
+  // BUILD-SAFE clipboard copy
   async function handleCopyForGoodNotes() {
     const root = sermonRef.current;
     if (!root) return;
@@ -401,15 +387,24 @@ export default function SermonDetail() {
     setCopyOpen(true);
 
     try {
-      const blob = new Blob([html], { type: "text/html" });
-      const item = new ClipboardItem({ "text/html": blob });
-      await navigator.clipboard.write([item]);
+      const ClipboardItemAny = window?.ClipboardItem;
+      if (ClipboardItemAny) {
+        const blob = new Blob([html], { type: "text/html" });
+        const item = new ClipboardItemAny({ "text/html": blob });
+        await navigator.clipboard.write([item]);
+      } else {
+        const tmp = document.createElement("div");
+        tmp.innerHTML = html;
+        await navigator.clipboard.writeText(tmp.innerText);
+      }
       toast.success("Copied for GoodNotes!");
     } catch {
       const tmp = document.createElement("div");
       tmp.innerHTML = html;
-      await navigator.clipboard.writeText(tmp.innerText);
-      toast.success("Copied (text fallback)!");
+      try {
+        await navigator.clipboard.writeText(tmp.innerText);
+      } catch {}
+      toast.success("Copied (fallback)!");
     }
   }
 
@@ -458,7 +453,6 @@ export default function SermonDetail() {
           <h1 className="font-display text-3xl sm:text-5xl font-bold mb-2">{title}</h1>
           {scripture ? <p className="text-sm text-primary/80">{scripture}</p> : null}
 
-          {/* DOWNLOAD BUTTONS */}
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <button
               onClick={() => handleDownload("pdf")}
@@ -578,7 +572,7 @@ export default function SermonDetail() {
   break-inside: avoid-page;
 }
 
-/* Web view: show page cards */
+/* Web view page cards */
 @media screen{
   .sermon-content .pdf-page{
     padding: 34px;
@@ -595,19 +589,18 @@ export default function SermonDetail() {
   line-height: 1.05;
   margin: 0 0 14px 0;
 }
-
 .sermon-content h2{
   font-size: 26px;
   line-height: 1.15;
   margin: 18px 0 12px 0;
 }
-
 .sermon-content p{
   font-size: 18px;
   line-height: 1.6;
   margin: 0 0 12px 0;
 }
 
+/* Main point page heading big bold */
 .sermon-content .point-page h2,
 .sermon-content .point-page h3{
   font-size: 30px;
@@ -620,7 +613,6 @@ export default function SermonDetail() {
   margin: 0;
   padding-left: 24px;
 }
-
 .sermon-content li{
   font-size: 20px;
   line-height: 1.5;
@@ -632,7 +624,6 @@ export default function SermonDetail() {
   text-align: center;
   padding-top: 40px;
 }
-
 .sermon-content .title-page .subtitle{
   font-size: 20px;
   opacity: 0.85;
