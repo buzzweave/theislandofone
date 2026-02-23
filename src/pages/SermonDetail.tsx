@@ -4,12 +4,7 @@ import DOMPurify from "dompurify";
 import { toast } from "sonner";
 
 import { useSermon } from "@/hooks/useSermons";
-import {
-  exportSermonToPdf,
-  exportSermonToEpub,
-  exportSermonToWord,
-  exportSermonToGoodNotesPdf,
-} from "@/lib/sermonExport";
+import { exportSermonToEpub } from "@/lib/sermonExport";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -44,13 +39,11 @@ function escapeHtml(s: string) {
     .replace(/'/g, "&#039;");
 }
 
-function isAllCapsLine(line: string) {
-  const t = (line ?? "").trim();
-  if (!t) return false;
-  if (t.length < 4) return false;
-  if (/[a-z]/.test(t)) return false;
-  // has at least one letter
-  return /[A-Z]/.test(t);
+function normalizeLines(raw: string) {
+  return String(raw ?? "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n");
 }
 
 function isMainPointMarker(line: string) {
@@ -63,17 +56,16 @@ function isClosingMarker(line: string) {
   return t.startsWith("CLOSING") || t.startsWith("ALTAR") || t.startsWith("INVITATION");
 }
 
-function normalizeLines(raw: string) {
-  return String(raw ?? "")
-    .replace(/\r\n/g, "\n")
-    .replace(/\r/g, "\n")
-    .split("\n");
+function isAllCapsLine(line: string) {
+  const t = (line ?? "").trim();
+  if (!t) return false;
+  if (t.length < 4) return false;
+  if (/[a-z]/.test(t)) return false;
+  return /[A-Z]/.test(t);
 }
 
 function toHtmlParagraphs(lines: string[]) {
-  // Preserve line breaks cleanly
   const escaped = lines.map((l) => escapeHtml(l));
-  // Convert consecutive blank lines to paragraph breaks
   let html = "";
   let buf: string[] = [];
   const flush = () => {
@@ -82,18 +74,14 @@ function toHtmlParagraphs(lines: string[]) {
     buf = [];
   };
   for (const line of escaped) {
-    if (line.trim() === "") {
-      flush();
-    } else {
-      buf.push(line);
-    }
+    if (line.trim() === "") flush();
+    else buf.push(line);
   }
   flush();
   return html.trim();
 }
 
 function toBulletList(lines: string[]) {
-  // Support •, -, * bullets
   const items = lines
     .map((l) => l.trim())
     .filter(Boolean)
@@ -107,53 +95,39 @@ function toBulletList(lines: string[]) {
     .filter(Boolean);
 
   if (items.length === 0) return "";
-
-  return `<ul>\n${items.map((i) => `<li>${escapeHtml(i)}</li>`).join("\n")}\n</ul>`;
+  return `<ul>${items.map((i) => `<li>${escapeHtml(i)}</li>`).join("")}</ul>`;
 }
 
 /*
-LOCKED EXPORT + VIEW PAGER
-
-Goal:
-- Page 1: Title only
-- Page 2: Scripture + Illustration together
-- Then: every MAIN POINT gets its own page (main point title in CAPS + bullets under it)
-- Closing gets its own page
-
-Important:
-- If your stored content already contains <section class="pdf-page"> wrappers, we use as-is.
-- Otherwise we auto-page from PLAIN TEXT using markers:
-  "MAIN POINT" lines and ALL CAPS main point title lines
-  Bullet lines starting with • or - or *
+BUILD LOCKED PAGES
+- If sermon already has <section class="pdf-page"> wrappers -> use as-is
+- Otherwise build:
+  Page 1: Title
+  Page 2: Everything before first MAIN POINT (Scripture + Illustration)
+  Pages: each MAIN POINT block = 1 page (CAPS heading + bullets)
+  Last: closing block = 1 page
 */
 function buildLockedPages(title: string, scriptureRef: string, rawText: string, sanitizedHtml: string | null) {
-  const inlinePageStyle = `style="page-break-after:always;break-after:page;page-break-inside:avoid;break-inside:avoid-page;"`;
-
-  // If already wrapped, keep it (your stored sermon is already perfect)
   if (typeof sanitizedHtml === "string" && sanitizedHtml.includes('class="pdf-page"')) {
     return sanitizedHtml;
   }
 
-  // We auto-page from rawText (works best when your sermon text uses MAIN POINT headings + bullets)
   const lines = normalizeLines(rawText);
 
-  // Title page
   const page1 = `
-<section class="pdf-page title-page" ${inlinePageStyle}>
+<section class="pdf-page title-page">
   <div class="title-wrap">
     <h1>${escapeHtml(title)}</h1>
     ${scriptureRef ? `<p class="subtitle">${escapeHtml(scriptureRef)}</p>` : ""}
   </div>
 </section>`.trim();
 
-  // Split into: prePoints (scripture+illustration), points[], closing[]
   const pre: string[] = [];
-  const points: Array<{ heading: string; bullets: string[]; body: string[] }> = [];
   const closing: string[] = [];
+  const points: Array<{ heading: string; bullets: string[]; body: string[] }> = [];
 
   let i = 0;
 
-  // Gather everything until first MAIN POINT marker
   while (i < lines.length) {
     const line = lines[i] ?? "";
     if (isMainPointMarker(line) || isClosingMarker(line)) break;
@@ -161,11 +135,9 @@ function buildLockedPages(title: string, scriptureRef: string, rawText: string, 
     i++;
   }
 
-  // Parse main points + closing
   while (i < lines.length) {
     const line = lines[i] ?? "";
 
-    // Closing takes remainder
     if (isClosingMarker(line)) {
       while (i < lines.length) {
         closing.push(lines[i] ?? "");
@@ -174,13 +146,11 @@ function buildLockedPages(title: string, scriptureRef: string, rawText: string, 
       break;
     }
 
-    // MAIN POINT block
     if (isMainPointMarker(line)) {
       const mpLines: string[] = [];
       mpLines.push(line);
       i++;
 
-      // Collect until next MAIN POINT or closing
       while (i < lines.length) {
         const l = lines[i] ?? "";
         if (isMainPointMarker(l) || isClosingMarker(l)) break;
@@ -188,9 +158,7 @@ function buildLockedPages(title: string, scriptureRef: string, rawText: string, 
         i++;
       }
 
-      // Determine heading inside block:
-      // Prefer first ALL CAPS line after "MAIN POINT..."
-      let heading = mpLines[0].trim(); // fallback
+      let heading = mpLines[0].trim();
       for (let k = 1; k < mpLines.length; k++) {
         if (isAllCapsLine(mpLines[k])) {
           heading = mpLines[k].trim();
@@ -198,10 +166,7 @@ function buildLockedPages(title: string, scriptureRef: string, rawText: string, 
         }
       }
 
-      // Bullets: lines that begin with • or - or *
       const bulletLines = mpLines.filter((l) => /^\s*(•|-|\*)\s+/.test(l));
-
-      // Body (non-bullet, excluding the MAIN POINT marker line and heading line)
       const bodyLines = mpLines.filter((l) => {
         const t = (l ?? "").trim();
         if (!t) return false;
@@ -215,42 +180,114 @@ function buildLockedPages(title: string, scriptureRef: string, rawText: string, 
       continue;
     }
 
-    // Anything else that sneaks through before points
     pre.push(line);
     i++;
   }
 
-  // Page 2: Scripture + Illustration (pre section)
   const page2 = `
-<section class="pdf-page scripture-illustration-page" ${inlinePageStyle}>
+<section class="pdf-page scripture-illustration-page">
   ${toHtmlParagraphs(pre)}
 </section>`.trim();
 
-  // Main point pages: one main point per page, heading + bullets, with optional body
   const pointPages = points.map((p) => {
-    // Force main point heading to CAPS in output
     const capHeading = p.heading.toUpperCase();
     const bulletsHtml = toBulletList(p.bullets);
     const bodyHtml = p.body.length ? toHtmlParagraphs(p.body) : "";
-
     return `
-<section class="pdf-page point-page" ${inlinePageStyle}>
+<section class="pdf-page point-page">
   <h2>${escapeHtml(capHeading)}</h2>
   ${bulletsHtml}
   ${bodyHtml}
 </section>`.trim();
   });
 
-  // Closing page (if present)
   const closingPage =
     closing.length > 0
       ? `
-<section class="pdf-page closing-page" ${inlinePageStyle}>
+<section class="pdf-page closing-page">
   ${toHtmlParagraphs(closing)}
 </section>`.trim()
       : "";
 
   return [page1, page2, ...pointPages, closingPage].filter(Boolean).join("\n");
+}
+
+/*
+EXPORT FIX (THIS IS WHAT FIXES YOUR SCREENSHOT)
+We export by opening a print-ready HTML document that RENDERS the HTML.
+No tags show up in PDF/GoodNotes/Word anymore.
+*/
+function downloadAsFile(filename: string, content: string, mime: string) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function openPrintWindowForPdf(title: string, pagedHtml: string) {
+  const css = `
+    @page { size: A4 portrait; margin: 0.75in; }
+    body { font-family: Arial, Helvetica, sans-serif; color:#111; }
+    .pdf-page { page-break-after: always; break-after: page; break-inside: avoid-page; }
+    h1 { font-size: 44px; margin: 0 0 14px 0; text-align:center; }
+    h2 { font-size: 32px; margin: 0 0 14px 0; font-weight: 900; }
+    p  { font-size: 18px; line-height: 1.6; margin: 0 0 12px 0; }
+    li { font-size: 20px; line-height: 1.5; margin: 0 0 10px 0; }
+    ul { margin: 0; padding-left: 24px; }
+    .title-wrap { padding-top: 40px; }
+    .subtitle { text-align:center; font-size: 20px; opacity: 0.85; margin-top: 10px; }
+  `;
+
+  const htmlDoc = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>${escapeHtml(title)}</title>
+  <style>${css}</style>
+</head>
+<body>
+  ${pagedHtml}
+  <script>
+    window.onload = () => {
+      window.focus();
+      window.print();
+    };
+  </script>
+</body>
+</html>`;
+
+  const w = window.open("", "_blank");
+  if (!w) {
+    toast.error("Popup blocked. Allow popups to print/save PDF.");
+    return;
+  }
+  w.document.open();
+  w.document.write(htmlDoc);
+  w.document.close();
+}
+
+function downloadWordDoc(title: string, pagedHtml: string) {
+  // Word renders HTML if saved as .doc with HTML body.
+  const htmlDoc = `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>${escapeHtml(title)}</title>
+</head>
+<body>
+${pagedHtml}
+</body>
+</html>`;
+  const filename = `${title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")}.doc`;
+  downloadAsFile(filename, htmlDoc, "application/msword");
 }
 
 export default function SermonDetail() {
@@ -346,22 +383,10 @@ export default function SermonDetail() {
     return DOMPurify.sanitize(manuscriptRaw);
   }, [manuscriptRaw]);
 
-  // This is the key: pagedHtml is what we SHOW, PRINT, and EXPORT
+  // THIS is what you display + export (paged HTML)
   const pagedHtml = useMemo(() => {
     return buildLockedPages(title, scripture, manuscriptRaw, sanitizedHtml);
   }, [title, scripture, manuscriptRaw, sanitizedHtml]);
-
-  // Create an export-safe sermon object so PDF/WORD/GOODNOTES all get the paged content
-  const sermonForExport = useMemo(() => {
-    if (!sermon) return sermon;
-    return {
-      ...(sermon as any),
-      manuscript: pagedHtml,
-      content: pagedHtml,
-      content_html: pagedHtml,
-      body: pagedHtml,
-    };
-  }, [sermon, pagedHtml]);
 
   async function handlePurchase() {
     if (!id) return;
@@ -400,29 +425,41 @@ export default function SermonDetail() {
   }
 
   async function handleDownload(kind: "pdf" | "epub" | "word" | "goodnotes") {
-    if (!sermonForExport) return;
-
     if (!isFullAccess) {
       toast.error("Please unlock this sermon to download.");
       return;
     }
 
     try {
-      switch (kind) {
-        case "pdf":
-          exportSermonToPdf(sermonForExport);
-          break;
-        case "epub":
-          exportSermonToEpub(sermonForExport);
-          break;
-        case "word":
-          exportSermonToWord(sermonForExport);
-          break;
-        case "goodnotes":
-          await exportSermonToGoodNotesPdf(sermonForExport);
-          break;
+      if (kind === "pdf") {
+        openPrintWindowForPdf(title, pagedHtml); // SAVE AS PDF from print dialog
+        return;
       }
-      toast.success("Download started!");
+
+      if (kind === "goodnotes") {
+        // GoodNotes wants a PDF — same pipeline, but user taps Save to Files then open in GoodNotes
+        openPrintWindowForPdf(`${title} - GoodNotes`, pagedHtml);
+        return;
+      }
+
+      if (kind === "word") {
+        downloadWordDoc(title, pagedHtml);
+        toast.success("Word download started!");
+        return;
+      }
+
+      if (kind === "epub") {
+        // keep your existing epub exporter
+        exportSermonToEpub({
+          ...(sermon as any),
+          manuscript: pagedHtml,
+          content: pagedHtml,
+          content_html: pagedHtml,
+          body: pagedHtml,
+        });
+        toast.success("EPUB download started!");
+        return;
+      }
     } catch (err) {
       console.error("Download failed:", err);
       toast.error("Download failed. Please try again.");
@@ -519,7 +556,7 @@ export default function SermonDetail() {
               className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full border font-semibold ${
                 !isFullAccess ? "border-border text-muted-foreground cursor-not-allowed" : "border-primary/30"
               }`}
-              title={!isFullAccess ? "Unlock to download" : "Download GoodNotes"}
+              title={!isFullAccess ? "Unlock to download" : "Download GoodNotes PDF"}
             >
               <NotebookPen className="h-4 w-4" />
               Download GoodNotes
@@ -571,44 +608,16 @@ export default function SermonDetail() {
           </div>
         ) : (
           <>
-            {/* A4 PORTRAIT PRINT + KEEP MAIN POINTS WITH BULLETS */}
             <style>{`
 @media print {
   @page { size: A4 portrait; margin: 0.75in; }
-
-  .sermon-content .pdf-page{
-    page-break-after: always;
-    break-after: page;
-    page-break-inside: avoid;
-    break-inside: avoid-page;
-  }
-
-  .sermon-content h1,
-  .sermon-content h2,
-  .sermon-content h3,
-  .sermon-content ul,
-  .sermon-content li,
-  .sermon-content p{
-    page-break-inside: avoid;
+  .sermon-content .pdf-page { page-break-after: always; break-after: page; break-inside: avoid-page; }
+  .sermon-content h1,.sermon-content h2,.sermon-content h3,.sermon-content p,.sermon-content ul,.sermon-content li{
     break-inside: avoid;
-  }
-
-  .sermon-content h2,
-  .sermon-content h3{
-    page-break-after: avoid;
+    page-break-inside: avoid;
   }
 }
-            `}</style>
-
-            {/* BIG GOODNOTES FONTS + CLEAN PAGES */}
-            <style>{`
-.sermon-content .pdf-page{
-  page-break-after: always;
-  break-after: page;
-  page-break-inside: avoid;
-  break-inside: avoid-page;
-}
-
+.sermon-content .pdf-page{ page-break-after: always; break-after: page; break-inside: avoid-page; }
 @media screen{
   .sermon-content .pdf-page{
     padding: 34px;
@@ -618,16 +627,13 @@ export default function SermonDetail() {
     background: rgba(0,0,0,0.15);
   }
 }
-
 .sermon-content h1{ font-size:44px; line-height:1.05; margin:0 0 14px 0; }
 .sermon-content h2{ font-size:32px; line-height:1.1; margin:0 0 14px 0; font-weight:900; }
 .sermon-content p{ font-size:18px; line-height:1.6; margin:0 0 12px 0; }
-
+.sermon-content li{ font-size:20px; line-height:1.5; margin:0 0 10px 0; }
 .sermon-content ul{ margin:0; padding-left:24px; }
-.sermon-content li{ font-size:20px; line-height:1.5; margin:0 0 12px 0; }
-
 .sermon-content .title-page .title-wrap{ text-align:center; padding-top:40px; }
-.sermon-content .title-page .subtitle{ font-size:20px; opacity:0.85; }
+.sermon-content .title-page .subtitle{ text-align:center; font-size:20px; opacity:0.85; margin-top:10px; }
             `}</style>
 
             <div className="prose prose-invert max-w-none">
