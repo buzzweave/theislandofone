@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import DOMPurify from "dompurify";
 import { toast } from "sonner";
@@ -44,46 +44,213 @@ function escapeHtml(s: string) {
     .replace(/'/g, "&#039;");
 }
 
+function isAllCapsLine(line: string) {
+  const t = (line ?? "").trim();
+  if (!t) return false;
+  if (t.length < 4) return false;
+  if (/[a-z]/.test(t)) return false;
+  // has at least one letter
+  return /[A-Z]/.test(t);
+}
+
+function isMainPointMarker(line: string) {
+  const t = (line ?? "").trim().toUpperCase();
+  return t.startsWith("MAIN POINT");
+}
+
+function isClosingMarker(line: string) {
+  const t = (line ?? "").trim().toUpperCase();
+  return t.startsWith("CLOSING") || t.startsWith("ALTAR") || t.startsWith("INVITATION");
+}
+
+function normalizeLines(raw: string) {
+  return String(raw ?? "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n");
+}
+
+function toHtmlParagraphs(lines: string[]) {
+  // Preserve line breaks cleanly
+  const escaped = lines.map((l) => escapeHtml(l));
+  // Convert consecutive blank lines to paragraph breaks
+  let html = "";
+  let buf: string[] = [];
+  const flush = () => {
+    if (buf.length === 0) return;
+    html += `<p>${buf.join("<br/>")}</p>\n`;
+    buf = [];
+  };
+  for (const line of escaped) {
+    if (line.trim() === "") {
+      flush();
+    } else {
+      buf.push(line);
+    }
+  }
+  flush();
+  return html.trim();
+}
+
+function toBulletList(lines: string[]) {
+  // Support •, -, * bullets
+  const items = lines
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((l) =>
+      l
+        .replace(/^•\s?/, "")
+        .replace(/^-+\s?/, "")
+        .replace(/^\*\s?/, "")
+        .trim(),
+    )
+    .filter(Boolean);
+
+  if (items.length === 0) return "";
+
+  return `<ul>\n${items.map((i) => `<li>${escapeHtml(i)}</li>`).join("\n")}\n</ul>`;
+}
+
 /*
-Build-safe locked paging (no DOMParser, no Node/HTMLElement).
-Rules:
-- If sermon content already contains <section class="pdf-page"> wrappers, we use it as-is.
-- Otherwise we generate:
-  PAGE 1: Title only
-  PAGE 2: Scripture + Illustration + rest (until you store wrappers in the sermon content)
+LOCKED EXPORT + VIEW PAGER
+
+Goal:
+- Page 1: Title only
+- Page 2: Scripture + Illustration together
+- Then: every MAIN POINT gets its own page (main point title in CAPS + bullets under it)
+- Closing gets its own page
+
+Important:
+- If your stored content already contains <section class="pdf-page"> wrappers, we use as-is.
+- Otherwise we auto-page from PLAIN TEXT using markers:
+  "MAIN POINT" lines and ALL CAPS main point title lines
+  Bullet lines starting with • or - or *
 */
-function buildLockedPages(args: {
-  title: string;
-  scriptureRef: string;
-  rawText: string;
-  sanitizedHtml: string | null;
-}) {
-  const { title, scriptureRef, rawText, sanitizedHtml } = args;
+function buildLockedPages(title: string, scriptureRef: string, rawText: string, sanitizedHtml: string | null) {
+  const inlinePageStyle = `style="page-break-after:always;break-after:page;page-break-inside:avoid;break-inside:avoid-page;"`;
 
-  const alreadyWrapped = typeof sanitizedHtml === "string" && sanitizedHtml.includes('class="pdf-page"');
+  // If already wrapped, keep it (your stored sermon is already perfect)
+  if (typeof sanitizedHtml === "string" && sanitizedHtml.includes('class="pdf-page"')) {
+    return sanitizedHtml;
+  }
 
-  if (alreadyWrapped) return sanitizedHtml as string;
+  // We auto-page from rawText (works best when your sermon text uses MAIN POINT headings + bullets)
+  const lines = normalizeLines(rawText);
 
+  // Title page
   const page1 = `
-<section class="pdf-page title-page">
+<section class="pdf-page title-page" ${inlinePageStyle}>
   <div class="title-wrap">
     <h1>${escapeHtml(title)}</h1>
     ${scriptureRef ? `<p class="subtitle">${escapeHtml(scriptureRef)}</p>` : ""}
   </div>
 </section>`.trim();
 
-  const bodyHtml = sanitizedHtml
-    ? sanitizedHtml
-    : `<p>${escapeHtml(rawText)
-        .replace(/\n{2,}/g, "\n\n")
-        .replace(/\n/g, "<br/>")}</p>`;
+  // Split into: prePoints (scripture+illustration), points[], closing[]
+  const pre: string[] = [];
+  const points: Array<{ heading: string; bullets: string[]; body: string[] }> = [];
+  const closing: string[] = [];
 
+  let i = 0;
+
+  // Gather everything until first MAIN POINT marker
+  while (i < lines.length) {
+    const line = lines[i] ?? "";
+    if (isMainPointMarker(line) || isClosingMarker(line)) break;
+    pre.push(line);
+    i++;
+  }
+
+  // Parse main points + closing
+  while (i < lines.length) {
+    const line = lines[i] ?? "";
+
+    // Closing takes remainder
+    if (isClosingMarker(line)) {
+      while (i < lines.length) {
+        closing.push(lines[i] ?? "");
+        i++;
+      }
+      break;
+    }
+
+    // MAIN POINT block
+    if (isMainPointMarker(line)) {
+      const mpLines: string[] = [];
+      mpLines.push(line);
+      i++;
+
+      // Collect until next MAIN POINT or closing
+      while (i < lines.length) {
+        const l = lines[i] ?? "";
+        if (isMainPointMarker(l) || isClosingMarker(l)) break;
+        mpLines.push(l);
+        i++;
+      }
+
+      // Determine heading inside block:
+      // Prefer first ALL CAPS line after "MAIN POINT..."
+      let heading = mpLines[0].trim(); // fallback
+      for (let k = 1; k < mpLines.length; k++) {
+        if (isAllCapsLine(mpLines[k])) {
+          heading = mpLines[k].trim();
+          break;
+        }
+      }
+
+      // Bullets: lines that begin with • or - or *
+      const bulletLines = mpLines.filter((l) => /^\s*(•|-|\*)\s+/.test(l));
+
+      // Body (non-bullet, excluding the MAIN POINT marker line and heading line)
+      const bodyLines = mpLines.filter((l) => {
+        const t = (l ?? "").trim();
+        if (!t) return false;
+        if (t.toUpperCase().startsWith("MAIN POINT")) return false;
+        if (t === heading) return false;
+        if (/^\s*(•|-|\*)\s+/.test(l)) return false;
+        return true;
+      });
+
+      points.push({ heading, bullets: bulletLines, body: bodyLines });
+      continue;
+    }
+
+    // Anything else that sneaks through before points
+    pre.push(line);
+    i++;
+  }
+
+  // Page 2: Scripture + Illustration (pre section)
   const page2 = `
-<section class="pdf-page scripture-illustration-page">
-  ${bodyHtml}
+<section class="pdf-page scripture-illustration-page" ${inlinePageStyle}>
+  ${toHtmlParagraphs(pre)}
 </section>`.trim();
 
-  return `${page1}\n${page2}`;
+  // Main point pages: one main point per page, heading + bullets, with optional body
+  const pointPages = points.map((p) => {
+    // Force main point heading to CAPS in output
+    const capHeading = p.heading.toUpperCase();
+    const bulletsHtml = toBulletList(p.bullets);
+    const bodyHtml = p.body.length ? toHtmlParagraphs(p.body) : "";
+
+    return `
+<section class="pdf-page point-page" ${inlinePageStyle}>
+  <h2>${escapeHtml(capHeading)}</h2>
+  ${bulletsHtml}
+  ${bodyHtml}
+</section>`.trim();
+  });
+
+  // Closing page (if present)
+  const closingPage =
+    closing.length > 0
+      ? `
+<section class="pdf-page closing-page" ${inlinePageStyle}>
+  ${toHtmlParagraphs(closing)}
+</section>`.trim()
+      : "";
+
+  return [page1, page2, ...pointPages, closingPage].filter(Boolean).join("\n");
 }
 
 export default function SermonDetail() {
@@ -91,26 +258,21 @@ export default function SermonDetail() {
   const id = params.id ?? "";
   const navigate = useNavigate();
 
-  // Important: always pass a string to the hook
   const { data: sermon, isLoading } = useSermon(id);
 
-  // Cast auth to any so TS doesn’t block build if your context types differ
   const auth: any = useAuth();
   const user = auth?.user ?? null;
   const isSubscribed = Boolean(auth?.isSubscribed);
-  const checkPurchase = auth?.checkPurchase; // may be undefined or different signature
+  const checkPurchase = auth?.checkPurchase;
 
   const [purchased, setPurchased] = useState(false);
   const [checkingPurchase, setCheckingPurchase] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
-  // Build-safe ref (no TS generic)
-  const sermonRef = useRef<any>(null);
-
-  // Normalize sermon fields
   const title = safeText((sermon as any)?.title) || "Sermon";
   const scripture = safeText((sermon as any)?.scripture);
   const excerpt = safeText((sermon as any)?.excerpt ?? (sermon as any)?.summary);
+
   const manuscriptRaw = safeText(
     (sermon as any)?.manuscript ??
       (sermon as any)?.content ??
@@ -124,14 +286,12 @@ export default function SermonDetail() {
   const chargeEnabled = Boolean((sermon as any)?.charge_enabled ?? (sermon as any)?.charge_for_sermon ?? false);
   const price = safeMoney((sermon as any)?.price);
 
-  // Decide if this sermon is locked
   const isLocked = useMemo(() => {
     if (isFreeFlag || accessLevel === "free") return false;
     if (price > 0 || chargeEnabled) return true;
     return accessLevel !== "free";
   }, [isFreeFlag, accessLevel, price, chargeEnabled]);
 
-  // Check purchase status (best-effort)
   useEffect(() => {
     let alive = true;
 
@@ -152,9 +312,6 @@ export default function SermonDetail() {
       setCheckingPurchase(true);
 
       try {
-        // Support BOTH signatures:
-        // 1) checkPurchase("sermon", id)
-        // 2) checkPurchase(id)
         let result: any;
         try {
           result = await (checkPurchase as any)("sermon", id);
@@ -189,15 +346,22 @@ export default function SermonDetail() {
     return DOMPurify.sanitize(manuscriptRaw);
   }, [manuscriptRaw]);
 
-  // Locked paging HTML for website + print PDF (build safe)
+  // This is the key: pagedHtml is what we SHOW, PRINT, and EXPORT
   const pagedHtml = useMemo(() => {
-    return buildLockedPages({
-      title,
-      scriptureRef: scripture,
-      rawText: manuscriptRaw,
-      sanitizedHtml,
-    });
+    return buildLockedPages(title, scripture, manuscriptRaw, sanitizedHtml);
   }, [title, scripture, manuscriptRaw, sanitizedHtml]);
+
+  // Create an export-safe sermon object so PDF/WORD/GOODNOTES all get the paged content
+  const sermonForExport = useMemo(() => {
+    if (!sermon) return sermon;
+    return {
+      ...(sermon as any),
+      manuscript: pagedHtml,
+      content: pagedHtml,
+      content_html: pagedHtml,
+      body: pagedHtml,
+    };
+  }, [sermon, pagedHtml]);
 
   async function handlePurchase() {
     if (!id) return;
@@ -209,7 +373,6 @@ export default function SermonDetail() {
 
     setCheckoutLoading(true);
     try {
-      // Use any-cast to avoid TS typing build failures
       const fn: any = (supabase as any).functions;
 
       const { data, error } = await fn.invoke("create-checkout", {
@@ -236,9 +399,8 @@ export default function SermonDetail() {
     }
   }
 
-  // DOWNLOADS: use client-side export functions
   async function handleDownload(kind: "pdf" | "epub" | "word" | "goodnotes") {
-    if (!sermon) return;
+    if (!sermonForExport) return;
 
     if (!isFullAccess) {
       toast.error("Please unlock this sermon to download.");
@@ -248,16 +410,16 @@ export default function SermonDetail() {
     try {
       switch (kind) {
         case "pdf":
-          exportSermonToPdf(sermon);
+          exportSermonToPdf(sermonForExport);
           break;
         case "epub":
-          exportSermonToEpub(sermon);
+          exportSermonToEpub(sermonForExport);
           break;
         case "word":
-          exportSermonToWord(sermon);
+          exportSermonToWord(sermonForExport);
           break;
         case "goodnotes":
-          await exportSermonToGoodNotesPdf(sermon);
+          await exportSermonToGoodNotesPdf(sermonForExport);
           break;
       }
       toast.success("Download started!");
@@ -312,7 +474,6 @@ export default function SermonDetail() {
           <h1 className="font-display text-3xl sm:text-5xl font-bold mb-2">{title}</h1>
           {scripture ? <p className="text-sm text-primary/80">{scripture}</p> : null}
 
-          {/* DOWNLOAD BUTTONS (RESTORED) */}
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <button
               onClick={() => handleDownload("pdf")}
@@ -410,12 +571,12 @@ export default function SermonDetail() {
           </div>
         ) : (
           <>
-            {/* PRINT + PDF LOCKING (SERMON ONLY) */}
+            {/* A4 PORTRAIT PRINT + KEEP MAIN POINTS WITH BULLETS */}
             <style>{`
 @media print {
   @page { size: A4 portrait; margin: 0.75in; }
 
-  .sermon-content .pdf-page {
+  .sermon-content .pdf-page{
     page-break-after: always;
     break-after: page;
     page-break-inside: avoid;
@@ -425,22 +586,21 @@ export default function SermonDetail() {
   .sermon-content h1,
   .sermon-content h2,
   .sermon-content h3,
-  .sermon-content p,
   .sermon-content ul,
-  .sermon-content li {
+  .sermon-content li,
+  .sermon-content p{
     page-break-inside: avoid;
     break-inside: avoid;
   }
 
-  .sermon-content h1,
   .sermon-content h2,
-  .sermon-content h3 {
+  .sermon-content h3{
     page-break-after: avoid;
   }
 }
             `}</style>
 
-            {/* GoodNotes big fonts + page cards on screen */}
+            {/* BIG GOODNOTES FONTS + CLEAN PAGES */}
             <style>{`
 .sermon-content .pdf-page{
   page-break-after: always;
@@ -460,7 +620,7 @@ export default function SermonDetail() {
 }
 
 .sermon-content h1{ font-size:44px; line-height:1.05; margin:0 0 14px 0; }
-.sermon-content h2{ font-size:26px; line-height:1.15; margin:18px 0 12px 0; }
+.sermon-content h2{ font-size:32px; line-height:1.1; margin:0 0 14px 0; font-weight:900; }
 .sermon-content p{ font-size:18px; line-height:1.6; margin:0 0 12px 0; }
 
 .sermon-content ul{ margin:0; padding-left:24px; }
@@ -471,7 +631,7 @@ export default function SermonDetail() {
             `}</style>
 
             <div className="prose prose-invert max-w-none">
-              <article className="sermon-content" ref={sermonRef}>
+              <article className="sermon-content">
                 <div dangerouslySetInnerHTML={{ __html: pagedHtml }} />
               </article>
             </div>
