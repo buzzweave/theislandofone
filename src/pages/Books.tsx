@@ -4,7 +4,7 @@ import { BookOpen, Lock } from "lucide-react";
 import { useBooks } from "@/hooks/useBooks";
 
 export default function Books() {
-  const { data: books = [], isLoading } = useBooks();
+  const { data: books = [], isLoading } = useBooks(true);
   const categories = ["All", ...Array.from(new Set(books.map((b) => b.category)))];
   const [activeCategory, setActiveCategory] = useState("All");
 

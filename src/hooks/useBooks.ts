@@ -27,16 +27,23 @@ export interface Book {
   chapters: BookChapterInput[];
   created_at: string;
   updated_at: string;
+  is_published: boolean;
+  published_at: string | null;
+  unpublished_at: string | null;
 }
 
-export function useBooks() {
+export function useBooks(publishedOnly = false) {
   return useQuery({
-    queryKey: ["books"],
+    queryKey: ["books", publishedOnly],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("books")
         .select("*")
         .order("sort_order", { ascending: true });
+      if (publishedOnly) {
+        query = query.eq("is_published", true);
+      }
+      const { data, error } = await query;
       if (error) throw new Error(error.message);
       return (data || []).map((b: any) => ({ ...b, chapters: [] })) as Book[];
     },
@@ -71,6 +78,7 @@ export function useAddBook() {
       const payload: any = { ...book };
       payload.is_free = !!payload.is_free;
       payload.featured = !!payload.featured;
+      payload.is_published = false; // Never auto-publish
       if (!payload.audio_url) payload.audio_url = null;
       if (!payload.access_tiers) payload.access_tiers = [];
       if (typeof payload.access_tiers === "string") {
@@ -104,6 +112,10 @@ export function useUpdateBook() {
       if ("access_tiers" in payload && typeof payload.access_tiers === "string") {
         payload.access_tiers = payload.access_tiers.split(",").filter(Boolean);
       }
+      // Never change publish status through normal update
+      delete payload.is_published;
+      delete payload.published_at;
+      delete payload.unpublished_at;
       delete payload.chapters;
 
       const { data, error } = await supabase
@@ -117,6 +129,25 @@ export function useUpdateBook() {
         throw new Error(error.message);
       }
       return data as Book;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["books"] }),
+  });
+}
+
+/** Dedicated publish toggle - decoupled from normal updates */
+export function useToggleBookPublish() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, publish }: { id: string; publish: boolean }) => {
+      const updates: any = { is_published: publish };
+      if (publish) {
+        updates.published_at = new Date().toISOString();
+        updates.unpublished_at = null;
+      } else {
+        updates.unpublished_at = new Date().toISOString();
+      }
+      const { error } = await supabase.from("books").update(updates).eq("id", id);
+      if (error) throw new Error(error.message);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["books"] }),
   });

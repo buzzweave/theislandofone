@@ -48,7 +48,7 @@ const navItems = [
   { to: "/admin/speaking", label: "Speaking", icon: Mic },
   { to: "/admin/members", label: "Members", icon: Users },
   { to: "/admin/analytics", label: "Analytics", icon: BarChart3 },
-  { to: "/admin/chatgpt", label: "ChatGPT", icon: MessageSquare },
+  { to: "/admin/ai-chat", label: "AI Chat", icon: MessageSquare },
   { to: "/admin/plans", label: "Plans", icon: Crown },
   { to: "/admin/graphics", label: "Graphics", icon: Image },
   { to: "/admin/audiobooks", label: "Audiobooks", icon: Headphones },

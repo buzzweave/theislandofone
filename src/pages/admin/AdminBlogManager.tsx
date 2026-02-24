@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import RichTextEditor from "@/components/admin/RichTextEditor";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, PenLine, Upload, Eye, EyeOff, Facebook, RefreshCw, Download, Settings, Save, Maximize2 } from "lucide-react";
+import { Plus, Pencil, Trash2, PenLine, Upload, Eye, EyeOff, Facebook, RefreshCw, Download, Settings, Save, Maximize2, Video } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { uploadToStorage } from "@/lib/supabaseUpload";
@@ -21,6 +21,7 @@ type PostForm = {
   excerpt: string;
   content: string;
   image_url: string;
+  video_url: string;
   is_published: boolean;
   published_at: string | null;
 };
@@ -32,6 +33,7 @@ const emptyForm: PostForm = {
   excerpt: "",
   content: "",
   image_url: "",
+  video_url: "",
   is_published: false,
   published_at: null,
 };
@@ -65,6 +67,60 @@ function ImageUploader({ currentUrl, onUploaded }: { currentUrl: string; onUploa
         <Upload className="h-4 w-4 mr-2" />
         {uploading ? "Uploading..." : currentUrl ? "Replace Image" : "Upload Image"}
       </Button>
+    </div>
+  );
+}
+
+function VideoUploader({ currentUrl, onUploaded }: { currentUrl: string; onUploaded: (url: string) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const { toast } = useToast();
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const maxSize = 500 * 1024 * 1024; // 500MB
+    if (file.size > maxSize) {
+      toast({ title: "File too large", description: "Max 500MB", variant: "destructive" });
+      return;
+    }
+    const allowed = ["video/mp4", "video/quicktime", "video/webm"];
+    if (!allowed.includes(file.type)) {
+      toast({ title: "Invalid file type", description: "Only MP4, MOV, WebM allowed.", variant: "destructive" });
+      return;
+    }
+    setUploading(true);
+    setProgress(30);
+    try {
+      const url = await uploadToStorage("blog-videos", file);
+      setProgress(100);
+      onUploaded(url);
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    }
+    setUploading(false);
+    setProgress(0);
+    if (inputRef.current) inputRef.current.value = "";
+  };
+
+  return (
+    <div className="space-y-2">
+      {currentUrl && (
+        <video src={currentUrl} controls preload="metadata" className="w-full max-h-48 rounded-md border border-border" />
+      )}
+      <input ref={inputRef} type="file" accept="video/mp4,video/quicktime,video/webm" className="hidden" onChange={handleFile} />
+      <div className="flex gap-2">
+        <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()} disabled={uploading}>
+          <Video className="h-4 w-4 mr-2" />
+          {uploading ? `Uploading ${progress}%…` : currentUrl ? "Replace Video" : "Upload Video"}
+        </Button>
+        {currentUrl && (
+          <Button type="button" variant="ghost" size="sm" onClick={() => onUploaded("")}>
+            Remove
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
@@ -132,6 +188,7 @@ export default function AdminBlogManager() {
       excerpt: post.excerpt,
       content: post.content,
       image_url: post.image_url,
+      video_url: (post as any).video_url || "",
       is_published: !!post.is_published,
       published_at: post.published_at,
     });
@@ -260,6 +317,11 @@ export default function AdminBlogManager() {
           <div className="space-y-2">
             <Label>Excerpt</Label>
             <Textarea value={form.excerpt} onChange={(e) => setForm({ ...form, excerpt: e.target.value })} placeholder="Short summary…" rows={2} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Video</Label>
+            <VideoUploader currentUrl={form.video_url} onUploaded={(url) => setForm({ ...form, video_url: url })} />
           </div>
 
           <div className="space-y-2">

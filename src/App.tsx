@@ -28,7 +28,7 @@ import AdminVideoManager from "./pages/admin/AdminVideoManager";
 import AdminMembers from "./pages/admin/AdminMembers";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import AdminSettings from "./pages/admin/AdminSettings";
-import AdminChatGPT from "./pages/admin/AdminChatGPT";
+import AdminAIChat from "./pages/admin/AdminAIChat";
 import AdminHeroBanners from "./pages/admin/AdminHeroBanners";
 import AdminMembershipPlans from "./pages/admin/AdminMembershipPlans";
 import AdminGraphics from "./pages/admin/AdminGraphics";
@@ -333,7 +333,7 @@ const App = () => (
                   <Route path="speaking" element={<AdminSpeakingRequests />} />
                   <Route path="members" element={<AdminMembers />} />
                   <Route path="analytics" element={<AdminAnalytics />} />
-                  <Route path="chatgpt" element={<AdminChatGPT />} />
+                  <Route path="ai-chat" element={<AdminAIChat />} />
                   <Route path="plans" element={<AdminMembershipPlans />} />
                   <Route path="graphics" element={<AdminGraphics />} />
                   <Route path="audiobooks" element={<AdminAudiobooks />} />

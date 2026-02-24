@@ -55,27 +55,11 @@ function sanitizeBlogHtml(inputHtml: string) {
   return DOMPurify.sanitize(cleaned, {
     USE_PROFILES: { html: true },
     ALLOWED_TAGS: [
-      "p",
-      "br",
-      "strong",
-      "b",
-      "em",
-      "i",
-      "u",
-      "blockquote",
-      "h1",
-      "h2",
-      "h3",
-      "h4",
-      "ul",
-      "ol",
-      "li",
-      "a",
-      "span",
-      "div",
-      "img",
+      "p", "br", "strong", "b", "em", "i", "u", "blockquote",
+      "h1", "h2", "h3", "h4", "ul", "ol", "li", "a", "span", "div", "img",
+      "video", "source",
     ],
-    ALLOWED_ATTR: ["href", "target", "rel", "src", "alt", "title", "class", "style"],
+    ALLOWED_ATTR: ["href", "target", "rel", "src", "alt", "title", "class", "style", "controls", "type", "preload"],
   });
 }
 
@@ -184,6 +168,17 @@ export default function BlogPost() {
             {format(new Date(post.published_at || post.created_at), "MMMM d, yyyy")}
           </span>
         </div>
+
+        {(post as any).video_url && (
+          <div className="my-6 rounded-xl overflow-hidden border border-border">
+            <video
+              src={(post as any).video_url}
+              controls
+              preload="metadata"
+              className="w-full max-h-[500px]"
+            />
+          </div>
+        )}
 
         <div
           className="blog-content sermon-flow [&_*]:!text-foreground"
