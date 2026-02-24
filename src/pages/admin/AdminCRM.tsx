@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import RichTextEditor from "@/components/admin/RichTextEditor";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -20,6 +21,8 @@ import {
   FileText,
   Eye,
   Loader2,
+  MessageSquare,
+  Phone,
 } from "lucide-react";
 
 interface Subscriber {
@@ -268,6 +271,9 @@ export default function AdminCRM() {
           <TabsTrigger value="campaigns" className="gap-2">
             <FileText className="h-4 w-4" /> Campaigns
           </TabsTrigger>
+          <TabsTrigger value="sms" className="gap-2">
+            <Phone className="h-4 w-4" /> SMS
+          </TabsTrigger>
         </TabsList>
 
         {/* SUBSCRIBERS TAB */}
@@ -511,7 +517,99 @@ export default function AdminCRM() {
             </div>
           )}
         </TabsContent>
+
+        {/* SMS TAB */}
+        <TabsContent value="sms" className="space-y-4 mt-4">
+          <SMSComposer subscribers={subscribers} toast={toast} />
+        </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function SMSComposer({ subscribers, toast }: { subscribers: any[]; toast: any }) {
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{ sent: number; failed: number; total: number } | null>(null);
+
+  const smsEligible = subscribers.filter(
+    (s: any) => s.sms_opt_in && !s.sms_opt_out && s.phone_number
+  );
+
+  const handleSend = async () => {
+    if (!message.trim()) return;
+    if (!confirm(`Send SMS to ${smsEligible.length} eligible contacts?`)) return;
+    setSending(true);
+    setResult(null);
+    try {
+      const res = await supabase.functions.invoke("send-sms", {
+        body: { message },
+      });
+      if (res.error) throw res.error;
+      setResult(res.data);
+      toast({ title: "SMS sent", description: `${res.data.sent} sent, ${res.data.failed} failed.` });
+    } catch (err: any) {
+      const errMsg = typeof err === "string" ? err : err?.message || JSON.stringify(err);
+      toast({ title: "SMS failed", description: errMsg, variant: "destructive" });
+    }
+    setSending(false);
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Phone className="h-4 w-4" /> Mass SMS
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="text-center p-3 rounded-lg bg-muted">
+              <div className="text-2xl font-bold">{smsEligible.length}</div>
+              <p className="text-xs text-muted-foreground">Opted-In Contacts</p>
+            </div>
+            <div className="text-center p-3 rounded-lg bg-muted">
+              <div className="text-2xl font-bold">{subscribers.filter((s: any) => s.phone_number).length}</div>
+              <p className="text-xs text-muted-foreground">With Phone Numbers</p>
+            </div>
+          </div>
+
+          <div>
+            <Label className="mb-1.5 block">Message</Label>
+            <Textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Hi {name}, ..."
+              rows={4}
+              maxLength={1600}
+            />
+            <p className="text-xs text-muted-foreground mt-1">{message.length}/1600 characters. Use {"{name}"} for personalization.</p>
+          </div>
+
+          <div className="flex gap-2 items-center">
+            <Button onClick={handleSend} disabled={sending || !message.trim() || smsEligible.length === 0}>
+              {sending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
+              {sending ? "Sending…" : `Send to ${smsEligible.length} contacts`}
+            </Button>
+          </div>
+
+          {result && (
+            <div className="text-sm p-3 rounded-lg bg-muted">
+              ✅ Sent: {result.sent} | ❌ Failed: {result.failed} | Total: {result.total}
+            </div>
+          )}
+
+          <div className="rounded-lg border border-border p-3 text-xs text-muted-foreground space-y-1">
+            <p className="font-medium text-foreground">Important Notes:</p>
+            <p>• SMS requires Twilio credentials (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER) configured as backend secrets.</p>
+            <p>• Only contacts with sms_opt_in=true and sms_opt_out=false will receive messages.</p>
+            <p>• Quiet hours enforced: 10 PM – 8 AM EST.</p>
+            <p>• STOP/UNSUBSCRIBE replies auto-opt-out contacts.</p>
+            <p>• Using a personal phone number requires A2P/10DLC registration. A dedicated business number is recommended.</p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

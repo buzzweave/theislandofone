@@ -24,7 +24,9 @@ import {
   ArrowLeft,
   Crown,
 } from "lucide-react";
-import { useBooks, useAddBook, useUpdateBook, useDeleteBook, type Book, type BookChapterInput } from "@/hooks/useBooks";
+import { useBooks, useAddBook, useUpdateBook, useDeleteBook, useToggleBookPublish, type Book, type BookChapterInput } from "@/hooks/useBooks";
+import { Badge } from "@/components/ui/badge";
+import { Eye, EyeOff } from "lucide-react";
 import SortableChapterList from "@/components/admin/SortableChapterList";
 import { useAIContent } from "@/contexts/AIContentContext";
 import AudioGenerator from "@/components/admin/AudioGenerator";
@@ -44,6 +46,8 @@ export default function AdminBookEditor() {
   const addBookMut = useAddBook();
   const updateBookMut = useUpdateBook();
   const deleteBookMut = useDeleteBook();
+  const togglePublishMut = useToggleBookPublish();
+  const [publishFilter, setPublishFilter] = useState<"all" | "published" | "draft">("all");
   // Chapters are saved as part of the book body via VPS
   const isMobile = useIsMobile();
   const aiContent = useAIContent();
@@ -293,8 +297,23 @@ export default function AdminBookEditor() {
               <Plus className="h-4 w-4" />
             </Button>
           </div>
+          <div className="flex gap-1 px-2 pt-2">
+            {(["all", "published", "draft"] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setPublishFilter(f)}
+                className={`text-[10px] px-2 py-0.5 rounded-full capitalize ${publishFilter === f ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"}`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
           <div className="flex-1 overflow-y-auto">
-            {bookList.map((b) => (
+            {bookList.filter((b) => {
+              if (publishFilter === "published") return b.is_published;
+              if (publishFilter === "draft") return !b.is_published;
+              return true;
+            }).map((b) => (
               <button
                 key={b.id}
                 onClick={() => setActiveId(b.id)}
@@ -309,8 +328,10 @@ export default function AdminBookEditor() {
                   <span className="truncate font-medium">{b.title}</span>
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
+                  <span className={`text-[10px] px-1.5 py-0 rounded-full ${b.is_published ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+                    {b.is_published ? "Published" : "Draft"}
+                  </span>
                   <span className="text-[10px] text-muted-foreground">{b.category}</span>
-                  <span className="text-[10px] text-muted-foreground">{b.chapters.length} ch.</span>
                 </div>
               </button>
             ))}
@@ -553,6 +574,27 @@ export default function AdminBookEditor() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium flex items-center gap-1.5">
+                    {local.is_published ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                    Publish Book
+                  </p>
+                  <p className="text-xs text-muted-foreground">Make this book visible on the public Books page.</p>
+                </div>
+                <Switch
+                  checked={!!local.is_published}
+                  onCheckedChange={async (v) => {
+                    try {
+                      await togglePublishMut.mutateAsync({ id: local.id, publish: v });
+                      setLocal((prev) => prev ? { ...prev, is_published: v } : prev);
+                      toast({ title: v ? "Book published" : "Book unpublished" });
+                    } catch (err: any) {
+                      toast({ title: "Error", description: err.message, variant: "destructive" });
+                    }
+                  }}
+                />
+              </div>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium">Feature on Front Page</p>

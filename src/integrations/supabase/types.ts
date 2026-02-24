@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_dev_audit: {
         Row: {
           action: string
@@ -181,6 +205,38 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          role: string
+        }
+        Insert: {
+          content?: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          role?: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "ai_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audiobooks: {
         Row: {
           audio_url: string
@@ -239,6 +295,7 @@ export type Database = {
           slug: string
           title: string
           updated_at: string
+          video_url: string
         }
         Insert: {
           author?: string
@@ -252,6 +309,7 @@ export type Database = {
           slug: string
           title: string
           updated_at?: string
+          video_url?: string
         }
         Update: {
           author?: string
@@ -265,6 +323,7 @@ export type Database = {
           slug?: string
           title?: string
           updated_at?: string
+          video_url?: string
         }
         Relationships: []
       }
@@ -365,11 +424,14 @@ export type Database = {
           featured: boolean
           id: string
           is_free: boolean
+          is_published: boolean
           pdf_url: string
           price: number
+          published_at: string | null
           sort_order: number
           subtitle: string
           title: string
+          unpublished_at: string | null
           updated_at: string
         }
         Insert: {
@@ -383,11 +445,14 @@ export type Database = {
           featured?: boolean
           id?: string
           is_free?: boolean
+          is_published?: boolean
           pdf_url?: string
           price?: number
+          published_at?: string | null
           sort_order?: number
           subtitle?: string
           title: string
+          unpublished_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -401,11 +466,14 @@ export type Database = {
           featured?: boolean
           id?: string
           is_free?: boolean
+          is_published?: boolean
           pdf_url?: string
           price?: number
+          published_at?: string | null
           sort_order?: number
           subtitle?: string
           title?: string
+          unpublished_at?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -945,6 +1013,96 @@ export type Database = {
         }
         Relationships: []
       }
+      sms_campaigns: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          message_template: string
+          name: string
+          scheduled_for: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          message_template?: string
+          name?: string
+          scheduled_for?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          message_template?: string
+          name?: string
+          scheduled_for?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sms_messages: {
+        Row: {
+          body: string
+          campaign_id: string | null
+          contact_id: string | null
+          created_at: string
+          error: string | null
+          from_number: string
+          id: string
+          provider_message_id: string | null
+          sent_at: string | null
+          status: string
+          to_number: string
+        }
+        Insert: {
+          body?: string
+          campaign_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          error?: string | null
+          from_number?: string
+          id?: string
+          provider_message_id?: string | null
+          sent_at?: string | null
+          status?: string
+          to_number?: string
+        }
+        Update: {
+          body?: string
+          campaign_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          error?: string | null
+          from_number?: string
+          id?: string
+          provider_message_id?: string | null
+          sent_at?: string | null
+          status?: string
+          to_number?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_messages_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "sms_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_messages_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "subscribers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       smtp_settings: {
         Row: {
           created_at: string
@@ -1054,6 +1212,11 @@ export type Database = {
           id: string
           is_active: boolean | null
           name: string | null
+          phone_number: string | null
+          sms_last_opt_in_at: string | null
+          sms_last_opt_out_at: string | null
+          sms_opt_in: boolean | null
+          sms_opt_out: boolean | null
           source: string | null
           subscribed_at: string
           unsubscribed_at: string | null
@@ -1065,6 +1228,11 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name?: string | null
+          phone_number?: string | null
+          sms_last_opt_in_at?: string | null
+          sms_last_opt_out_at?: string | null
+          sms_opt_in?: boolean | null
+          sms_opt_out?: boolean | null
           source?: string | null
           subscribed_at?: string
           unsubscribed_at?: string | null
@@ -1076,6 +1244,11 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name?: string | null
+          phone_number?: string | null
+          sms_last_opt_in_at?: string | null
+          sms_last_opt_out_at?: string | null
+          sms_opt_in?: boolean | null
+          sms_opt_out?: boolean | null
           source?: string | null
           subscribed_at?: string
           unsubscribed_at?: string | null
