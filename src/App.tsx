@@ -29,6 +29,8 @@ import AdminMembers from "./pages/admin/AdminMembers";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminAIChat from "./pages/admin/AdminAIChat";
+import AdminOpenAIStudio from "./pages/admin/AdminOpenAIStudio";
+import AdminCategories from "./pages/admin/AdminCategories";
 import AdminHeroBanners from "./pages/admin/AdminHeroBanners";
 import AdminMembershipPlans from "./pages/admin/AdminMembershipPlans";
 import AdminGraphics from "./pages/admin/AdminGraphics";
@@ -334,6 +336,8 @@ const App = () => (
                   <Route path="members" element={<AdminMembers />} />
                   <Route path="analytics" element={<AdminAnalytics />} />
                   <Route path="ai-chat" element={<AdminAIChat />} />
+                  <Route path="ai-studio" element={<AdminOpenAIStudio />} />
+                  <Route path="categories" element={<AdminCategories />} />
                   <Route path="plans" element={<AdminMembershipPlans />} />
                   <Route path="graphics" element={<AdminGraphics />} />
                   <Route path="audiobooks" element={<AdminAudiobooks />} />

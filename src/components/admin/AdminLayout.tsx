@@ -49,6 +49,8 @@ const navItems = [
   { to: "/admin/members", label: "Members", icon: Users },
   { to: "/admin/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/admin/ai-chat", label: "AI Chat", icon: MessageSquare },
+  { to: "/admin/ai-studio", label: "OpenAI Studio", icon: Bot },
+  { to: "/admin/categories", label: "Categories", icon: ClipboardList },
   { to: "/admin/plans", label: "Plans", icon: Crown },
   { to: "/admin/graphics", label: "Graphics", icon: Image },
   { to: "/admin/audiobooks", label: "Audiobooks", icon: Headphones },

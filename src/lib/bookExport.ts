@@ -11,11 +11,8 @@ import { triggerDownload } from "@/lib/downloadHelper";
  * Strip HTML tags and decode common entities, then normalize into clean paragraphs.
  */
 export function stripHtml(html: string): string {
-  // Replace block-level closing tags with newlines to preserve paragraph breaks
   let text = html.replace(/<\/p>/gi, "\n").replace(/<\/div>/gi, "\n").replace(/<br\s*\/?>/gi, "\n");
-  // Remove all remaining HTML tags
   text = text.replace(/<[^>]+>/g, "");
-  // Decode common HTML entities
   text = text
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
@@ -27,17 +24,13 @@ export function stripHtml(html: string): string {
 }
 
 export function normalizeParagraphs(text: string): string {
-  // First strip any HTML
   const cleaned = stripHtml(text);
-  // Split into lines and trim each
   const lines = cleaned.split("\n").map((l) => l.trim());
   const paragraphs: string[] = [];
   let current = "";
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-
-    // Empty line = paragraph break
     if (!line) {
       if (current) {
         paragraphs.push(current);
@@ -45,17 +38,91 @@ export function normalizeParagraphs(text: string): string {
       }
       continue;
     }
-
     if (!current) {
       current = line;
     } else {
-      // Join to current paragraph with a space
       current += " " + line;
     }
   }
   if (current) paragraphs.push(current);
-
   return paragraphs.join("\n\n");
+}
+
+// --- Cover image resizing utility ---
+async function fetchImageAsDataUrl(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0);
+      resolve(canvas.toDataURL("image/jpeg", 0.92));
+    };
+    img.onerror = () => reject(new Error("Failed to load cover image"));
+    img.src = url;
+  });
+}
+
+async function resizeCoverForEpub(url: string, targetW = 1600, targetH = 2560): Promise<{ dataUrl: string; blob: Blob }> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = targetW;
+      canvas.height = targetH;
+      const ctx = canvas.getContext("2d")!;
+      // Fill background
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, targetW, targetH);
+      // Draw cover image scaled to fit
+      const scale = Math.min(targetW / img.naturalWidth, targetH / img.naturalHeight);
+      const w = img.naturalWidth * scale;
+      const h = img.naturalHeight * scale;
+      ctx.drawImage(img, (targetW - w) / 2, (targetH - h) / 2, w, h);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) return reject(new Error("Canvas toBlob failed"));
+          const reader = new FileReader();
+          reader.onloadend = () => resolve({ dataUrl: reader.result as string, blob });
+          reader.readAsDataURL(blob);
+        },
+        "image/jpeg",
+        0.85
+      );
+    };
+    img.onerror = () => reject(new Error("Failed to load cover image for resize"));
+    img.src = url;
+  });
+}
+
+/** Generate a resized marketing cover as a downloadable file */
+export async function generateMarketingCover(coverUrl: string, title: string) {
+  const { blob } = await resizeCoverForEpub(coverUrl, 1600, 2560);
+  triggerDownload(blob, `${title.replace(/[^a-zA-Z0-9]/g, "_")}_cover_1600x2560.jpg`);
+}
+
+/** Check cover dimensions against store minimums */
+export async function checkCoverDimensions(coverUrl: string): Promise<{ width: number; height: number; appleOk: boolean; kdpOk: boolean }> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const w = img.naturalWidth;
+      const h = img.naturalHeight;
+      resolve({
+        width: w,
+        height: h,
+        appleOk: Math.min(w, h) >= 1400,
+        kdpOk: w >= 625 && h >= 1000,
+      });
+    };
+    img.onerror = () => reject(new Error("Failed to load image"));
+    img.src = coverUrl;
+  });
 }
 
 export function exportBookToPdf(book: Book) {
@@ -66,11 +133,10 @@ export function exportBookToPdf(book: Book) {
   const marginBottom = 18;
   const marginSide = 18;
   const contentW = pageW - marginSide * 2;
-  const lineHeight = 5.5; // generous line spacing
-  const paraGap = 4; // space between paragraphs
-  const firstLineIndent = 8; // paragraph indent
+  const lineHeight = 5.5;
+  const paraGap = 4;
+  const firstLineIndent = 8;
 
-  // --- Title page ---
   doc.setFont("helvetica", "bold");
   doc.setFontSize(26);
   const titleLines = doc.splitTextToSize(book.title, contentW - 10);
@@ -81,44 +147,34 @@ export function exportBookToPdf(book: Book) {
     doc.setFont("helvetica", "italic");
     doc.setFontSize(14);
     const subY = titleY + titleLines.length * 11 + 8;
-    doc.text(doc.splitTextToSize(book.subtitle, contentW - 10), pageW / 2, subY, {
-      align: "center",
-    });
+    doc.text(doc.splitTextToSize(book.subtitle, contentW - 10), pageW / 2, subY, { align: "center" });
   }
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(12);
   doc.text(`by ${book.author}`, pageW / 2, pageH * 0.62, { align: "center" });
 
-  // Copyright notice
   doc.setFontSize(8);
   doc.setFont("helvetica", "italic");
   doc.text(
     `© ${new Date().getFullYear()} The Island of One. All rights reserved. For personal use only.`,
-    pageW / 2,
-    pageH * 0.85,
-    { align: "center" }
+    pageW / 2, pageH * 0.85, { align: "center" }
   );
 
-  // --- Chapters ---
   book.chapters.forEach((chapter, i) => {
     doc.addPage();
-
-    // Chapter heading with breathing room
     let y = marginTop + 12;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
     doc.setTextColor(120, 120, 120);
     doc.text(`CHAPTER ${i + 1}`, pageW / 2, y, { align: "center" });
-
     y += 10;
     doc.setFontSize(18);
     doc.setTextColor(0, 0, 0);
     const chTitleLines = doc.splitTextToSize(chapter.title, contentW);
     doc.text(chTitleLines, pageW / 2, y, { align: "center" });
-    y += chTitleLines.length * 8 + 14; // extra space before body
+    y += chTitleLines.length * 8 + 14;
 
-    // Body text
     doc.setFont("times", "normal");
     doc.setFontSize(11);
     const normalized = normalizeParagraphs(chapter.content);
@@ -126,19 +182,15 @@ export function exportBookToPdf(book: Book) {
 
     paras.forEach((para, pIdx) => {
       const wrapped: string[] = doc.splitTextToSize(para, contentW - firstLineIndent);
-
-      // If paragraph won't fit at all, start new page
       if (y + wrapped.length * lineHeight > pageH - marginBottom && y > marginTop + 30) {
         doc.addPage();
         y = marginTop;
       }
-
       wrapped.forEach((line: string, lIdx: number) => {
         if (y > pageH - marginBottom) {
           doc.addPage();
           y = marginTop;
         }
-        // Indent first line of each paragraph (except the very first)
         const x = lIdx === 0 && pIdx > 0 ? marginSide + firstLineIndent : marginSide;
         doc.text(line, x, y);
         y += lineHeight;
@@ -151,19 +203,25 @@ export function exportBookToPdf(book: Book) {
   triggerDownload(pdfBlob, `${book.title.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`);
 }
 
-export function exportBookToEpub(book: Book) {
-  // Build a simple XHTML-based EPUB (ZIP with mimetype + content)
-  // Using a minimal approach that works in-browser without heavy deps
+// --- EPUB 3 with proper cover ---
+export async function exportBookToEpub(book: Book) {
+  if (!book.cover_image) {
+    throw new Error("Add a cover image before exporting.");
+  }
+
+  // Resize cover for EPUB embedding (1600x2560)
+  let coverJpegBytes: Uint8Array;
+  try {
+    const { blob } = await resizeCoverForEpub(book.cover_image, 1600, 2560);
+    coverJpegBytes = new Uint8Array(await blob.arrayBuffer());
+  } catch {
+    throw new Error("Failed to process cover image. Ensure the cover URL is accessible.");
+  }
 
   const sanitize = (text: string) =>
-    text
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+    text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
   const bookId = crypto.randomUUID();
-
   const mimetype = "application/epub+zip";
 
   const container = `<?xml version="1.0" encoding="UTF-8"?>
@@ -181,6 +239,7 @@ export function exportBookToEpub(book: Book) {
     .map((_, i) => `    <itemref idref="ch${i}"/>`)
     .join("\n");
 
+  // EPUB 3 OPF with proper cover image declaration
   const contentOpf = `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" unique-identifier="bookid" version="3.0">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
@@ -189,12 +248,16 @@ export function exportBookToEpub(book: Book) {
     <dc:creator>${sanitize(book.author)}</dc:creator>
     <dc:language>en</dc:language>
     <meta property="dcterms:modified">${new Date().toISOString().split(".")[0]}Z</meta>
+    <meta name="cover" content="cover-image"/>
   </metadata>
   <manifest>
     <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+    <item id="cover-xhtml" href="cover.xhtml" media-type="application/xhtml+xml"/>
+    <item id="cover-image" href="images/cover.jpg" media-type="image/jpeg" properties="cover-image"/>
 ${chapterItems}
   </manifest>
   <spine>
+    <itemref idref="cover-xhtml"/>
 ${chapterSpine}
   </spine>
 </package>`;
@@ -217,6 +280,23 @@ ${tocItems}
 </body>
 </html>`;
 
+  // Cover page XHTML
+  const coverXhtml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><title>Cover</title>
+<style>
+  body { margin: 0; padding: 0; text-align: center; }
+  img { max-width: 100%; max-height: 100%; }
+</style>
+</head>
+<body>
+  <div style="text-align:center;">
+    <img src="images/cover.jpg" alt="${sanitize(book.title)}" />
+  </div>
+</body>
+</html>`;
+
   const copyrightNotice = `© ${new Date().getFullYear()} The Island of One. All rights reserved. For personal use only.`;
 
   const epubCss = `body { font-family: Georgia, "Times New Roman", serif; line-height: 1.8; margin: 1.5em; color: #222; }
@@ -228,13 +308,10 @@ p.first::first-letter { float: left; font-size: 3.8em; line-height: 0.8; padding
 .copyright { font-size: 0.75em; font-style: italic; color: #999; text-align: center; margin-top: 3em; border-top: 1px solid #ddd; padding-top: 1em; }`;
 
   const chapterFiles = book.chapters.map((ch, i) => {
-    const paras = normalizeParagraphs(ch.content)
-      .split("\n\n")
-      .filter((p) => p.trim());
+    const paras = normalizeParagraphs(ch.content).split("\n\n").filter((p) => p.trim());
     const bodyHtml = paras
       .map((p, pIdx) => `  <p${pIdx === 0 ? ' class="first"' : ''}>${sanitize(p)}</p>`)
       .join("\n");
-
     return {
       name: `OEBPS/ch${i}.xhtml`,
       content: `<?xml version="1.0" encoding="UTF-8"?>
@@ -251,21 +328,24 @@ ${bodyHtml}
     };
   });
 
-  // Build ZIP manually (minimal implementation for EPUB)
-  const files: { name: string; content: string; noCompression?: boolean }[] = [
-    { name: "mimetype", content: mimetype, noCompression: true },
-    { name: "META-INF/container.xml", content: container },
-    { name: "OEBPS/content.opf", content: contentOpf },
-    { name: "OEBPS/nav.xhtml", content: nav },
-    ...chapterFiles,
+  // Build ZIP with text files + binary cover image
+  const encoder = new TextEncoder();
+  const textFiles: { name: string; data: Uint8Array; noCompression?: boolean }[] = [
+    { name: "mimetype", data: encoder.encode(mimetype), noCompression: true },
+    { name: "META-INF/container.xml", data: encoder.encode(container) },
+    { name: "OEBPS/content.opf", data: encoder.encode(contentOpf) },
+    { name: "OEBPS/nav.xhtml", data: encoder.encode(nav) },
+    { name: "OEBPS/cover.xhtml", data: encoder.encode(coverXhtml) },
+    { name: "OEBPS/images/cover.jpg", data: coverJpegBytes },
+    ...chapterFiles.map((f) => ({ name: f.name, data: encoder.encode(f.content) })),
   ];
 
-  const blob = buildEpubZip(files);
+  const blob = buildEpubZipBinary(textFiles);
   triggerDownload(blob, `${book.title.replace(/[^a-zA-Z0-9]/g, "_")}.epub`);
 }
 
-// Minimal ZIP builder for EPUB (store-only, no compression needed for small text files)
-export function buildEpubZip(files: { name: string; content: string; noCompression?: boolean }[]) {
+// Updated ZIP builder that handles binary data (Uint8Array)
+export function buildEpubZipBinary(files: { name: string; data: Uint8Array; noCompression?: boolean }[]) {
   const encoder = new TextEncoder();
   const parts: Uint8Array[] = [];
   const centralDir: Uint8Array[] = [];
@@ -273,22 +353,20 @@ export function buildEpubZip(files: { name: string; content: string; noCompressi
 
   for (const file of files) {
     const nameBytes = encoder.encode(file.name);
-    const contentBytes = encoder.encode(file.content);
+    const contentBytes = file.data;
     const crc = crc32(contentBytes);
 
-    // Local file header
     const localHeader = new Uint8Array(30 + nameBytes.length);
     const lv = new DataView(localHeader.buffer);
-    lv.setUint32(0, 0x04034b50, true); // signature
-    lv.setUint16(4, 20, true); // version
-    lv.setUint16(8, 0, true); // compression: store
+    lv.setUint32(0, 0x04034b50, true);
+    lv.setUint16(4, 20, true);
+    lv.setUint16(8, 0, true);
     lv.setUint32(14, crc, true);
-    lv.setUint32(18, contentBytes.length, true); // compressed
-    lv.setUint32(22, contentBytes.length, true); // uncompressed
+    lv.setUint32(18, contentBytes.length, true);
+    lv.setUint32(22, contentBytes.length, true);
     lv.setUint16(26, nameBytes.length, true);
     localHeader.set(nameBytes, 30);
 
-    // Central directory entry
     const cdEntry = new Uint8Array(46 + nameBytes.length);
     const cv = new DataView(cdEntry.buffer);
     cv.setUint32(0, 0x02014b50, true);
@@ -311,7 +389,6 @@ export function buildEpubZip(files: { name: string; content: string; noCompressi
   let cdSize = 0;
   for (const cd of centralDir) cdSize += cd.length;
 
-  // End of central directory
   const eocd = new Uint8Array(22);
   const ev = new DataView(eocd.buffer);
   ev.setUint32(0, 0x06054b50, true);
@@ -320,7 +397,16 @@ export function buildEpubZip(files: { name: string; content: string; noCompressi
   ev.setUint32(12, cdSize, true);
   ev.setUint32(16, cdOffset, true);
 
-  return new Blob([...parts, ...centralDir, eocd].map(b => new Uint8Array(b.buffer as ArrayBuffer, b.byteOffset, b.byteLength)), { type: "application/epub+zip" });
+  return new Blob(
+    [...parts, ...centralDir, eocd].map((b) => new Uint8Array(b.buffer as ArrayBuffer, b.byteOffset, b.byteLength)),
+    { type: "application/epub+zip" }
+  );
+}
+
+// Keep legacy buildEpubZip for backwards compat
+export function buildEpubZip(files: { name: string; content: string; noCompression?: boolean }[]) {
+  const encoder = new TextEncoder();
+  return buildEpubZipBinary(files.map((f) => ({ name: f.name, data: encoder.encode(f.content), noCompression: f.noCompression })));
 }
 
 export function crc32(data: Uint8Array): number {
@@ -335,7 +421,6 @@ export function crc32(data: Uint8Array): number {
 }
 
 export function exportBookToWord(book: Book) {
-  // Pass raw HTML from rich text editor directly – Word renders it natively
   const chapters = book.chapters
     .map((ch, i) => {
       const chapterHtml = ch.content || "";
