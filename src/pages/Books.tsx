@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { BookOpen, Lock } from "lucide-react";
 import { useBooks } from "@/hooks/useBooks";
+import BooksSideBanner from "@/components/BooksSideBanner";
 
 export default function Books() {
   const { data: books = [], isLoading } = useBooks(true);
@@ -12,6 +13,7 @@ export default function Books() {
 
   return (
     <div className="min-h-screen">
+      <BooksSideBanner />
       {/* Header */}
       <section className="py-14 sm:py-20 bg-gradient-section">
         <div className="container mx-auto px-4 text-center">

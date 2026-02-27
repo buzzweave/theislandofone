@@ -16,71 +16,152 @@ serve(async (req) => {
     const model = Deno.env.get("OPENAI_MODEL") || "gpt-4o-mini";
     const systemPrompt = Deno.env.get("AI_SYSTEM_PROMPT") || "You are a helpful AI assistant for The Island of One ministry. Be warm, encouraging, and faith-driven. Keep answers clear and concise.";
 
-    const { messages, conversationId, action } = await req.json();
+    const body = await req.json();
+    const { messages, conversationId, action, draftType, systemPrompt: customSystemPrompt, userPrompt } = body;
 
-    // Auth check
-    const authHeader = req.headers.get("Authorization") || "";
     const sbUrl = Deno.env.get("SUPABASE_URL")!;
     const sbKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(sbUrl, sbKey);
 
-    // Verify admin via token
+    const authHeader = req.headers.get("Authorization") || "";
     const token = authHeader.replace("Bearer ", "");
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "";
     
-    // Skip auth check if token is just the anon key (for function invocation)
     let userId: string | null = null;
     if (token && token !== anonKey) {
       const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
       if (authErr || !user) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       userId = user.id;
-
-      // Check admin role
       const { data: roles } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id)
-        .eq("role", "admin");
+        .from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin");
       if (!roles?.length) {
         return new Response(JSON.stringify({ error: "Admin access required" }), {
-          status: 403,
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // --- Generate Draft (book or sermon) ---
+    if (action === "generate_draft") {
+      if (!draftType || !userPrompt) {
+        return new Response(JSON.stringify({ error: "Missing draftType or userPrompt" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const sysPrompt = customSystemPrompt || (draftType === "book"
+        ? "You are a Christian book author. Return valid JSON with: title, subtitle, author, description, chapters (array of {title, content}). Each chapter should have at least 300 words."
+        : "You are a sermon writer. Return valid JSON with: title, scripture, excerpt, manuscript, category.");
+
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: sysPrompt + "\n\nIMPORTANT: Return ONLY valid JSON, no markdown code blocks." },
+            { role: "user", content: userPrompt },
+          ],
+          max_tokens: 8000,
+          temperature: 0.7,
+        }),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error("OpenAI error:", response.status, errText);
+        return new Response(JSON.stringify({ error: "AI service error" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const aiResult = await response.json();
+      let content = aiResult.choices?.[0]?.message?.content || "";
+      
+      // Clean markdown code blocks if present
+      content = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+      
+      let parsed;
+      try {
+        parsed = JSON.parse(content);
+      } catch {
+        return new Response(JSON.stringify({ error: "Failed to parse AI response as JSON", raw: content.substring(0, 500) }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Save draft to DB
+      if (draftType === "book") {
+        const { data: book, error: bookErr } = await supabase.from("books").insert({
+          title: parsed.title || "Untitled Book",
+          subtitle: parsed.subtitle || "",
+          author: parsed.author || "Bryant Clark",
+          description: parsed.description || "",
+          is_published: false,
+          is_free: true,
+          price: 0,
+          category: "Faith",
+        }).select().single();
+
+        if (bookErr) throw bookErr;
+
+        if (parsed.chapters?.length && book) {
+          const chapterRows = parsed.chapters.map((ch: any, i: number) => ({
+            book_id: book.id,
+            title: ch.title || `Chapter ${i + 1}`,
+            content: ch.content || "",
+            sort_order: i,
+          }));
+          await supabase.from("book_chapters").insert(chapterRows);
+        }
+
+        return new Response(JSON.stringify({ success: true, title: parsed.title, id: book?.id }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } else {
+        const { data: sermon, error: sermonErr } = await supabase.from("sermons").insert({
+          title: parsed.title || "Untitled Sermon",
+          scripture: parsed.scripture || "",
+          excerpt: parsed.excerpt || "",
+          manuscript: parsed.manuscript || "",
+          category: parsed.category || "Faith",
+          is_free: true,
+          price: 0,
+        }).select().single();
+
+        if (sermonErr) throw sermonErr;
+
+        return new Response(JSON.stringify({ success: true, title: parsed.title, id: sermon?.id }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
     }
 
-    // Handle listing conversations
+    // --- List conversations ---
     if (action === "list_conversations") {
       const { data, error } = await supabase
-        .from("ai_conversations")
-        .select("*")
-        .order("updated_at", { ascending: false })
-        .limit(50);
+        .from("ai_conversations").select("*").order("updated_at", { ascending: false }).limit(50);
       if (error) throw error;
       return new Response(JSON.stringify({ conversations: data }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Handle loading messages for a conversation
+    // --- Load messages ---
     if (action === "load_messages") {
       const { data, error } = await supabase
-        .from("ai_messages")
-        .select("*")
-        .eq("conversation_id", conversationId)
-        .order("created_at", { ascending: true });
+        .from("ai_messages").select("*").eq("conversation_id", conversationId).order("created_at", { ascending: true });
       if (error) throw error;
       return new Response(JSON.stringify({ messages: data }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Handle delete conversation
+    // --- Delete conversation ---
     if (action === "delete_conversation") {
       await supabase.from("ai_conversations").delete().eq("id", conversationId);
       return new Response(JSON.stringify({ ok: true }), {
@@ -88,50 +169,34 @@ serve(async (req) => {
       });
     }
 
-    // Chat completion with streaming
+    // --- Chat completion with streaming ---
     if (!messages?.length) {
       return new Response(JSON.stringify({ error: "No messages provided" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Create or use existing conversation
     let convId = conversationId;
     if (!convId && userId) {
       const title = (messages[0]?.content || "New Chat").substring(0, 100);
-      const { data: conv, error: convErr } = await supabase
-        .from("ai_conversations")
-        .insert({ user_id: userId, title })
-        .select()
-        .single();
-      if (convErr) console.error("Conv create error:", convErr);
+      const { data: conv } = await supabase
+        .from("ai_conversations").insert({ user_id: userId, title }).select().single();
       convId = conv?.id;
     }
 
-    // Save user message
     const userMsg = messages[messages.length - 1];
     if (convId && userMsg?.role === "user") {
       await supabase.from("ai_messages").insert({
-        conversation_id: convId,
-        role: "user",
-        content: userMsg.content,
+        conversation_id: convId, role: "user", content: userMsg.content,
       });
     }
 
-    // Call OpenAI
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...messages,
-        ],
+        messages: [{ role: "system", content: systemPrompt }, ...messages],
         stream: true,
       }),
     });
@@ -140,12 +205,10 @@ serve(async (req) => {
       const errText = await response.text();
       console.error("OpenAI error:", response.status, errText);
       return new Response(JSON.stringify({ error: "AI service error" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Collect full response for DB while streaming
     const reader = response.body!.getReader();
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
@@ -159,8 +222,6 @@ serve(async (req) => {
             if (done) break;
             const chunk = decoder.decode(value, { stream: true });
             controller.enqueue(encoder.encode(chunk));
-
-            // Parse for DB storage
             for (const line of chunk.split("\n")) {
               if (!line.startsWith("data: ") || line.includes("[DONE]")) continue;
               try {
@@ -170,17 +231,12 @@ serve(async (req) => {
               } catch {}
             }
           }
-          
-          // Save assistant message to DB
           if (convId && fullContent) {
             await supabase.from("ai_messages").insert({
-              conversation_id: convId,
-              role: "assistant",
-              content: fullContent,
+              conversation_id: convId, role: "assistant", content: fullContent,
             });
             await supabase.from("ai_conversations").update({ updated_at: new Date().toISOString() }).eq("id", convId);
           }
-
           controller.close();
         } catch (err) {
           controller.error(err);
@@ -189,17 +245,12 @@ serve(async (req) => {
     });
 
     return new Response(stream, {
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "text/event-stream",
-        "X-Conversation-Id": convId || "",
-      },
+      headers: { ...corsHeaders, "Content-Type": "text/event-stream", "X-Conversation-Id": convId || "" },
     });
   } catch (e) {
     console.error("ai-chat error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
