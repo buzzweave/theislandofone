@@ -1,24 +1,27 @@
-import { useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Crown, Mail, Lock, User } from "lucide-react";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Crown, Mail, Lock, User, Gift } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { lovable } from "@/integrations/lovable/index";
 
 export default function Auth() {
-  const { signIn, signUp, user } = useAuth();
+  const { signIn, signUp, user, checkSubscription } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const from = (location.state as any)?.from || "/";
+  const inviteCode = searchParams.get("invite");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [inviteRedeemed, setInviteRedeemed] = useState(false);
 
   // Login form
   const [loginEmail, setLoginEmail] = useState("");
@@ -29,11 +32,29 @@ export default function Auth() {
   const [signupPassword, setSignupPassword] = useState("");
   const [signupName, setSignupName] = useState("");
 
-  // Redirect if already logged in
-  if (user) {
-    navigate(from, { replace: true });
-    return null;
-  }
+  // Auto-redeem invite after login/signup
+  useEffect(() => {
+    if (user && inviteCode && !inviteRedeemed) {
+      setInviteRedeemed(true);
+      (async () => {
+        try {
+          const { data, error } = await supabase.functions.invoke("redeem-invite", {
+            body: { invite_code: inviteCode },
+          });
+          if (error) throw new Error(error.message);
+          if (data?.error) throw new Error(data.error);
+          toast.success("🎉 Welcome! You now have a free lifetime Inner Circle membership!");
+          await checkSubscription();
+          navigate("/", { replace: true });
+        } catch (err: any) {
+          toast.error(err.message || "Could not redeem invitation.");
+          navigate(from, { replace: true });
+        }
+      })();
+    } else if (user && !inviteCode) {
+      navigate(from, { replace: true });
+    }
+  }, [user, inviteCode, inviteRedeemed]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +65,8 @@ export default function Auth() {
       toast.error(error);
     } else {
       toast.success("Welcome back!");
-      navigate(from, { replace: true });
+      // navigate handled by useEffect above if invite present
+      if (!inviteCode) navigate(from, { replace: true });
     }
   };
 
@@ -64,15 +86,27 @@ export default function Auth() {
     <div className="min-h-screen flex items-center justify-center py-20">
       <div className="w-full max-w-md px-4">
         <div className="text-center mb-8">
-          <Crown className="h-10 w-10 text-primary mx-auto mb-3" />
-          <h1 className="font-display text-3xl font-bold">Welcome</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Sign in to access your purchases and membership.
-          </p>
+          {inviteCode ? (
+            <>
+              <Gift className="h-10 w-10 text-primary mx-auto mb-3" />
+              <h1 className="font-display text-3xl font-bold">You're Invited!</h1>
+              <p className="text-muted-foreground text-sm mt-1">
+                Sign up or sign in to claim your <strong>free lifetime Inner Circle membership</strong>.
+              </p>
+            </>
+          ) : (
+            <>
+              <Crown className="h-10 w-10 text-primary mx-auto mb-3" />
+              <h1 className="font-display text-3xl font-bold">Welcome</h1>
+              <p className="text-muted-foreground text-sm mt-1">
+                Sign in to access your purchases and membership.
+              </p>
+            </>
+          )}
         </div>
 
         <Card>
-          <Tabs defaultValue="login">
+          <Tabs defaultValue={inviteCode ? "signup" : "login"}>
             <CardHeader className="pb-2">
               <TabsList className="w-full">
                 <TabsTrigger value="login" className="flex-1">Sign In</TabsTrigger>
