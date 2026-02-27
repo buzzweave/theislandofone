@@ -50,3 +50,12 @@ verify_jwt = false
 
 [functions.send-sms]
 verify_jwt = false
+
+[functions.create-invite]
+verify_jwt = false
+
+[functions.redeem-invite]
+verify_jwt = false
+
+[functions.share-invite]
+verify_jwt = false
