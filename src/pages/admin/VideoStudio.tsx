@@ -23,6 +23,9 @@ import {
 } from "lucide-react";
 import VideoRenderer from "@/components/admin/video-studio/VideoRenderer";
 import NanoStudio from "@/components/admin/video-studio/NanoStudio";
+import BackgroundMusicPanel, { type MusicSettings } from "@/components/admin/video-studio/BackgroundMusicPanel";
+import NarrationTextToggle from "@/components/admin/video-studio/NarrationTextToggle";
+import RenderControls from "@/components/admin/video-studio/RenderControls";
 import { Link } from "react-router-dom";
 
 /* ─── Voice configs ─── */
@@ -110,9 +113,17 @@ export default function VideoStudio() {
   const [effects, setEffects] = useState<string[]>([]);
   const [outputFormat, setOutputFormat] = useState("16:9");
   const [transition, setTransition] = useState("fade");
-  const [musicVolume, setMusicVolume] = useState(15);
-  const [musicFadeIn, setMusicFadeIn] = useState(3);
-  const [musicFadeOut, setMusicFadeOut] = useState(3);
+  const [showNarrationText, setShowNarrationText] = useState(true);
+
+  // Background music panel settings (user-uploaded music)
+  const [userMusicSettings, setUserMusicSettings] = useState<MusicSettings>({
+    enabled: false,
+    selectedTrackUrl: "",
+    loop: false,
+    fadeIn: 3,
+    fadeOut: 3,
+    volume: 50,
+  });
 
   // Custom slides upload
   const [customSlideImages, setCustomSlideImages] = useState<string[]>([]);
@@ -672,64 +683,31 @@ export default function VideoStudio() {
             </CardContent>
           </Card>
 
-          {/* Music with Fader */}
+          {/* Background Music (user-uploaded) */}
+          <BackgroundMusicPanel settings={userMusicSettings} onChange={setUserMusicSettings} />
+
+          {/* Narration Text Toggle */}
+          <NarrationTextToggle enabled={showNarrationText} onChange={setShowNarrationText} />
+
+          {/* AI Music Style (generated) */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
-                <Music className="h-4 w-4" /> Background Music
+                <Music className="h-4 w-4" /> AI Generated Music
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent>
               <Select value={musicStyle} onValueChange={setMusicStyle}>
-                <SelectTrigger><SelectValue placeholder="No Music" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="No AI Music" /></SelectTrigger>
                 <SelectContent>
                   {MUSIC_STYLES.map((m) => (
                     <SelectItem key={m.id} value={m.id || "none"}>{m.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              
-              {musicStyle && musicStyle !== "none" && (
-                <div className="space-y-3 pt-1">
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between items-center">
-                      <Label className="text-xs">Volume</Label>
-                      <span className="text-xs text-muted-foreground">{musicVolume}%</span>
-                    </div>
-                    <Slider
-                      value={[musicVolume]}
-                      onValueChange={([v]) => setMusicVolume(v)}
-                      max={100}
-                      min={0}
-                      step={5}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Fade In (s)</Label>
-                      <Slider
-                        value={[musicFadeIn]}
-                        onValueChange={([v]) => setMusicFadeIn(v)}
-                        max={10}
-                        min={0}
-                        step={1}
-                      />
-                      <span className="text-[10px] text-muted-foreground">{musicFadeIn}s</span>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Fade Out (s)</Label>
-                      <Slider
-                        value={[musicFadeOut]}
-                        onValueChange={([v]) => setMusicFadeOut(v)}
-                        max={10}
-                        min={0}
-                        step={1}
-                      />
-                      <span className="text-[10px] text-muted-foreground">{musicFadeOut}s</span>
-                    </div>
-                  </div>
-                </div>
-              )}
+              <p className="text-[10px] text-muted-foreground mt-2">
+                AI music is ignored when user-uploaded background music is active.
+              </p>
             </CardContent>
           </Card>
 
@@ -785,7 +763,7 @@ export default function VideoStudio() {
             <CardContent>
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { id: "16:9", label: "YouTube", icon: MonitorPlay },
+                  { id: "16:9", label: "YouTube 4K", icon: MonitorPlay },
                   { id: "9:16", label: "Shorts", icon: Smartphone },
                   { id: "1:1", label: "Square", icon: Square },
                 ].map((f) => (
@@ -803,26 +781,16 @@ export default function VideoStudio() {
                   </button>
                 ))}
               </div>
+              <p className="text-[10px] text-muted-foreground mt-2">16:9 renders at 3840×2160 (True 4K)</p>
             </CardContent>
           </Card>
 
-          {/* Generate Button */}
-          <Button
-            className="w-full gap-2 h-12 text-base"
-            size="lg"
-            onClick={runPipeline}
+          {/* Generate Button with Credit/Cooldown Controls */}
+          <RenderControls
+            onRender={runPipeline}
             disabled={isProcessing || (!contentText.trim() && !promptText.trim())}
-          >
-            {isProcessing ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Processing...
-              </>
-            ) : (
-              <>
-                <Film className="h-4 w-4" /> Generate Video
-              </>
-            )}
-          </Button>
+            isProcessing={isProcessing}
+          />
 
           {/* Publish Options (after completion) */}
           {step === "completed" && (
@@ -831,23 +799,25 @@ export default function VideoStudio() {
                 <VideoRenderer
                   slides={slides}
                   audioUrl={audioUrl}
-                  musicUrl={musicUrl || undefined}
-                  musicVolume={musicVolume / 100}
-                  musicFadeIn={musicFadeIn}
-                  musicFadeOut={musicFadeOut}
+                  musicUrl={userMusicSettings.enabled && userMusicSettings.selectedTrackUrl ? userMusicSettings.selectedTrackUrl : (musicUrl || undefined)}
+                  musicVolume={userMusicSettings.enabled ? userMusicSettings.volume / 100 : 0.15}
+                  musicFadeIn={userMusicSettings.enabled ? userMusicSettings.fadeIn : 3}
+                  musicFadeOut={userMusicSettings.enabled ? userMusicSettings.fadeOut : 3}
+                  musicLoop={userMusicSettings.enabled ? userMusicSettings.loop : false}
                   outputFormat={outputFormat}
                   viralMode={viralMode}
                   effects={effects}
                   transition={transition}
                   title={contentTitle}
+                  showNarrationText={showNarrationText}
                   onComplete={(url) => setVideoOutputUrl(url)}
                 />
               )}
 
-              <Card className="border-green-500/30">
+              <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm flex items-center gap-2">
-                    <Share2 className="h-4 w-4 text-green-500" /> Publish Options
+                    <Share2 className="h-4 w-4" /> Publish Options
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">

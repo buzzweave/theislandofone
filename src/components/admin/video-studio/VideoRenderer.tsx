@@ -18,18 +18,20 @@ interface VideoRendererProps {
   musicVolume?: number;
   musicFadeIn?: number;
   musicFadeOut?: number;
+  musicLoop?: boolean;
   outputFormat: string;
   viralMode: boolean;
   effects: string[];
   transition?: string;
   title: string;
+  showNarrationText?: boolean;
   onComplete?: (videoUrl: string) => void;
 }
 
 const FORMAT_DIMS: Record<string, { w: number; h: number }> = {
-  "16:9": { w: 1920, h: 1080 },
-  "9:16": { w: 1080, h: 1920 },
-  "1:1": { w: 1080, h: 1080 },
+  "16:9": { w: 3840, h: 2160 },
+  "9:16": { w: 2160, h: 3840 },
+  "1:1": { w: 2160, h: 2160 },
 };
 
 export default function VideoRenderer({
@@ -39,11 +41,13 @@ export default function VideoRenderer({
   musicVolume = 0.15,
   musicFadeIn = 3,
   musicFadeOut = 3,
+  musicLoop = false,
   outputFormat,
   viralMode,
   effects,
   transition = "fade",
   title,
+  showNarrationText = true,
   onComplete,
 }: VideoRendererProps) {
   const [rendering, setRendering] = useState(false);
@@ -110,6 +114,7 @@ export default function VideoRenderer({
     if (musicUrl) {
       musicAudio = new Audio(musicUrl);
       musicAudio.crossOrigin = "anonymous";
+      musicAudio.loop = musicLoop;
       await new Promise<void>((resolve) => {
         musicAudio!.oncanplaythrough = () => resolve();
         musicAudio!.onerror = () => resolve();
@@ -290,57 +295,60 @@ export default function VideoRenderer({
 
       ctx.restore();
 
-      // Text with word-sync fade animation
-      const fadeIn = Math.min(slideProgress * 4, 1);
-      const fontSize = viralMode ? dims.w * 0.045 : dims.w * 0.032;
-      ctx.globalAlpha = fadeIn;
-      ctx.fillStyle = "#ffffff";
-      ctx.font = `bold ${fontSize}px 'Georgia', serif`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.shadowColor = "rgba(0,0,0,0.8)";
-      ctx.shadowBlur = 20;
+      // Text with word-sync fade animation (only if showNarrationText)
+      if (showNarrationText) {
+        const fadeIn = Math.min(slideProgress * 4, 1);
+        const fontSize = viralMode ? dims.w * 0.045 : dims.w * 0.032;
+        ctx.globalAlpha = fadeIn;
+        ctx.fillStyle = "#ffffff";
+        ctx.font = `bold ${fontSize}px 'Georgia', serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.shadowColor = "rgba(0,0,0,0.8)";
+        ctx.shadowBlur = 20;
 
-      // Word wrap
-      const maxWidth = dims.w * 0.75;
-      const words = slide.text.split(" ");
-      const lines: string[] = [];
-      let currentLine = "";
-      for (const word of words) {
-        const testLine = currentLine ? `${currentLine} ${word}` : word;
-        if (ctx.measureText(testLine).width > maxWidth && currentLine) {
-          lines.push(currentLine);
-          currentLine = word;
-        } else {
-          currentLine = testLine;
-        }
-      }
-      if (currentLine) lines.push(currentLine);
-
-      const lineHeight = fontSize * 1.4;
-      const startY = dims.h / 2 - ((lines.length - 1) * lineHeight) / 2;
-
-      // Word-by-word reveal for sync with narration
-      const totalWords = words.length;
-      const wordsRevealed = Math.ceil(slideProgress * totalWords);
-
-      let wordCount = 0;
-      lines.forEach((line, lineIdx) => {
-        const lineWords = line.split(" ");
-        let displayLine = "";
-        for (const w of lineWords) {
-          wordCount++;
-          if (wordCount <= wordsRevealed) {
-            displayLine += (displayLine ? " " : "") + w;
+        // Word wrap
+        const maxWidth = dims.w * 0.75;
+        const words = slide.text.split(" ");
+        const lines: string[] = [];
+        let currentLine = "";
+        for (const word of words) {
+          const testLine = currentLine ? `${currentLine} ${word}` : word;
+          if (ctx.measureText(testLine).width > maxWidth && currentLine) {
+            lines.push(currentLine);
+            currentLine = word;
+          } else {
+            currentLine = testLine;
           }
         }
-        if (displayLine) {
-          ctx.fillText(displayLine, dims.w / 2, startY + lineIdx * lineHeight);
-        }
-      });
+        if (currentLine) lines.push(currentLine);
 
-      ctx.globalAlpha = 1;
-      ctx.shadowBlur = 0;
+        const lineHeight = fontSize * 1.4;
+        const startY = dims.h / 2 - ((lines.length - 1) * lineHeight) / 2;
+
+        // Word-by-word reveal for sync with narration
+        const totalWords = words.length;
+        const wordsRevealed = Math.ceil(slideProgress * totalWords);
+
+        let wordCount = 0;
+        lines.forEach((line, lineIdx) => {
+          const lineWords = line.split(" ");
+          let displayLine = "";
+          for (const w of lineWords) {
+            wordCount++;
+            if (wordCount <= wordsRevealed) {
+              displayLine += (displayLine ? " " : "") + w;
+            }
+          }
+          if (displayLine) {
+            ctx.fillText(displayLine, dims.w / 2, startY + lineIdx * lineHeight);
+          }
+        });
+
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 0;
+      }
+
       ctx.restore();
 
       frame++;
@@ -382,7 +390,7 @@ export default function VideoRenderer({
     }
 
     setRendering(false);
-  }, [slides, audioUrl, musicUrl, musicVolume, musicFadeIn, musicFadeOut, outputFormat, viralMode, effects, transition, title, onComplete, toast]);
+  }, [slides, audioUrl, musicUrl, musicVolume, musicFadeIn, musicFadeOut, musicLoop, outputFormat, viralMode, effects, transition, title, showNarrationText, onComplete, toast]);
 
   return (
     <div className="space-y-3">
