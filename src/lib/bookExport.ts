@@ -420,6 +420,153 @@ export function crc32(data: Uint8Array): number {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
+/** Generate a sample EPUB containing only the Preface (first chapter) */
+export async function exportSampleEpub(book: Book) {
+  if (!book.cover_image) {
+    throw new Error("Add a cover image before exporting.");
+  }
+
+  if (!book.chapters || book.chapters.length === 0) {
+    throw new Error("No chapters found. Add at least one chapter.");
+  }
+
+  // Use the first chapter (Preface) as the sample
+  const prefaceChapter = book.chapters[0];
+  const prefaceContent = normalizeParagraphs(prefaceChapter.content);
+
+  // Take a compelling excerpt — up to ~3000 characters for a hook
+  const maxSampleLength = 3000;
+  let sampleText = prefaceContent;
+  if (sampleText.length > maxSampleLength) {
+    // Find the last paragraph break before the limit
+    const truncated = sampleText.substring(0, maxSampleLength);
+    const lastParaBreak = truncated.lastIndexOf("\n\n");
+    sampleText = lastParaBreak > 500 ? truncated.substring(0, lastParaBreak) : truncated;
+  }
+
+  // Build a sample book object with modified title and single chapter
+  const sampleBook: Book = {
+    ...book,
+    title: `${book.title} (Sample)`,
+    chapters: [{
+      ...prefaceChapter,
+      content: sampleText,
+    }],
+  };
+
+  // Resize cover
+  let coverJpegBytes: Uint8Array;
+  try {
+    const { blob } = await resizeCoverForEpub(book.cover_image, 1600, 2560);
+    coverJpegBytes = new Uint8Array(await blob.arrayBuffer());
+  } catch {
+    throw new Error("Failed to process cover image.");
+  }
+
+  const sanitize = (text: string) =>
+    text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+  const bookId = crypto.randomUUID();
+
+  const container = `<?xml version="1.0" encoding="UTF-8"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>`;
+
+  const contentOpf = `<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="bookid" version="3.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="bookid">${bookId}</dc:identifier>
+    <dc:title>${sanitize(sampleBook.title)}</dc:title>
+    <dc:creator>${sanitize(book.author)}</dc:creator>
+    <dc:language>en</dc:language>
+    <meta property="dcterms:modified">${new Date().toISOString().split(".")[0]}Z</meta>
+    <meta name="cover" content="cover-image"/>
+  </metadata>
+  <manifest>
+    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+    <item id="cover-xhtml" href="cover.xhtml" media-type="application/xhtml+xml"/>
+    <item id="cover-image" href="images/cover.jpg" media-type="image/jpeg" properties="cover-image"/>
+    <item id="ch0" href="ch0.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine>
+    <itemref idref="cover-xhtml"/>
+    <itemref idref="ch0"/>
+  </spine>
+</package>`;
+
+  const nav = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<head><title>${sanitize(sampleBook.title)}</title></head>
+<body>
+  <nav epub:type="toc">
+    <h1>Table of Contents</h1>
+    <ol>
+        <li><a href="ch0.xhtml">${sanitize(prefaceChapter.title)}</a></li>
+    </ol>
+  </nav>
+</body>
+</html>`;
+
+  const coverXhtml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><title>Cover</title>
+<style>
+  body { margin: 0; padding: 0; text-align: center; }
+  img { max-width: 100%; max-height: 100%; }
+</style>
+</head>
+<body>
+  <div style="text-align:center;">
+    <img src="images/cover.jpg" alt="${sanitize(sampleBook.title)}" />
+  </div>
+</body>
+</html>`;
+
+  const epubCss = `body { font-family: Georgia, "Times New Roman", serif; line-height: 1.8; margin: 1.5em; color: #222; }
+h1 { text-align: center; font-size: 1.6em; margin-top: 2em; margin-bottom: 0.3em; }
+.chapter-num { text-align: center; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.15em; color: #888; margin-bottom: 0.5em; }
+p { text-indent: 1.5em; margin: 0.6em 0; text-align: justify; }
+p.first { text-indent: 0; }
+p.first::first-letter { float: left; font-size: 3.8em; line-height: 0.8; padding-right: 0.08em; padding-top: 0.05em; color: #6b2c2c; font-weight: bold; font-family: Georgia, "Times New Roman", serif; }
+.sample-notice { font-size: 0.85em; font-style: italic; color: #888; text-align: center; margin-top: 3em; border-top: 1px solid #ddd; padding-top: 1em; }`;
+
+  const paras = sampleText.split("\n\n").filter((p) => p.trim());
+  const bodyHtml = paras
+    .map((p, pIdx) => `  <p${pIdx === 0 ? ' class="first"' : ''}>${sanitize(p)}</p>`)
+    .join("\n");
+
+  const chapterXhtml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><title>${sanitize(prefaceChapter.title)}</title><style>${epubCss}</style></head>
+<body>
+  <div class="chapter-num">Preface</div>
+  <h1>${sanitize(prefaceChapter.title)}</h1>
+${bodyHtml}
+  <p class="sample-notice">This is a sample. Get the full book at The Island of One.</p>
+</body>
+</html>`;
+
+  const encoder = new TextEncoder();
+  const files: { name: string; data: Uint8Array; noCompression?: boolean }[] = [
+    { name: "mimetype", data: encoder.encode("application/epub+zip"), noCompression: true },
+    { name: "META-INF/container.xml", data: encoder.encode(container) },
+    { name: "OEBPS/content.opf", data: encoder.encode(contentOpf) },
+    { name: "OEBPS/nav.xhtml", data: encoder.encode(nav) },
+    { name: "OEBPS/cover.xhtml", data: encoder.encode(coverXhtml) },
+    { name: "OEBPS/images/cover.jpg", data: coverJpegBytes },
+    { name: "OEBPS/ch0.xhtml", data: encoder.encode(chapterXhtml) },
+  ];
+
+  const blob = buildEpubZipBinary(files);
+  triggerDownload(blob, `${book.title.replace(/[^a-zA-Z0-9]/g, "_")}_sample.epub`);
+}
+
 export function exportBookToWord(book: Book) {
   const chapters = book.chapters
     .map((ch, i) => {

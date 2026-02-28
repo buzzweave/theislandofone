@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { api } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 export const VOICE_OPTIONS = [
@@ -35,7 +35,29 @@ export function useAudioGeneration(): UseAudioGenerationReturn {
     setProgress("Sending to ElevenLabs...");
 
     try {
-      const data = await api.post<{ audioUrl: string }>("/api/text-to-speech", { text, voice, title });
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error("Not authenticated. Please sign in first.");
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/text-to-speech`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ text, voice, title }),
+        }
+      );
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: `Server error (${response.status})` }));
+        throw new Error(err.error || `Generation failed (${response.status})`);
+      }
+
+      const data = await response.json();
 
       setProgress("Audio generated!");
       toast({ title: "Audio generated!", description: "Your audiobook is ready to play and download." });

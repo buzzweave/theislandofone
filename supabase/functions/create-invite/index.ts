@@ -54,8 +54,8 @@ Deno.serve(async (req) => {
       const origin = req.headers.get("origin") || "https://theislandofone.lovable.app";
       return new Response(JSON.stringify({
         invite_code: existing.invite_code,
-        invite_url: `${origin}/auth?invite=${existing.invite_code}`,
-        share_url: `${Deno.env.get("SUPABASE_URL")}/functions/v1/share-invite?code=${existing.invite_code}`,
+        invite_url: `${origin}/i/${existing.invite_code}`,
+        share_url: `${origin}/i/${existing.invite_code}`,
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -74,8 +74,8 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       invite_code: invite.invite_code,
-      invite_url: `${origin}/auth?invite=${invite.invite_code}`,
-      share_url: `${Deno.env.get("SUPABASE_URL")}/functions/v1/share-invite?code=${invite.invite_code}`,
+      invite_url: `${origin}/i/${invite.invite_code}`,
+      share_url: `${origin}/i/${invite.invite_code}`,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
