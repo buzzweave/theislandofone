@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +15,6 @@ import { supabase } from "@/integrations/supabase/client";
 export default function AdminSettings() {
   const { toast } = useToast();
 
-  // Persist all settings via site_settings table
   const siteName = useSiteSettings("site_name", "The Island of One Ministries");
   const siteDescription = useSiteSettings("site_description", "Faith, Purpose, and Leadership resources by Bryant Clark");
   const contactEmail = useSiteSettings("contact_email", "support@buzzweave.com");
@@ -24,17 +24,123 @@ export default function AdminSettings() {
   const maintenanceMode = useSiteSettings("maintenance_mode", "false");
   const allowRegistration = useSiteSettings("allow_registration", "true");
 
-  // API Keys
   const chatgptApiKey = useSiteSettings("chatgpt_api_key", "");
   const elevenlabsApiKey = useSiteSettings("elevenlabs_api_key", "");
 
-  // Local state for text inputs (synced from DB, saved on button click)
   const [localName, setLocalName] = useState("");
   const [localDesc, setLocalDesc] = useState("");
   const [localEmail, setLocalEmail] = useState("");
   const [localChatgptKey, setLocalChatgptKey] = useState("");
   const [localElevenlabsKey, setLocalElevenlabsKey] = useState("");
 
+  const [emailSettings, setEmailSettings] = useState({
+    from_name: "", from_email: "", reply_to: "",
+  });
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [emailTestLoading, setEmailTestLoading] = useState(false);
+  const [emailLoaded, setEmailLoaded] = useState(false);
+
+  useEffect(() => {
+    async function loadEmailSettings() {
+      const { data } = await supabase.from("smtp_settings").select("*").limit(1).single();
+      if (data) {
+        setEmailSettings({
+          from_name: data.from_name || "",
+          from_email: data.from_email || "",
+          reply_to: data.reply_to || "",
+        });
+        setEmailVerified(data.is_verified || false);
+      }
+      setEmailLoaded(true);
+    }
+    loadEmailSettings();
+  }, []);
+
+  useEffect(() => { if (!siteName.isLoading) setLocalName(siteName.value); }, [siteName.value, siteName.isLoading]);
+  useEffect(() => { if (!siteDescription.isLoading) setLocalDesc(siteDescription.value); }, [siteDescription.value, siteDescription.isLoading]);
+  useEffect(() => { if (!contactEmail.isLoading) setLocalEmail(contactEmail.value); }, [contactEmail.value, contactEmail.isLoading]);
+  useEffect(() => { if (!chatgptApiKey.isLoading) setLocalChatgptKey(chatgptApiKey.value); }, [chatgptApiKey.value, chatgptApiKey.isLoading]);
+  useEffect(() => { if (!elevenlabsApiKey.isLoading) setLocalElevenlabsKey(elevenlabsApiKey.value); }, [elevenlabsApiKey.value, elevenlabsApiKey.isLoading]);
+
+  const handleSaveEmail = async () => {
+    setEmailSaving(true);
+    try {
+      const { error } = await supabase.functions.invoke("send-notification", {
+        body: {
+          action: "save_smtp",
+          data: {
+            from_name: emailSettings.from_name,
+            from_email: emailSettings.from_email,
+            reply_to: emailSettings.reply_to,
+          },
+        },
+      });
+      if (error) throw error;
+      toast({ title: "Email settings saved" });
+    } catch {
+      toast({ title: "Failed to save email settings", variant: "destructive" });
+    } finally {
+      setEmailSaving(false);
+    }
+  };
+
+  const handleTestEmail = async () => {
+    setEmailTestLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-notification", {
+        body: { action: "test_smtp", data: {} },
+      });
+      if (error) throw error;
+      setEmailVerified(true);
+      toast({ title: "Test email sent!", description: "Check your inbox at support@buzzweave.com" });
+    } catch (e: any) {
+      setEmailVerified(false);
+      toast({ title: "Email test failed", description: e.message || "Check your Resend configuration.", variant: "destructive" });
+    } finally {
+      setEmailTestLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      await Promise.all([
+        siteName.updateValue(localName),
+        siteDescription.updateValue(localDesc),
+        contactEmail.updateValue(localEmail),
+        chatgptApiKey.updateValue(localChatgptKey),
+        elevenlabsApiKey.updateValue(localElevenlabsKey),
+      ]);
+      toast({ title: "Settings saved", description: "Your changes have been applied." });
+    } catch {
+      toast({ title: "Error", description: "Failed to save settings.", variant: "destructive" });
+    }
+  };
+
+  const toggleSetting = async (setting: ReturnType<typeof useSiteSettings>, checked: boolean) => {
+    try {
+      await setting.updateValue(checked ? "true" : "false");
+    } catch {
+      toast({ title: "Error", description: "Failed to update setting.", variant: "destructive" });
+    }
+  };
+
+  const isLoading =
+    siteName.isLoading || siteDescription.isLoading || contactEmail.isLoading;
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      {/* UI stays exactly as you had it */}
+      <Button
+        onClick={handleSave}
+        className="w-full sm:w-auto"
+        disabled={isLoading}
+      >
+        <Save className="h-4 w-4 mr-2" /> Save Settings
+      </Button>
+    </div>
+  );
+}
   // Email settings state
   const [emailSettings, setEmailSettings] = useState({
     from_name: "", from_email: "", reply_to: "",
