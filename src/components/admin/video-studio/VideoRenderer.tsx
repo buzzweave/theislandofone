@@ -8,15 +8,20 @@ import { useToast } from "@/hooks/use-toast";
 interface Slide {
   text: string;
   bg: string;
+  image?: string;
 }
 
 interface VideoRendererProps {
   slides: Slide[];
   audioUrl: string;
   musicUrl?: string;
+  musicVolume?: number;
+  musicFadeIn?: number;
+  musicFadeOut?: number;
   outputFormat: string;
   viralMode: boolean;
   effects: string[];
+  transition?: string;
   title: string;
   onComplete?: (videoUrl: string) => void;
 }
@@ -31,9 +36,13 @@ export default function VideoRenderer({
   slides,
   audioUrl,
   musicUrl,
+  musicVolume = 0.15,
+  musicFadeIn = 3,
+  musicFadeOut = 3,
   outputFormat,
   viralMode,
   effects,
+  transition = "fade",
   title,
   onComplete,
 }: VideoRendererProps) {
@@ -42,6 +51,22 @@ export default function VideoRenderer({
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
+
+  // Preload images for slides
+  const loadSlideImages = async (slides: Slide[]): Promise<(HTMLImageElement | null)[]> => {
+    return Promise.all(
+      slides.map((slide) => {
+        if (!slide.image) return Promise.resolve(null);
+        return new Promise<HTMLImageElement | null>((resolve) => {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.onload = () => resolve(img);
+          img.onerror = () => resolve(null);
+          img.src = slide.image!;
+        });
+      })
+    );
+  };
 
   const renderVideo = useCallback(async () => {
     if (!canvasRef.current || slides.length === 0) return;
@@ -55,14 +80,16 @@ export default function VideoRenderer({
     canvas.height = dims.h;
     const ctx = canvas.getContext("2d")!;
 
-    const slideDuration = viralMode ? 3000 : 5000; // ms per slide
+    const slideImages = await loadSlideImages(slides);
+
+    const slideDuration = viralMode ? 3000 : 5000;
     const fps = 30;
     const totalFrames = Math.ceil((slides.length * slideDuration) / (1000 / fps));
+    const totalDurationSec = (slides.length * slideDuration) / 1000;
 
-    // Set up MediaRecorder
     const stream = canvas.captureStream(fps);
 
-    // Load audio elements
+    // Load narration
     const narrationAudio = new Audio(audioUrl);
     narrationAudio.crossOrigin = "anonymous";
     await new Promise<void>((resolve, reject) => {
@@ -71,7 +98,6 @@ export default function VideoRenderer({
       narrationAudio.load();
     });
 
-    // Create audio context to mix narration + music
     const audioCtx = new AudioContext();
     const dest = audioCtx.createMediaStreamDestination();
 
@@ -80,22 +106,30 @@ export default function VideoRenderer({
     narrationSource.connect(audioCtx.destination);
 
     let musicAudio: HTMLAudioElement | null = null;
+    let musicGainNode: GainNode | null = null;
     if (musicUrl) {
       musicAudio = new Audio(musicUrl);
       musicAudio.crossOrigin = "anonymous";
       await new Promise<void>((resolve) => {
         musicAudio!.oncanplaythrough = () => resolve();
-        musicAudio!.onerror = () => resolve(); // non-blocking
+        musicAudio!.onerror = () => resolve();
         musicAudio!.load();
       });
       const musicSource = audioCtx.createMediaElementSource(musicAudio);
-      const gainNode = audioCtx.createGain();
-      gainNode.gain.value = 0.15; // duck under narration
-      musicSource.connect(gainNode);
-      gainNode.connect(dest);
+      musicGainNode = audioCtx.createGain();
+      musicGainNode.gain.value = 0; // start at 0 for fade-in
+      musicSource.connect(musicGainNode);
+      musicGainNode.connect(dest);
+
+      // Schedule fade-in
+      musicGainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+      musicGainNode.gain.linearRampToValueAtTime(musicVolume, audioCtx.currentTime + musicFadeIn);
+      // Schedule fade-out
+      const fadeOutStart = Math.max(0, totalDurationSec - musicFadeOut);
+      musicGainNode.gain.setValueAtTime(musicVolume, audioCtx.currentTime + fadeOutStart);
+      musicGainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + totalDurationSec);
     }
 
-    // Add audio tracks to stream
     dest.stream.getAudioTracks().forEach((t) => stream.addTrack(t));
 
     const mediaRecorder = new MediaRecorder(stream, {
@@ -118,7 +152,6 @@ export default function VideoRenderer({
     narrationAudio.play();
     if (musicAudio) musicAudio.play();
 
-    // Render frames
     let frame = 0;
     const drawFrame = () => {
       if (frame >= totalFrames) {
@@ -133,16 +166,49 @@ export default function VideoRenderer({
       const slideIdx = Math.min(Math.floor(timeMs / slideDuration), slides.length - 1);
       const slide = slides[slideIdx];
       const slideProgress = (timeMs % slideDuration) / slideDuration;
+      const slideImage = slideImages[slideIdx];
+
+      // Transition calculations
+      const transitionDuration = 0.15; // 15% of slide duration
+      let transitionAlpha = 1;
+      let transitionScale = 1;
+      let transitionOffsetX = 0;
+      let transitionBlur = 0;
+
+      if (slideProgress < transitionDuration) {
+        const tp = slideProgress / transitionDuration;
+        if (transition === "fade") transitionAlpha = tp;
+        else if (transition === "slide") transitionOffsetX = (1 - tp) * dims.w;
+        else if (transition === "zoom") transitionScale = 0.8 + tp * 0.2;
+        else if (transition === "blur") transitionBlur = (1 - tp) * 10;
+      }
 
       // Draw background
-      const gradient = ctx.createLinearGradient(0, 0, dims.w, dims.h);
-      // Parse bg string for colors - fallback to dark
-      gradient.addColorStop(0, "#1a1a2e");
-      gradient.addColorStop(1, "#16213e");
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, dims.w, dims.h);
+      ctx.save();
+      ctx.globalAlpha = transitionAlpha;
+      ctx.translate(transitionOffsetX, 0);
+      ctx.translate(dims.w / 2, dims.h / 2);
+      ctx.scale(transitionScale, transitionScale);
+      ctx.translate(-dims.w / 2, -dims.h / 2);
 
-      // Ken Burns zoom effect
+      if (slideImage) {
+        // Ken Burns with image
+        const scale = 1 + slideProgress * 0.05;
+        ctx.save();
+        ctx.translate(dims.w / 2, dims.h / 2);
+        ctx.scale(scale, scale);
+        ctx.translate(-dims.w / 2, -dims.h / 2);
+        ctx.drawImage(slideImage, 0, 0, dims.w, dims.h);
+        ctx.restore();
+      } else {
+        const gradient = ctx.createLinearGradient(0, 0, dims.w, dims.h);
+        gradient.addColorStop(0, "#1a1a2e");
+        gradient.addColorStop(1, "#16213e");
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, dims.w, dims.h);
+      }
+
+      // Ken Burns zoom
       const scale = 1 + slideProgress * 0.05;
       ctx.save();
       ctx.translate(dims.w / 2, dims.h / 2);
@@ -168,12 +234,7 @@ export default function VideoRenderer({
       if (effects.includes("grain")) {
         ctx.fillStyle = `rgba(255,255,255,${0.02 + Math.random() * 0.02})`;
         for (let i = 0; i < 200; i++) {
-          ctx.fillRect(
-            Math.random() * dims.w,
-            Math.random() * dims.h,
-            Math.random() * 3,
-            Math.random() * 3
-          );
+          ctx.fillRect(Math.random() * dims.w, Math.random() * dims.h, Math.random() * 3, Math.random() * 3);
         }
       }
 
@@ -193,9 +254,43 @@ export default function VideoRenderer({
         ctx.fillRect(0, 0, dims.w, dims.h);
       }
 
+      if (effects.includes("bokeh")) {
+        for (let i = 0; i < 8; i++) {
+          const bx = (Math.sin(frame * 0.005 + i * 1.3) * 0.5 + 0.5) * dims.w;
+          const by = (Math.cos(frame * 0.007 + i * 0.9) * 0.5 + 0.5) * dims.h;
+          const br = 20 + Math.sin(frame * 0.02 + i) * 15;
+          const bGrad = ctx.createRadialGradient(bx, by, 0, bx, by, br);
+          bGrad.addColorStop(0, "rgba(255,255,255,0.15)");
+          bGrad.addColorStop(1, "rgba(255,255,255,0)");
+          ctx.fillStyle = bGrad;
+          ctx.beginPath();
+          ctx.arc(bx, by, br, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      if (effects.includes("smoke")) {
+        ctx.fillStyle = `rgba(100,100,120,${0.05 + Math.sin(frame * 0.01) * 0.03})`;
+        ctx.fillRect(0, dims.h * 0.6, dims.w, dims.h * 0.4);
+      }
+
+      if (effects.includes("letterbox")) {
+        ctx.fillStyle = "rgba(0,0,0,0.95)";
+        const barH = dims.h * 0.08;
+        ctx.fillRect(0, 0, dims.w, barH);
+        ctx.fillRect(0, dims.h - barH, dims.w, barH);
+      }
+
+      if (effects.includes("chromatic")) {
+        ctx.fillStyle = `rgba(255,0,0,${0.015 + Math.sin(frame * 0.04) * 0.01})`;
+        ctx.fillRect(3, 0, dims.w, dims.h);
+        ctx.fillStyle = `rgba(0,0,255,${0.015 + Math.cos(frame * 0.04) * 0.01})`;
+        ctx.fillRect(-3, 0, dims.w, dims.h);
+      }
+
       ctx.restore();
 
-      // Text with fade-in
+      // Text with word-sync fade animation
       const fadeIn = Math.min(slideProgress * 4, 1);
       const fontSize = viralMode ? dims.w * 0.045 : dims.w * 0.032;
       ctx.globalAlpha = fadeIn;
@@ -224,12 +319,29 @@ export default function VideoRenderer({
 
       const lineHeight = fontSize * 1.4;
       const startY = dims.h / 2 - ((lines.length - 1) * lineHeight) / 2;
-      lines.forEach((line, i) => {
-        ctx.fillText(line, dims.w / 2, startY + i * lineHeight);
+
+      // Word-by-word reveal for sync with narration
+      const totalWords = words.length;
+      const wordsRevealed = Math.ceil(slideProgress * totalWords);
+
+      let wordCount = 0;
+      lines.forEach((line, lineIdx) => {
+        const lineWords = line.split(" ");
+        let displayLine = "";
+        for (const w of lineWords) {
+          wordCount++;
+          if (wordCount <= wordsRevealed) {
+            displayLine += (displayLine ? " " : "") + w;
+          }
+        }
+        if (displayLine) {
+          ctx.fillText(displayLine, dims.w / 2, startY + lineIdx * lineHeight);
+        }
       });
 
       ctx.globalAlpha = 1;
       ctx.shadowBlur = 0;
+      ctx.restore();
 
       frame++;
       setProgress(Math.round((frame / totalFrames) * 100));
@@ -238,20 +350,12 @@ export default function VideoRenderer({
 
     drawFrame();
 
-    // Wait for recording to finish
     const blob = await recordingDone;
 
-    // Upload to storage
+    // Upload
     try {
-      const { data: { session } } = await supabase.auth.getSession();
       const fileName = `video-${Date.now()}.webm`;
-
-      const serviceUrl = import.meta.env.VITE_SUPABASE_URL;
-      const formData = new FormData();
-      formData.append("", blob, fileName);
-
-      // Upload via supabase storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from("audio-files")
         .upload(`videos/${fileName}`, blob, {
           contentType: "video/webm",
@@ -260,7 +364,6 @@ export default function VideoRenderer({
 
       if (uploadError) {
         console.error("Video upload error:", uploadError);
-        // Still allow download locally
       }
 
       const { data: publicUrl } = supabase.storage
@@ -279,7 +382,7 @@ export default function VideoRenderer({
     }
 
     setRendering(false);
-  }, [slides, audioUrl, musicUrl, outputFormat, viralMode, effects, title, onComplete, toast]);
+  }, [slides, audioUrl, musicUrl, musicVolume, musicFadeIn, musicFadeOut, outputFormat, viralMode, effects, transition, title, onComplete, toast]);
 
   return (
     <div className="space-y-3">

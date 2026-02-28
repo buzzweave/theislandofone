@@ -40,7 +40,8 @@ async function generateWithElevenLabs(text: string, voiceKey: string): Promise<U
   const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
   if (!ELEVENLABS_API_KEY) throw new Error("ElevenLabs API key not configured");
 
-  const voiceId = ELEVENLABS_VOICE_MAP[voiceKey] || ELEVENLABS_VOICE_MAP["deep-smooth"];
+  // Support both mapped keys and direct voice IDs
+  const voiceId = ELEVENLABS_VOICE_MAP[voiceKey] || voiceKey || ELEVENLABS_VOICE_MAP["deep-smooth"];
   const chunks: string[] = [];
   const maxChunkSize = 4500;
   const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
