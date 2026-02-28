@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface PublishRecord {
   id: string;
@@ -17,7 +17,14 @@ export interface PublishRecord {
 export function usePublishRecords(bookId?: string) {
   return useQuery({
     queryKey: ["publish_records", bookId],
-    queryFn: () => api.get<PublishRecord[]>(`/api/books/${bookId}/publish-records`),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("book_publish_records")
+        .select("*")
+        .eq("book_id", bookId!);
+      if (error) throw new Error(error.message);
+      return (data || []) as unknown as PublishRecord[];
+    },
     enabled: !!bookId,
   });
 }
@@ -25,8 +32,50 @@ export function usePublishRecords(bookId?: string) {
 export function useUpsertPublishRecord() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { book_id: string; platform: string; status: string; store_url?: string; notes?: string }) =>
-      api.post<PublishRecord>("/api/publish-records", data),
+    mutationFn: async (data: { book_id: string; platform: string; status: string; store_url?: string; notes?: string }) => {
+      // Check if record exists
+      const { data: existing } = await supabase
+        .from("book_publish_records")
+        .select("id")
+        .eq("book_id", data.book_id)
+        .eq("platform", data.platform)
+        .maybeSingle();
+
+      const payload: any = {
+        book_id: data.book_id,
+        platform: data.platform,
+        status: data.status,
+        store_url: data.store_url || null,
+        notes: data.notes || null,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (data.status === "submitted") {
+        payload.submitted_at = new Date().toISOString();
+      }
+      if (data.status === "live") {
+        payload.published_at = new Date().toISOString();
+      }
+
+      if (existing?.id) {
+        const { data: result, error } = await supabase
+          .from("book_publish_records")
+          .update(payload)
+          .eq("id", existing.id)
+          .select()
+          .single();
+        if (error) throw new Error(error.message);
+        return result as unknown as PublishRecord;
+      } else {
+        const { data: result, error } = await supabase
+          .from("book_publish_records")
+          .insert(payload)
+          .select()
+          .single();
+        if (error) throw new Error(error.message);
+        return result as unknown as PublishRecord;
+      }
+    },
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ["publish_records", vars.book_id] });
     },
