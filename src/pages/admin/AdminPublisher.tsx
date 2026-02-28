@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useBooks, Book } from "@/hooks/useBooks";
 import { usePublishRecords, PublishRecord, useUpsertPublishRecord } from "@/hooks/usePublishRecords";
-import { exportBookToEpub, generateMarketingCover, checkCoverDimensions } from "@/lib/bookExport";
+import { exportBookToEpub, exportSampleEpub, generateMarketingCover, checkCoverDimensions } from "@/lib/bookExport";
 import { toast } from "@/hooks/use-toast";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -137,6 +137,15 @@ function PlatformCard({
     }
   };
 
+  const handleDownloadSample = async () => {
+    try {
+      await exportSampleEpub(book);
+      toast({ title: "Sample EPUB Downloaded", description: "Your sample EPUB containing the Preface has been downloaded." });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
   return (
     <div className="rounded-xl border border-border bg-card p-6">
       <div className="flex items-center justify-between mb-5">
@@ -170,6 +179,9 @@ function PlatformCard({
               <Button size="sm" variant="outline" onClick={handleGenerateEpub}>
                 <Download className="h-3.5 w-3.5 mr-1.5" /> Download EPUB
               </Button>
+              <Button size="sm" variant="outline" onClick={handleDownloadSample}>
+                <Download className="h-3.5 w-3.5 mr-1.5" /> Download Sample
+              </Button>
               <Button size="sm" variant="outline" onClick={async () => {
                 if (!book.cover_image) { toast({ title: "No cover image", variant: "destructive" }); return; }
                 try { await generateMarketingCover(book.cover_image, book.title); toast({ title: "Cover downloaded" }); } catch {}
@@ -189,7 +201,7 @@ function PlatformCard({
             </p>
             <div className="flex flex-wrap gap-2">
               <Button size="sm" asChild>
-                <a href={isApple ? "https://authors.apple.com" : "https://kdp.amazon.com"} target="_blank" rel="noopener noreferrer">
+                <a href={isApple ? "https://authors.apple.com/epub-upload" : "https://kdp.amazon.com"} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> {isApple ? "Open Apple Books for Authors" : "Open Amazon KDP"}
                 </a>
               </Button>

@@ -63,6 +63,7 @@ import AIDevPlanDetail from "./pages/admin/ai-developer/AIDevPlanDetail";
 import AIDevDeployStaging from "./pages/admin/ai-developer/AIDevDeployStaging";
 import AIDevDeployLive from "./pages/admin/ai-developer/AIDevDeployLive";
 import AIDevDeployHistory from "./pages/admin/ai-developer/AIDevDeployHistory";
+import InviteRedirect from "./pages/InviteRedirect";
 
 function GlobalCopyProtection({ children }: { children: any }) {
   useEffect(() => {
@@ -357,6 +358,16 @@ const App = () => (
                   <Route path="ai-developer/settings" element={<AIDevSettings />} />
                   <Route path="ai-developer/audit" element={<AIDevAuditLog />} />
                 </Route>
+
+                {/* Invite redirect route */}
+                <Route
+                  path="/i/:code"
+                  element={
+                    <Layout>
+                      <InviteRedirect />
+                    </Layout>
+                  }
+                />
 
                 <Route path="*" element={<NotFound />} />
               </Routes>
