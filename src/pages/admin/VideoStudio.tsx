@@ -18,6 +18,8 @@ import {
   Zap, MonitorPlay, Smartphone, Square, Loader2, AlertCircle,
   RotateCcw, Volume2, BookOpen, FileText, PenLine, Youtube
 } from "lucide-react";
+import VideoRenderer from "@/components/admin/video-studio/VideoRenderer";
+import NanoStudio from "@/components/admin/video-studio/NanoStudio";
 
 /* ─── Voice configs ─── */
 const OPENAI_VOICES = [
@@ -94,6 +96,9 @@ export default function VideoStudio() {
 
   // Prompt-to-video
   const [promptText, setPromptText] = useState("");
+  const [studioMode, setStudioMode] = useState<"full" | "nano">("full");
+  const [musicUrl, setMusicUrl] = useState("");
+  const [videoOutputUrl, setVideoOutputUrl] = useState("");
 
   // Pipeline
   const [step, setStep] = useState<StudioStep>("select");
@@ -191,15 +196,42 @@ export default function VideoStudio() {
       if (!url) throw new Error("No audio URL returned");
       setAudioUrl(url);
 
-      // Step 2: Build slides
+      // Step 2: Generate background music if selected
+      if (musicStyle && musicStyle !== "none") {
+        try {
+          const musicPromptMap: Record<string, string> = {
+            "cinematic-emotional": "Cinematic emotional orchestral background, sweeping strings, hopeful",
+            "worship-instrumental": "Gentle worship instrumental, piano and pads, peaceful",
+            "documentary-piano": "Documentary piano score, thoughtful, measured pace",
+            "ambient-storytelling": "Ambient storytelling music, soft synths, atmospheric",
+          };
+          const { data: { session: mSess } } = await supabase.auth.getSession();
+          const musicRes = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-music`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${mSess?.access_token}` },
+              body: JSON.stringify({ prompt: musicPromptMap[musicStyle] || "Cinematic background music", duration: 30 }),
+            }
+          );
+          if (musicRes.ok) {
+            const musicData = await musicRes.json();
+            setMusicUrl(musicData.musicUrl || "");
+          }
+        } catch (e) {
+          console.warn("Music generation skipped:", e);
+        }
+      }
+
+      // Step 3: Build slides
       setStep("building_slides");
       await new Promise((r) => setTimeout(r, 800));
       const sl = buildSlides(text);
       setSlides(sl);
 
-      // Step 3: Render (placeholder – real FFmpeg rendering TBD)
+      // Step 4: Ready for rendering via VideoRenderer component
       setStep("rendering");
-      await new Promise((r) => setTimeout(r, 1500));
+      await new Promise((r) => setTimeout(r, 500));
 
       // Save project to DB
       await supabase.from("video_projects").insert({
@@ -235,6 +267,8 @@ export default function VideoStudio() {
     setAudioUrl("");
     setSlides([]);
     setErrorMsg("");
+    setMusicUrl("");
+    setVideoOutputUrl("");
   };
 
   const toggleEffect = (id: string) => {
@@ -246,15 +280,36 @@ export default function VideoStudio() {
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-          <Film className="h-5 w-5 text-primary" />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Film className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-display font-bold">Video Studio</h1>
+            <p className="text-sm text-muted-foreground">Turn books & sermons into cinematic videos</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-display font-bold">Video Studio</h1>
-          <p className="text-sm text-muted-foreground">Turn books & sermons into cinematic videos</p>
+        <div className="flex gap-1 bg-muted rounded-lg p-1">
+          <button
+            onClick={() => setStudioMode("full")}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${studioMode === "full" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            <Film className="h-3.5 w-3.5 inline mr-1.5" />Full Studio
+          </button>
+          <button
+            onClick={() => setStudioMode("nano")}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${studioMode === "nano" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            <Zap className="h-3.5 w-3.5 inline mr-1.5" />Nano Studio
+          </button>
         </div>
       </div>
+
+      {studioMode === "nano" ? (
+        <NanoStudio />
+      ) : (
+      <>
 
       {/* ─── Prompt-to-Video ─── */}
       <Card className="border-primary/20 bg-primary/5">
@@ -590,31 +645,49 @@ export default function VideoStudio() {
 
           {/* Publish Options (after completion) */}
           {step === "completed" && (
-            <Card className="border-green-500/30">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Share2 className="h-4 w-4 text-green-500" /> Publish Options
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {audioUrl && (
-                  <Button variant="outline" size="sm" className="w-full gap-2" asChild>
-                    <a href={audioUrl} download>
-                      <Download className="h-3.5 w-3.5" /> Download Audio
-                    </a>
+            <div className="space-y-4">
+              {/* Video Renderer */}
+              {slides.length > 0 && audioUrl && (
+                <VideoRenderer
+                  slides={slides}
+                  audioUrl={audioUrl}
+                  musicUrl={musicUrl || undefined}
+                  outputFormat={outputFormat}
+                  viralMode={viralMode}
+                  effects={effects}
+                  title={contentTitle}
+                  onComplete={(url) => setVideoOutputUrl(url)}
+                />
+              )}
+
+              <Card className="border-green-500/30">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Share2 className="h-4 w-4 text-green-500" /> Publish Options
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {audioUrl && (
+                    <Button variant="outline" size="sm" className="w-full gap-2" asChild>
+                      <a href={audioUrl} download>
+                        <Download className="h-3.5 w-3.5" /> Download Audio
+                      </a>
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" className="w-full gap-2" disabled>
+                    <Youtube className="h-3.5 w-3.5" /> Publish to YouTube (coming soon)
                   </Button>
-                )}
-                <Button variant="outline" size="sm" className="w-full gap-2" disabled>
-                  <Youtube className="h-3.5 w-3.5" /> Publish to YouTube (coming soon)
-                </Button>
-                <Button variant="outline" size="sm" className="w-full gap-2" disabled>
-                  <Share2 className="h-3.5 w-3.5" /> Share Link (coming soon)
-                </Button>
-              </CardContent>
-            </Card>
+                  <Button variant="outline" size="sm" className="w-full gap-2" disabled>
+                    <Share2 className="h-3.5 w-3.5" /> Share Link (coming soon)
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
           )}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }
