@@ -1337,6 +1337,75 @@ export type Database = {
         }
         Relationships: []
       }
+      video_projects: {
+        Row: {
+          audio_url: string | null
+          content_id: string | null
+          content_type: string
+          created_at: string
+          custom_text: string | null
+          effects: Json
+          error_message: string | null
+          id: string
+          music_style: string | null
+          output_format: string
+          prompt: string | null
+          slides: Json
+          status: string
+          title: string
+          tone: string
+          updated_at: string
+          video_url: string | null
+          viral_mode: boolean
+          voice_id: string
+          voice_provider: string
+        }
+        Insert: {
+          audio_url?: string | null
+          content_id?: string | null
+          content_type?: string
+          created_at?: string
+          custom_text?: string | null
+          effects?: Json
+          error_message?: string | null
+          id?: string
+          music_style?: string | null
+          output_format?: string
+          prompt?: string | null
+          slides?: Json
+          status?: string
+          title?: string
+          tone?: string
+          updated_at?: string
+          video_url?: string | null
+          viral_mode?: boolean
+          voice_id?: string
+          voice_provider?: string
+        }
+        Update: {
+          audio_url?: string | null
+          content_id?: string | null
+          content_type?: string
+          created_at?: string
+          custom_text?: string | null
+          effects?: Json
+          error_message?: string | null
+          id?: string
+          music_style?: string | null
+          output_format?: string
+          prompt?: string | null
+          slides?: Json
+          status?: string
+          title?: string
+          tone?: string
+          updated_at?: string
+          video_url?: string | null
+          viral_mode?: boolean
+          voice_id?: string
+          voice_provider?: string
+        }
+        Relationships: []
+      }
       videos: {
         Row: {
           category: string

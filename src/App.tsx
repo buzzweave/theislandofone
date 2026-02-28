@@ -63,6 +63,7 @@ import AIDevPlanDetail from "./pages/admin/ai-developer/AIDevPlanDetail";
 import AIDevDeployStaging from "./pages/admin/ai-developer/AIDevDeployStaging";
 import AIDevDeployLive from "./pages/admin/ai-developer/AIDevDeployLive";
 import AIDevDeployHistory from "./pages/admin/ai-developer/AIDevDeployHistory";
+import VideoStudio from "./pages/admin/VideoStudio";
 import InviteRedirect from "./pages/InviteRedirect";
 
 function GlobalCopyProtection({ children }: { children: any }) {
@@ -347,6 +348,7 @@ const App = () => (
                   <Route path="notifications" element={<AdminNotifications />} />
                   <Route path="settings" element={<AdminSettings />} />
                   <Route path="crm" element={<AdminCRM />} />
+                  <Route path="video-studio" element={<VideoStudio />} />
                   <Route path="ai-developer" element={<AIDevDashboard />} />
                   <Route path="ai-developer/console" element={<AIDevConsole />} />
                   <Route path="ai-developer/scan" element={<AIDevSiteScan />} />
