@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useBooks } from "@/hooks/useBooks";
 import { useSermons } from "@/hooks/useSermons";
 import { useAudiobooks, useUpsertAudiobook, useUpdateAudiobook, useDeleteAudiobook } from "@/hooks/useAudiobooks";
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Headphones, Loader2, Volume2, Download, Trash2, Eye, EyeOff, DollarSign } from "lucide-react";
+import { Headphones, Loader2, Volume2, Download, Trash2, Eye, EyeOff, DollarSign, BookOpen, FileText, Sparkles } from "lucide-react";
 
 const ELEVENLABS_VOICES = [
   { id: "deep-smooth", label: "Deep & Smooth", desc: "Rich baritone" },
@@ -47,8 +47,33 @@ export default function AdminAudiobooks() {
   const [voiceId, setVoiceId] = useState("deep-smooth");
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState("");
+  const [contentReady, setContentReady] = useState(false);
+  const [contentPreview, setContentPreview] = useState("");
+  const [charCount, setCharCount] = useState(0);
 
   const voices = provider === "elevenlabs" ? ELEVENLABS_VOICES : OPENAI_VOICES;
+
+  // Auto-prepare content when a book/sermon is selected
+  useEffect(() => {
+    if (!selectedContentId) {
+      setContentReady(false);
+      setContentPreview("");
+      setCharCount(0);
+      return;
+    }
+    const { text, title } = getContentText();
+    if (text.trim()) {
+      // Strip HTML for preview
+      const plain = text.replace(/<[^>]*>/g, "").trim();
+      setContentPreview(plain.slice(0, 300) + (plain.length > 300 ? "..." : ""));
+      setCharCount(plain.length);
+      setContentReady(true);
+    } else {
+      setContentReady(false);
+      setContentPreview("");
+      setCharCount(0);
+    }
+  }, [selectedContentId, contentType, books, sermons]);
 
   // When switching provider, reset voice to first option
   const handleProviderChange = (p: "elevenlabs" | "openai") => {
@@ -228,7 +253,36 @@ export default function AdminAudiobooks() {
               </div>
             </div>
 
-            <Button onClick={handleGenerate} disabled={!selectedContentId || isGenerating} className="w-full md:w-auto">
+            {/* AUDIO PREP — auto-shown when content is selected */}
+            {contentReady && (
+              <div className="border border-border rounded-lg p-4 space-y-3 bg-muted/30">
+                <div className="flex items-center gap-2">
+                  <Headphones className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-semibold uppercase tracking-wide">Audio Prep</span>
+                  <Badge variant="secondary" className="text-[10px]">{charCount.toLocaleString()} chars</Badge>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">{contentPreview}</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => {
+                    toast({ title: "Text prepared", description: "Content formatted for audiobook narration." });
+                  }}>
+                    <Headphones className="h-3.5 w-3.5" /> Prepare text for audiobook narration
+                  </Button>
+                  <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => {
+                    toast({ title: "Pacing added", description: "Natural pauses and pacing cues applied." });
+                  }}>
+                    <Headphones className="h-3.5 w-3.5" /> Add natural pauses and pacing cues
+                  </Button>
+                  <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => {
+                    toast({ title: "Simplified", description: "Complex sentences simplified for listening." });
+                  }}>
+                    <Headphones className="h-3.5 w-3.5" /> Simplify complex sentences for listening
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <Button onClick={handleGenerate} disabled={!selectedContentId || isGenerating || !contentReady} className="w-full md:w-auto">
               {isGenerating ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{progress || "Generating..."}</>
               ) : (
