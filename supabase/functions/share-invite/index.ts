@@ -1,3 +1,4 @@
+// v3 – fresh deploy
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
 
 const corsHeaders = {
@@ -8,22 +9,23 @@ const corsHeaders = {
 const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const code = new URL(req.url).searchParams.get("code");
+  const url = new URL(req.url);
+  const code = url.searchParams.get("code");
   if (!code) {
     return new Response("Missing code", { status: 400, headers: corsHeaders });
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-      { auth: { persistSession: false } }
-    );
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: { persistSession: false },
+    });
 
     // Verify invite exists
     const { data: invite } = await supabase
@@ -39,13 +41,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fetch logo
-    const { data: logoSetting } = await supabase
-      .from("site_settings")
-      .select("value")
-      .eq("key", "logo_url")
-      .maybeSingle();
-
+    // Fetch settings
     const { data: fbSetting } = await supabase
       .from("site_settings")
       .select("value")
@@ -55,12 +51,14 @@ Deno.serve(async (req) => {
     const site = "https://theislandofone.lovable.app";
     const ogImage = `${site}/invite-og.jpg`;
     const fbAppId = fbSetting?.value || "1169014871775113";
-    const link = `${site}/auth?invite=${code}`;
+    const link = `${site}/auth?invite=${encodeURIComponent(code)}`;
     const title = "You're Invited to Join The Island of One!";
-    const description = "You've been personally invited to join with a FREE lifetime Inner Circle membership. Get full access to all books, sermons, videos, and exclusive content.";
+    const description =
+      "You've been personally invited to join with a FREE lifetime Inner Circle membership. Get full access to all books, sermons, videos, and exclusive content.";
 
-    // Build OG-rich HTML page
-    const page = `<!DOCTYPE html><html><head>
+    const page = `<!DOCTYPE html>
+<html>
+<head>
 <meta charset="UTF-8">
 <title>${esc(title)}</title>
 <link rel="canonical" href="${esc(link)}" />
@@ -72,17 +70,18 @@ Deno.serve(async (req) => {
 <meta property="og:url" content="${esc(link)}" />
 <meta property="og:type" content="website" />
 <meta property="fb:app_id" content="${esc(fbAppId)}" />
-<meta property="og:app_id" content="${esc(fbAppId)}" />
 <meta property="og:site_name" content="The Island of One" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="${esc(title)}" />
 <meta name="twitter:description" content="${esc(description)}" />
 <meta name="twitter:image" content="${esc(ogImage)}" />
 <style>body{font:17px/1.8 Georgia,serif;max-width:700px;margin:80px auto;padding:0 20px;text-align:center;color:#666}</style>
-</head><body>
+</head>
+<body>
 <p>Redirecting to The Island of One&hellip;</p>
 <script>window.location.replace("${link.replace(/"/g, '\\"')}");</script>
-</body></html>`;
+</body>
+</html>`;
 
     return new Response(page, {
       headers: { "Content-Type": "text/html; charset=utf-8", ...corsHeaders },
