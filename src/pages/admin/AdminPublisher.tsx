@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useBooks, Book } from "@/hooks/useBooks";
+import { useBooks, useBook, Book } from "@/hooks/useBooks";
 import { usePublishRecords, PublishRecord, useUpsertPublishRecord } from "@/hooks/usePublishRecords";
 import { exportBookToEpub, exportSampleEpub, generateMarketingCover, checkCoverDimensions } from "@/lib/bookExport";
 import { toast } from "@/hooks/use-toast";
@@ -276,7 +276,8 @@ function PlatformCard({
 export default function AdminPublisher() {
   const { data: books = [], isLoading: booksLoading } = useBooks();
   const [selectedBookId, setSelectedBookId] = useState<string>("");
-  const selectedBook = books.find((b) => b.id === selectedBookId);
+  const { data: fullBook, isLoading: bookLoading } = useBook(selectedBookId || undefined);
+  const selectedBook = fullBook || books.find((b) => b.id === selectedBookId);
   const { data: records = [], isLoading: recordsLoading } = usePublishRecords(selectedBookId || undefined);
   const upsert = useUpsertPublishRecord();
 
@@ -337,6 +338,7 @@ export default function AdminPublisher() {
                 <h3 className="font-display font-semibold text-lg truncate">{selectedBook.title}</h3>
                 {selectedBook.subtitle && <p className="text-sm text-muted-foreground truncate">{selectedBook.subtitle}</p>}
                 <p className="text-xs text-muted-foreground mt-1">{selectedBook.chapters?.length || 0} chapters · {selectedBook.author}</p>
+                {bookLoading && <p className="text-xs text-muted-foreground">Loading chapters...</p>}
               </div>
             </div>
             <CoverPreview book={selectedBook} />
