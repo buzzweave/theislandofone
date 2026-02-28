@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useBooks } from "@/hooks/useBooks";
 import { useSermons } from "@/hooks/useSermons";
 import { useBlogPosts } from "@/hooks/useBlogPosts";
@@ -14,12 +14,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Slider } from "@/components/ui/slider";
 import {
   Film, Mic, Wand2, Play, Download, Share2, Sparkles, Music,
   Zap, MonitorPlay, Smartphone, Square, Loader2, AlertCircle,
   RotateCcw, Volume2, BookOpen, FileText, PenLine, Youtube,
-  Newspaper, Library, Upload, Plus, Trash2, GripVertical
+  Newspaper, Library, Upload, Plus, Trash2, Scissors, Brain, Palette
 } from "lucide-react";
 import VideoRenderer from "@/components/admin/video-studio/VideoRenderer";
 import NanoStudio from "@/components/admin/video-studio/NanoStudio";
@@ -27,6 +26,18 @@ import BackgroundMusicPanel, { type MusicSettings } from "@/components/admin/vid
 import NarrationTextToggle from "@/components/admin/video-studio/NarrationTextToggle";
 import RenderControls from "@/components/admin/video-studio/RenderControls";
 import { Link } from "react-router-dom";
+import {
+  processCinematicScript,
+  autoMatchVoice,
+  applyViralHookBoost,
+  EXPORT_PRESETS,
+  generateYouTubeMetadata,
+  generateShortsFromSlides,
+  type SceneSlide,
+  type ExportPreset,
+  type YouTubeMetadata,
+  type ShortClip,
+} from "@/lib/cinematicEngine";
 
 /* ─── Voice configs ─── */
 const OPENAI_VOICES = [
@@ -52,6 +63,7 @@ const TONE_OPTIONS = [
   { id: "cinematic", label: "🎬 Cinematic Narration", desc: "Epic storytelling" },
   { id: "devotional", label: "🕊️ Soft Devotional", desc: "Calm, reflective" },
   { id: "documentary", label: "📽️ Documentary", desc: "Informative, measured" },
+  { id: "gentle-female", label: "🌸 Gentle Woman", desc: "Soft, devotional warmth" },
 ];
 
 const MUSIC_STYLES = [
@@ -106,16 +118,20 @@ export default function VideoStudio() {
   const [voiceProvider, setVoiceProvider] = useState<"openai" | "elevenlabs">("openai");
   const [voiceId, setVoiceId] = useState("onyx");
   const [tone, setTone] = useState("cinematic");
+  const [autoVoiceMatch, setAutoVoiceMatch] = useState(true);
 
   // Options
   const [viralMode, setViralMode] = useState(false);
+  const [cinematicStoryMode, setCinematicStoryMode] = useState(true);
   const [musicStyle, setMusicStyle] = useState("");
   const [effects, setEffects] = useState<string[]>([]);
   const [outputFormat, setOutputFormat] = useState("16:9");
   const [transition, setTransition] = useState("fade");
   const [showNarrationText, setShowNarrationText] = useState(true);
+  const [enableBranding, setEnableBranding] = useState(true);
+  const [selectedPreset, setSelectedPreset] = useState("");
 
-  // Background music panel settings (user-uploaded music)
+  // Background music panel settings
   const [userMusicSettings, setUserMusicSettings] = useState<MusicSettings>({
     enabled: false,
     selectedTrackUrl: "",
@@ -137,14 +153,40 @@ export default function VideoStudio() {
   // Pipeline
   const [step, setStep] = useState<StudioStep>("select");
   const [audioUrl, setAudioUrl] = useState("");
-  const [slides, setSlides] = useState<{ text: string; bg: string; image?: string }[]>([]);
+  const [slides, setSlides] = useState<SceneSlide[]>([]);
   const [errorMsg, setErrorMsg] = useState("");
+
+  // YouTube optimizer
+  const [youtubeMetadata, setYoutubeMetadata] = useState<YouTubeMetadata | null>(null);
+
+  // Shorts generator
+  const [generatedShorts, setGeneratedShorts] = useState<ShortClip[]>([]);
 
   const voices = voiceProvider === "openai" ? OPENAI_VOICES : ELEVENLABS_VOICES;
 
+  // Auto voice match when tone changes
   useEffect(() => {
+    if (!autoVoiceMatch) return;
+    const match = autoMatchVoice(tone);
+    setVoiceProvider(match.provider);
+    setVoiceId(match.voiceId);
+  }, [tone, autoVoiceMatch]);
+
+  useEffect(() => {
+    if (autoVoiceMatch) return;
     setVoiceId(voiceProvider === "openai" ? "onyx" : "JBFqnCBsd6RMkjVDRZzb");
-  }, [voiceProvider]);
+  }, [voiceProvider, autoVoiceMatch]);
+
+  // Apply preset
+  const applyPreset = useCallback((presetId: string) => {
+    const preset = EXPORT_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    setSelectedPreset(presetId);
+    setEffects(preset.effects);
+    setTransition(preset.transition);
+    setViralMode(preset.viralMode);
+    toast({ title: "Preset Applied", description: preset.label });
+  }, [toast]);
 
   const contentText = useMemo(() => {
     if (contentType === "custom") return customText;
@@ -166,30 +208,6 @@ export default function VideoStudio() {
     if (contentType === "sermon") return sermons.find((s) => s.id === selectedContentId)?.title || "Sermon Video";
     return books.find((b) => b.id === selectedContentId)?.title || "Book Video";
   }, [contentType, selectedContentId, books, sermons, blogs]);
-
-  /* ─── Build slides from text ─── */
-  const buildSlides = (text: string): { text: string; bg: string; image?: string }[] => {
-    const sentences = text.split(/(?<=[.!?])\s+/).filter((s) => s.trim().length > 10);
-    const colors = [
-      "linear-gradient(135deg, hsl(var(--primary)), hsl(220 30% 15%))",
-      "linear-gradient(135deg, hsl(35 80% 45%), hsl(15 70% 20%))",
-      "linear-gradient(135deg, hsl(200 50% 20%), hsl(260 40% 15%))",
-      "linear-gradient(135deg, hsl(340 40% 25%), hsl(280 30% 15%))",
-    ];
-    const chunkSize = viralMode ? 1 : 2;
-    const result: { text: string; bg: string; image?: string }[] = [];
-    for (let i = 0; i < sentences.length; i += chunkSize) {
-      const chunk = sentences.slice(i, i + chunkSize).join(" ");
-      if (chunk.length > 15) {
-        result.push({
-          text: chunk.slice(0, 200),
-          bg: colors[result.length % colors.length],
-          image: customSlideImages[result.length] || undefined,
-        });
-      }
-    }
-    return result.slice(0, 30);
-  };
 
   /* ─── Generate audio via existing TTS proxy ─── */
   const generateAudio = async (text: string, title: string): Promise<string | null> => {
@@ -255,6 +273,9 @@ export default function VideoStudio() {
     }
 
     setErrorMsg("");
+    setYoutubeMetadata(null);
+    setGeneratedShorts([]);
+
     try {
       setStep("generating_audio");
       const url = await generateAudio(text, contentTitle);
@@ -289,8 +310,22 @@ export default function VideoStudio() {
 
       setStep("building_slides");
       await new Promise((r) => setTimeout(r, 800));
-      const sl = buildSlides(text);
-      setSlides(sl);
+
+      // Use cinematic engine for intelligent slide building
+      const processed = processCinematicScript(text, {
+        viralMode,
+        cinematicStoryMode,
+        customImages: customSlideImages,
+      });
+
+      let finalSlides = processed.slides;
+
+      // Apply viral hook boost if enabled
+      if (viralMode) {
+        finalSlides = applyViralHookBoost(finalSlides);
+      }
+
+      setSlides(finalSlides);
 
       setStep("rendering");
       await new Promise((r) => setTimeout(r, 500));
@@ -304,7 +339,7 @@ export default function VideoStudio() {
         voice_id: voiceId,
         tone,
         audio_url: url,
-        slides: sl as any,
+        slides: finalSlides as any,
         status: "completed",
         viral_mode: viralMode,
         music_style: musicStyle,
@@ -312,6 +347,14 @@ export default function VideoStudio() {
         output_format: outputFormat,
         prompt: promptText,
       });
+
+      // Generate YouTube metadata
+      const ytMeta = generateYouTubeMetadata(contentTitle, text, tone);
+      setYoutubeMetadata(ytMeta);
+
+      // Generate shorts candidates
+      const shorts = generateShortsFromSlides(finalSlides);
+      setGeneratedShorts(shorts);
 
       setStep("completed");
       toast({ title: "Video Ready!", description: "Your cinematic video has been generated." });
@@ -330,6 +373,8 @@ export default function VideoStudio() {
     setErrorMsg("");
     setMusicUrl("");
     setVideoOutputUrl("");
+    setYoutubeMetadata(null);
+    setGeneratedShorts([]);
   };
 
   const toggleEffect = (id: string) => {
@@ -529,10 +574,22 @@ export default function VideoStudio() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Auto Voice Match Toggle */}
+              <div className="flex items-center justify-between border border-border rounded-md p-3">
+                <div className="flex items-center gap-2">
+                  <Brain className="h-4 w-4 text-primary" />
+                  <div>
+                    <Label className="text-sm font-medium">Auto Voice Match</Label>
+                    <p className="text-[10px] text-muted-foreground">AI selects best voice for your tone</p>
+                  </div>
+                </div>
+                <Switch checked={autoVoiceMatch} onCheckedChange={setAutoVoiceMatch} />
+              </div>
+
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-xs">Provider</Label>
-                  <Select value={voiceProvider} onValueChange={(v) => setVoiceProvider(v as any)}>
+                  <Select value={voiceProvider} onValueChange={(v) => setVoiceProvider(v as any)} disabled={autoVoiceMatch}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="openai">OpenAI</SelectItem>
@@ -542,7 +599,7 @@ export default function VideoStudio() {
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs">Voice</Label>
-                  <Select value={voiceId} onValueChange={setVoiceId}>
+                  <Select value={voiceId} onValueChange={setVoiceId} disabled={autoVoiceMatch}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {voices.map((v) => (
@@ -557,7 +614,7 @@ export default function VideoStudio() {
 
               <div className="space-y-2">
                 <Label className="text-xs">Tone</Label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {TONE_OPTIONS.map((t) => (
                     <button
                       key={t.id}
@@ -586,7 +643,7 @@ export default function VideoStudio() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-xs text-muted-foreground">Upload background images for your slides. They'll be applied in order.</p>
+              <p className="text-xs text-muted-foreground">Upload background images for your slides. If none uploaded, AI generates keyword-based cinematic visuals automatically.</p>
               <div className="flex gap-2">
                 <label className="flex-1">
                   <input type="file" accept="image/*" multiple onChange={handleSlideImageUpload} className="hidden" />
@@ -624,13 +681,13 @@ export default function VideoStudio() {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <MonitorPlay className="h-4 w-4" /> Slide Preview
-                  <Badge variant="secondary" className="ml-auto">{slides.length} slides</Badge>
+                  <MonitorPlay className="h-4 w-4" /> Scene Preview
+                  <Badge variant="secondary" className="ml-auto">{slides.length} scenes</Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {slides.map((slide, i) => (
+                  {slides.filter(s => !s.isPause).map((slide, i) => (
                     <div
                       key={i}
                       className="aspect-video rounded-lg overflow-hidden relative flex items-center justify-center p-4"
@@ -642,7 +699,12 @@ export default function VideoStudio() {
                       <p className="relative z-10 text-white text-xs font-medium text-center leading-relaxed line-clamp-4">
                         {slide.text}
                       </p>
-                      <span className="absolute bottom-1.5 right-2 text-white/50 text-[10px]">{i + 1}</span>
+                      <div className="absolute bottom-1.5 right-2 flex items-center gap-1">
+                        {slide.emotion && slide.emotion !== "neutral" && (
+                          <Badge variant="secondary" className="text-[8px] px-1 py-0">{slide.emotion}</Badge>
+                        )}
+                        <span className="text-white/50 text-[10px]">{i + 1}</span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -667,6 +729,47 @@ export default function VideoStudio() {
 
         {/* ─── Right: Options Sidebar ─── */}
         <div className="space-y-4">
+          {/* Cinematic Export Presets */}
+          <Card className="border-primary/20">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Palette className="h-4 w-4 text-primary" /> Cinematic Preset
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Select value={selectedPreset} onValueChange={applyPreset}>
+                <SelectTrigger><SelectValue placeholder="Choose a preset..." /></SelectTrigger>
+                <SelectContent>
+                  {EXPORT_PRESETS.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      <div>
+                        <div>{p.label}</div>
+                        <div className="text-[10px] text-muted-foreground">{p.description}</div>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-muted-foreground mt-2">Auto-configures effects, transitions, and pacing.</p>
+            </CardContent>
+          </Card>
+
+          {/* Cinematic Story Mode */}
+          <Card className="border-primary/20">
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <Label className="font-medium">Cinematic Story Mode</Label>
+                </div>
+                <Switch checked={cinematicStoryMode} onCheckedChange={setCinematicStoryMode} />
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Documentary-style hooks, emotional pacing, scene-aware pauses, YouTube retention optimization.
+              </p>
+            </CardContent>
+          </Card>
+
           {/* Viral Mode */}
           <Card className="border-amber-500/30">
             <CardContent className="pt-4">
@@ -678,7 +781,23 @@ export default function VideoStudio() {
                 <Switch checked={viralMode} onCheckedChange={setViralMode} />
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                Shorter slides, bold typography, emotional pacing
+                Hook-first editing, faster cuts, subtitle emphasis, zoom dynamics.
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Branding */}
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Film className="h-4 w-4 text-amber-400" />
+                  <Label className="font-medium">Island of One Branding</Label>
+                </div>
+                <Switch checked={enableBranding} onCheckedChange={setEnableBranding} />
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Watermark, gold cinematic overlay, serif title cards.
               </p>
             </CardContent>
           </Card>
@@ -810,8 +929,71 @@ export default function VideoStudio() {
                   transition={transition}
                   title={contentTitle}
                   showNarrationText={showNarrationText}
+                  enableBranding={enableBranding}
+                  exportPreset={selectedPreset}
                   onComplete={(url) => setVideoOutputUrl(url)}
                 />
+              )}
+
+              {/* Shorts Generator */}
+              {generatedShorts.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Scissors className="h-4 w-4" /> Generated Shorts
+                      <Badge variant="secondary" className="text-[10px]">{generatedShorts.length} clips</Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <p className="text-[10px] text-muted-foreground">Vertical clips auto-generated from strong moments. No credit consumed.</p>
+                    {generatedShorts.map((clip, i) => (
+                      <div key={i} className="border border-border rounded-md p-2.5">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-medium">Clip {i + 1}</span>
+                          <Badge variant="outline" className="text-[9px]">Scenes {clip.startSlide + 1}–{clip.endSlide + 1}</Badge>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground line-clamp-2">"{clip.hookText}"</p>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* YouTube Optimizer */}
+              {youtubeMetadata && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Youtube className="h-4 w-4 text-red-500" /> YouTube Optimizer
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div>
+                      <p className="text-[10px] text-muted-foreground mb-1">Title Options</p>
+                      {youtubeMetadata.titles.map((t, i) => (
+                        <p key={i} className="text-xs font-medium mb-0.5">• {t}</p>
+                      ))}
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground mb-1">Description</p>
+                      <p className="text-xs whitespace-pre-line line-clamp-4">{youtubeMetadata.description}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground mb-1">Tags</p>
+                      <div className="flex flex-wrap gap-1">
+                        {youtubeMetadata.tags.map((tag, i) => (
+                          <Badge key={i} variant="outline" className="text-[9px]">{tag}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground mb-1">Thumbnail Ideas</p>
+                      {youtubeMetadata.thumbnailIdeas.map((t, i) => (
+                        <p key={i} className="text-[10px] text-muted-foreground">💡 {t}</p>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
               )}
 
               <Card>

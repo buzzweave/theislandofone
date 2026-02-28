@@ -4,11 +4,18 @@ import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { Download, Film, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import type { SceneSlide, DuckingParams } from "@/lib/cinematicEngine";
+import { getMusicDuckingParams } from "@/lib/cinematicEngine";
 
 interface Slide {
   text: string;
   bg: string;
   image?: string;
+  holdDuration?: number;
+  zoomIntensity?: number;
+  musicDip?: boolean;
+  isPause?: boolean;
+  emotion?: string;
 }
 
 interface VideoRendererProps {
@@ -25,6 +32,8 @@ interface VideoRendererProps {
   transition?: string;
   title: string;
   showNarrationText?: boolean;
+  enableBranding?: boolean;
+  exportPreset?: string;
   onComplete?: (videoUrl: string) => void;
 }
 
@@ -48,6 +57,8 @@ export default function VideoRenderer({
   transition = "fade",
   title,
   showNarrationText = true,
+  enableBranding = true,
+  exportPreset,
   onComplete,
 }: VideoRendererProps) {
   const [rendering, setRendering] = useState(false);
@@ -56,7 +67,6 @@ export default function VideoRenderer({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
 
-  // Preload images for slides
   const loadSlideImages = async (slides: Slide[]): Promise<(HTMLImageElement | null)[]> => {
     return Promise.all(
       slides.map((slide) => {
@@ -86,10 +96,23 @@ export default function VideoRenderer({
 
     const slideImages = await loadSlideImages(slides);
 
-    const slideDuration = viralMode ? 3000 : 5000;
+    // Scene-aware: use per-slide holdDuration or default
+    const defaultDuration = viralMode ? 3000 : 5000;
+    const slideDurations = slides.map((s) => s.holdDuration || defaultDuration);
+    const totalDurationMs = slideDurations.reduce((a, b) => a + b, 0);
+    const totalDurationSec = totalDurationMs / 1000;
     const fps = 30;
-    const totalFrames = Math.ceil((slides.length * slideDuration) / (1000 / fps));
-    const totalDurationSec = (slides.length * slideDuration) / 1000;
+    const totalFrames = Math.ceil(totalDurationMs / (1000 / fps));
+
+    // Pre-compute slide start times
+    const slideStartTimes: number[] = [];
+    let acc = 0;
+    for (const d of slideDurations) {
+      slideStartTimes.push(acc);
+      acc += d;
+    }
+
+    const ducking: DuckingParams = getMusicDuckingParams(exportPreset);
 
     const stream = canvas.captureStream(fps);
 
@@ -122,17 +145,46 @@ export default function VideoRenderer({
       });
       const musicSource = audioCtx.createMediaElementSource(musicAudio);
       musicGainNode = audioCtx.createGain();
-      musicGainNode.gain.value = 0; // start at 0 for fade-in
+      musicGainNode.gain.value = 0;
       musicSource.connect(musicGainNode);
       musicGainNode.connect(dest);
 
-      // Schedule fade-in
+      // Smart fade-in
       musicGainNode.gain.setValueAtTime(0, audioCtx.currentTime);
       musicGainNode.gain.linearRampToValueAtTime(musicVolume, audioCtx.currentTime + musicFadeIn);
-      // Schedule fade-out
-      const fadeOutStart = Math.max(0, totalDurationSec - musicFadeOut);
-      musicGainNode.gain.setValueAtTime(musicVolume, audioCtx.currentTime + fadeOutStart);
-      musicGainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + totalDurationSec);
+
+      // Voice-aware ducking: duck during narration, swell at transitions
+      const duckVol = ducking.duckVolume * (musicVolume / 0.15);
+      const normalVol = ducking.normalVolume * (musicVolume / 0.15);
+      const cappedDuck = Math.min(duckVol, musicVolume);
+      const cappedNormal = Math.min(normalVol, musicVolume);
+
+      // Schedule ducking per slide
+      for (let i = 0; i < slides.length; i++) {
+        const slideStartSec = slideStartTimes[i] / 1000;
+        const slideDurSec = slideDurations[i] / 1000;
+        const t = audioCtx.currentTime + slideStartSec;
+
+        if (slides[i].isPause || slides[i].musicDip) {
+          // Swell during pauses / dips
+          if (ducking.swellAtTransitions) {
+            musicGainNode.gain.setValueAtTime(cappedDuck, t);
+            musicGainNode.gain.linearRampToValueAtTime(cappedNormal, t + ducking.duckRampTime);
+            musicGainNode.gain.setValueAtTime(cappedNormal, t + slideDurSec - ducking.duckRampTime);
+            musicGainNode.gain.linearRampToValueAtTime(cappedDuck, t + slideDurSec);
+          }
+        } else if (slides[i].text) {
+          // Duck during narrated text
+          musicGainNode.gain.setValueAtTime(cappedDuck, t + 0.1);
+        }
+      }
+
+      // Smart fade-out
+      if (ducking.fadeIntelligence) {
+        const fadeStart = Math.max(0, totalDurationSec - musicFadeOut);
+        musicGainNode.gain.setValueAtTime(cappedDuck, audioCtx.currentTime + fadeStart);
+        musicGainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + totalDurationSec);
+      }
     }
 
     dest.stream.getAudioTracks().forEach((t) => stream.addTrack(t));
@@ -168,24 +220,44 @@ export default function VideoRenderer({
       }
 
       const timeMs = (frame / fps) * 1000;
-      const slideIdx = Math.min(Math.floor(timeMs / slideDuration), slides.length - 1);
+
+      // Find current slide using cumulative start times
+      let slideIdx = 0;
+      for (let i = slides.length - 1; i >= 0; i--) {
+        if (timeMs >= slideStartTimes[i]) {
+          slideIdx = i;
+          break;
+        }
+      }
+
       const slide = slides[slideIdx];
-      const slideProgress = (timeMs % slideDuration) / slideDuration;
+      const slideStartMs = slideStartTimes[slideIdx];
+      const slideDurMs = slideDurations[slideIdx];
+      const slideProgress = Math.min((timeMs - slideStartMs) / slideDurMs, 1);
       const slideImage = slideImages[slideIdx];
+      const zoomIntensity = (slide as any).zoomIntensity || 0.05;
+
+      // Skip rendering for pause slides (just dark)
+      if (slide.isPause) {
+        ctx.fillStyle = "#0a0a0a";
+        ctx.fillRect(0, 0, dims.w, dims.h);
+        frame++;
+        setProgress(Math.round((frame / totalFrames) * 100));
+        requestAnimationFrame(drawFrame);
+        return;
+      }
 
       // Transition calculations
-      const transitionDuration = 0.15; // 15% of slide duration
+      const transitionDuration = 0.15;
       let transitionAlpha = 1;
       let transitionScale = 1;
       let transitionOffsetX = 0;
-      let transitionBlur = 0;
 
       if (slideProgress < transitionDuration) {
         const tp = slideProgress / transitionDuration;
         if (transition === "fade") transitionAlpha = tp;
         else if (transition === "slide") transitionOffsetX = (1 - tp) * dims.w;
         else if (transition === "zoom") transitionScale = 0.8 + tp * 0.2;
-        else if (transition === "blur") transitionBlur = (1 - tp) * 10;
       }
 
       // Draw background
@@ -197,8 +269,7 @@ export default function VideoRenderer({
       ctx.translate(-dims.w / 2, -dims.h / 2);
 
       if (slideImage) {
-        // Ken Burns with image
-        const scale = 1 + slideProgress * 0.05;
+        const scale = 1 + slideProgress * zoomIntensity;
         ctx.save();
         ctx.translate(dims.w / 2, dims.h / 2);
         ctx.scale(scale, scale);
@@ -213,8 +284,8 @@ export default function VideoRenderer({
         ctx.fillRect(0, 0, dims.w, dims.h);
       }
 
-      // Ken Burns zoom
-      const scale = 1 + slideProgress * 0.05;
+      // Ken Burns zoom on overlay
+      const scale = 1 + slideProgress * zoomIntensity;
       ctx.save();
       ctx.translate(dims.w / 2, dims.h / 2);
       ctx.scale(scale, scale);
@@ -223,6 +294,12 @@ export default function VideoRenderer({
       // Dark overlay
       ctx.fillStyle = "rgba(0,0,0,0.4)";
       ctx.fillRect(0, 0, dims.w, dims.h);
+
+      // Island Cinematic Look: soft gold overlay
+      if (enableBranding || effects.includes("glow")) {
+        ctx.fillStyle = `rgba(201,162,39,${0.03 + Math.sin(frame * 0.03) * 0.015})`;
+        ctx.fillRect(0, 0, dims.w, dims.h);
+      }
 
       // Effects
       if (effects.includes("vignette")) {
@@ -252,11 +329,6 @@ export default function VideoRenderer({
           ctx.arc(px, py, 2 + Math.sin(frame * 0.05 + i) * 2, 0, Math.PI * 2);
           ctx.fill();
         }
-      }
-
-      if (effects.includes("glow")) {
-        ctx.fillStyle = `rgba(255,215,0,${0.03 + Math.sin(frame * 0.03) * 0.02})`;
-        ctx.fillRect(0, 0, dims.w, dims.h);
       }
 
       if (effects.includes("bokeh")) {
@@ -295,8 +367,8 @@ export default function VideoRenderer({
 
       ctx.restore();
 
-      // Text with word-sync fade animation (only if showNarrationText)
-      if (showNarrationText) {
+      // Narration text with word-sync
+      if (showNarrationText && slide.text) {
         const fadeIn = Math.min(slideProgress * 4, 1);
         const fontSize = viralMode ? dims.w * 0.045 : dims.w * 0.032;
         ctx.globalAlpha = fadeIn;
@@ -307,7 +379,6 @@ export default function VideoRenderer({
         ctx.shadowColor = "rgba(0,0,0,0.8)";
         ctx.shadowBlur = 20;
 
-        // Word wrap
         const maxWidth = dims.w * 0.75;
         const words = slide.text.split(" ");
         const lines: string[] = [];
@@ -326,7 +397,7 @@ export default function VideoRenderer({
         const lineHeight = fontSize * 1.4;
         const startY = dims.h / 2 - ((lines.length - 1) * lineHeight) / 2;
 
-        // Word-by-word reveal for sync with narration
+        // Word-by-word reveal synced with narration timing
         const totalWords = words.length;
         const wordsRevealed = Math.ceil(slideProgress * totalWords);
 
@@ -349,6 +420,20 @@ export default function VideoRenderer({
         ctx.shadowBlur = 0;
       }
 
+      // Island of One branding watermark
+      if (enableBranding) {
+        ctx.save();
+        const wmFontSize = dims.w * 0.012;
+        ctx.font = `${wmFontSize}px 'Georgia', serif`;
+        ctx.fillStyle = "rgba(201,162,39,0.35)";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "bottom";
+        ctx.shadowColor = "rgba(0,0,0,0.5)";
+        ctx.shadowBlur = 4;
+        ctx.fillText("TheIslandOfOne.com", dims.w - dims.w * 0.02, dims.h - dims.h * 0.02);
+        ctx.restore();
+      }
+
       ctx.restore();
 
       frame++;
@@ -360,7 +445,6 @@ export default function VideoRenderer({
 
     const blob = await recordingDone;
 
-    // Upload
     try {
       const fileName = `video-${Date.now()}.webm`;
       const { error: uploadError } = await supabase.storage
@@ -390,7 +474,7 @@ export default function VideoRenderer({
     }
 
     setRendering(false);
-  }, [slides, audioUrl, musicUrl, musicVolume, musicFadeIn, musicFadeOut, musicLoop, outputFormat, viralMode, effects, transition, title, showNarrationText, onComplete, toast]);
+  }, [slides, audioUrl, musicUrl, musicVolume, musicFadeIn, musicFadeOut, musicLoop, outputFormat, viralMode, effects, transition, title, showNarrationText, enableBranding, exportPreset, onComplete, toast]);
 
   return (
     <div className="space-y-3">
