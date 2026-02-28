@@ -216,28 +216,28 @@ serve(async (req) => {
       audioData = await generateWithElevenLabs(text, voice);
     }
 
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const fileName = `${Date.now()}-${(title || "audio").replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()}.mp3`;
 
-    const uploadResponse = await fetch(
-      `${SUPABASE_URL}/storage/v1/object/audio-files/${fileName}`,
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`, "Content-Type": "audio/mpeg" },
-        body: audioData,
-      }
-    );
+    // Use service role client for storage upload
+    const { data: uploadData, error: uploadError } = await serviceClient.storage
+      .from("audio-files")
+      .upload(fileName, audioData, {
+        contentType: "audio/mpeg",
+        upsert: true,
+      });
 
-    if (!uploadResponse.ok) {
-      const uploadErr = await uploadResponse.text();
-      console.error("Upload error:", uploadErr);
-      return new Response(JSON.stringify({ error: "Failed to upload audio file" }), {
+    if (uploadError) {
+      console.error("Upload error:", uploadError.message);
+      return new Response(JSON.stringify({ error: "Failed to upload audio file: " + uploadError.message }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const audioUrl = `${SUPABASE_URL}/storage/v1/object/public/audio-files/${fileName}`;
+    const { data: publicUrlData } = serviceClient.storage
+      .from("audio-files")
+      .getPublicUrl(fileName);
+
+    const audioUrl = publicUrlData.publicUrl;
 
     return new Response(JSON.stringify({ audioUrl, fileName }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
