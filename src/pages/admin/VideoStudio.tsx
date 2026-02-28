@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useBooks } from "@/hooks/useBooks";
 import { useSermons } from "@/hooks/useSermons";
+import { useBlogPosts } from "@/hooks/useBlogPosts";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -13,13 +14,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
 import {
   Film, Mic, Wand2, Play, Download, Share2, Sparkles, Music,
   Zap, MonitorPlay, Smartphone, Square, Loader2, AlertCircle,
-  RotateCcw, Volume2, BookOpen, FileText, PenLine, Youtube
+  RotateCcw, Volume2, BookOpen, FileText, PenLine, Youtube,
+  Newspaper, Library, Upload, Plus, Trash2, GripVertical
 } from "lucide-react";
 import VideoRenderer from "@/components/admin/video-studio/VideoRenderer";
 import NanoStudio from "@/components/admin/video-studio/NanoStudio";
+import { Link } from "react-router-dom";
 
 /* ─── Voice configs ─── */
 const OPENAI_VOICES = [
@@ -60,6 +64,17 @@ const EFFECTS_OPTIONS = [
   { id: "glow", label: "💫 Soft Glow" },
   { id: "grain", label: "🎞️ Film Grain" },
   { id: "vignette", label: "🌑 Dark Vignette" },
+  { id: "bokeh", label: "🔵 Bokeh Lights" },
+  { id: "smoke", label: "🌫️ Smoke Overlay" },
+  { id: "letterbox", label: "🎬 Letterbox Bars" },
+  { id: "chromatic", label: "🌈 Chromatic Shift" },
+];
+
+const TRANSITION_OPTIONS = [
+  { id: "fade", label: "Fade" },
+  { id: "slide", label: "Slide" },
+  { id: "zoom", label: "Zoom" },
+  { id: "blur", label: "Blur" },
 ];
 
 type StudioStep = "select" | "generating_audio" | "building_slides" | "rendering" | "completed" | "failed";
@@ -77,9 +92,10 @@ export default function VideoStudio() {
   const { toast } = useToast();
   const { data: books = [] } = useBooks();
   const { data: sermons = [] } = useSermons();
+  const { data: blogs = [] } = useBlogPosts();
 
   // Content
-  const [contentType, setContentType] = useState<"book" | "sermon" | "custom">("book");
+  const [contentType, setContentType] = useState<"book" | "sermon" | "blog" | "custom">("book");
   const [selectedContentId, setSelectedContentId] = useState("");
   const [customText, setCustomText] = useState("");
 
@@ -93,6 +109,13 @@ export default function VideoStudio() {
   const [musicStyle, setMusicStyle] = useState("");
   const [effects, setEffects] = useState<string[]>([]);
   const [outputFormat, setOutputFormat] = useState("16:9");
+  const [transition, setTransition] = useState("fade");
+  const [musicVolume, setMusicVolume] = useState(15);
+  const [musicFadeIn, setMusicFadeIn] = useState(3);
+  const [musicFadeOut, setMusicFadeOut] = useState(3);
+
+  // Custom slides upload
+  const [customSlideImages, setCustomSlideImages] = useState<string[]>([]);
 
   // Prompt-to-video
   const [promptText, setPromptText] = useState("");
@@ -103,7 +126,7 @@ export default function VideoStudio() {
   // Pipeline
   const [step, setStep] = useState<StudioStep>("select");
   const [audioUrl, setAudioUrl] = useState("");
-  const [slides, setSlides] = useState<{ text: string; bg: string }[]>([]);
+  const [slides, setSlides] = useState<{ text: string; bg: string; image?: string }[]>([]);
   const [errorMsg, setErrorMsg] = useState("");
 
   const voices = voiceProvider === "openai" ? OPENAI_VOICES : ELEVENLABS_VOICES;
@@ -114,23 +137,27 @@ export default function VideoStudio() {
 
   const contentText = useMemo(() => {
     if (contentType === "custom") return customText;
+    if (contentType === "blog") {
+      const b = blogs.find((b) => b.id === selectedContentId);
+      return b ? (b.content || "").replace(/<[^>]*>/g, "").trim() : "";
+    }
     if (contentType === "sermon") {
       const s = sermons.find((s) => s.id === selectedContentId);
       return s ? (s.manuscript || "").replace(/<[^>]*>/g, "").trim() : "";
     }
-    // For books we'd need chapters – simplified for MVP
     const b = books.find((b) => b.id === selectedContentId);
     return b ? (b.description || "").replace(/<[^>]*>/g, "").trim() : "";
-  }, [contentType, selectedContentId, customText, books, sermons]);
+  }, [contentType, selectedContentId, customText, books, sermons, blogs]);
 
   const contentTitle = useMemo(() => {
     if (contentType === "custom") return "Custom Video";
+    if (contentType === "blog") return blogs.find((b) => b.id === selectedContentId)?.title || "Blog Video";
     if (contentType === "sermon") return sermons.find((s) => s.id === selectedContentId)?.title || "Sermon Video";
     return books.find((b) => b.id === selectedContentId)?.title || "Book Video";
-  }, [contentType, selectedContentId, books, sermons]);
+  }, [contentType, selectedContentId, books, sermons, blogs]);
 
   /* ─── Build slides from text ─── */
-  const buildSlides = (text: string): { text: string; bg: string }[] => {
+  const buildSlides = (text: string): { text: string; bg: string; image?: string }[] => {
     const sentences = text.split(/(?<=[.!?])\s+/).filter((s) => s.trim().length > 10);
     const colors = [
       "linear-gradient(135deg, hsl(var(--primary)), hsl(220 30% 15%))",
@@ -139,14 +166,18 @@ export default function VideoStudio() {
       "linear-gradient(135deg, hsl(340 40% 25%), hsl(280 30% 15%))",
     ];
     const chunkSize = viralMode ? 1 : 2;
-    const result: { text: string; bg: string }[] = [];
+    const result: { text: string; bg: string; image?: string }[] = [];
     for (let i = 0; i < sentences.length; i += chunkSize) {
       const chunk = sentences.slice(i, i + chunkSize).join(" ");
       if (chunk.length > 15) {
-        result.push({ text: chunk.slice(0, 200), bg: colors[result.length % colors.length] });
+        result.push({
+          text: chunk.slice(0, 200),
+          bg: colors[result.length % colors.length],
+          image: customSlideImages[result.length] || undefined,
+        });
       }
     }
-    return result.slice(0, 30); // cap at 30 slides
+    return result.slice(0, 30);
   };
 
   /* ─── Generate audio via existing TTS proxy ─── */
@@ -180,6 +211,30 @@ export default function VideoStudio() {
     return data.audioUrl || null;
   };
 
+  /* ─── Handle slide image upload ─── */
+  const handleSlideImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    const urls: string[] = [];
+    for (const file of Array.from(files)) {
+      const fileName = `slide-${Date.now()}-${Math.random().toString(36).slice(2)}.${file.name.split('.').pop()}`;
+      const { error } = await supabase.storage.from("audio-files").upload(`slides/${fileName}`, file, {
+        contentType: file.type,
+        upsert: true,
+      });
+      if (!error) {
+        const { data: pub } = supabase.storage.from("audio-files").getPublicUrl(`slides/${fileName}`);
+        urls.push(pub.publicUrl);
+      }
+    }
+    setCustomSlideImages((prev) => [...prev, ...urls]);
+    toast({ title: "Slides Uploaded", description: `${urls.length} image(s) added.` });
+  };
+
   /* ─── Main pipeline ─── */
   const runPipeline = async () => {
     const text = contentText || promptText;
@@ -190,13 +245,11 @@ export default function VideoStudio() {
 
     setErrorMsg("");
     try {
-      // Step 1: Generate audio
       setStep("generating_audio");
       const url = await generateAudio(text, contentTitle);
       if (!url) throw new Error("No audio URL returned");
       setAudioUrl(url);
 
-      // Step 2: Generate background music if selected
       if (musicStyle && musicStyle !== "none") {
         try {
           const musicPromptMap: Record<string, string> = {
@@ -223,17 +276,14 @@ export default function VideoStudio() {
         }
       }
 
-      // Step 3: Build slides
       setStep("building_slides");
       await new Promise((r) => setTimeout(r, 800));
       const sl = buildSlides(text);
       setSlides(sl);
 
-      // Step 4: Ready for rendering via VideoRenderer component
       setStep("rendering");
       await new Promise((r) => setTimeout(r, 500));
 
-      // Save project to DB
       await supabase.from("video_projects").insert({
         title: contentTitle,
         content_type: contentType,
@@ -280,29 +330,36 @@ export default function VideoStudio() {
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
             <Film className="h-5 w-5 text-primary" />
           </div>
           <div>
             <h1 className="text-2xl font-display font-bold">Video Studio</h1>
-            <p className="text-sm text-muted-foreground">Turn books & sermons into cinematic videos</p>
+            <p className="text-sm text-muted-foreground">Turn books, sermons & blogs into cinematic videos</p>
           </div>
         </div>
-        <div className="flex gap-1 bg-muted rounded-lg p-1">
-          <button
-            onClick={() => setStudioMode("full")}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${studioMode === "full" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            <Film className="h-3.5 w-3.5 inline mr-1.5" />Full Studio
-          </button>
-          <button
-            onClick={() => setStudioMode("nano")}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${studioMode === "nano" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            <Zap className="h-3.5 w-3.5 inline mr-1.5" />Nano Studio
-          </button>
+        <div className="flex items-center gap-2">
+          <Link to="/admin/video-library">
+            <Button variant="outline" size="sm" className="gap-1.5">
+              <Library className="h-3.5 w-3.5" /> Video Library
+            </Button>
+          </Link>
+          <div className="flex gap-1 bg-muted rounded-lg p-1">
+            <button
+              onClick={() => setStudioMode("full")}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${studioMode === "full" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <Film className="h-3.5 w-3.5 inline mr-1.5" />Full Studio
+            </button>
+            <button
+              onClick={() => setStudioMode("nano")}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${studioMode === "nano" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <Zap className="h-3.5 w-3.5 inline mr-1.5" />Nano Studio
+            </button>
+          </div>
         </div>
       </div>
 
@@ -393,6 +450,9 @@ export default function VideoStudio() {
                   <TabsTrigger value="sermon" className="flex-1 gap-1.5">
                     <FileText className="h-3.5 w-3.5" /> Sermon
                   </TabsTrigger>
+                  <TabsTrigger value="blog" className="flex-1 gap-1.5">
+                    <Newspaper className="h-3.5 w-3.5" /> Blog
+                  </TabsTrigger>
                   <TabsTrigger value="custom" className="flex-1 gap-1.5">
                     <PenLine className="h-3.5 w-3.5" /> Custom
                   </TabsTrigger>
@@ -415,6 +475,17 @@ export default function VideoStudio() {
                     <SelectContent>
                       {sermons.map((s) => (
                         <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </TabsContent>
+
+                <TabsContent value="blog" className="mt-3">
+                  <Select value={selectedContentId} onValueChange={setSelectedContentId}>
+                    <SelectTrigger><SelectValue placeholder="Select a blog post..." /></SelectTrigger>
+                    <SelectContent>
+                      {blogs.map((b) => (
+                        <SelectItem key={b.id} value={b.id}>{b.title}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -495,6 +566,48 @@ export default function VideoStudio() {
             </CardContent>
           </Card>
 
+          {/* Slide Upload */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Upload className="h-4 w-4" /> Custom Slide Images
+                <Badge variant="secondary" className="ml-auto">{customSlideImages.length} uploaded</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">Upload background images for your slides. They'll be applied in order.</p>
+              <div className="flex gap-2">
+                <label className="flex-1">
+                  <input type="file" accept="image/*" multiple onChange={handleSlideImageUpload} className="hidden" />
+                  <Button variant="outline" className="w-full gap-2" asChild>
+                    <span><Plus className="h-4 w-4" /> Upload Images</span>
+                  </Button>
+                </label>
+                {customSlideImages.length > 0 && (
+                  <Button variant="outline" size="icon" onClick={() => setCustomSlideImages([])}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+              {customSlideImages.length > 0 && (
+                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                  {customSlideImages.map((url, i) => (
+                    <div key={i} className="aspect-video rounded-md overflow-hidden border border-border relative group">
+                      <img src={url} alt={`Slide ${i + 1}`} className="w-full h-full object-cover" />
+                      <span className="absolute bottom-0.5 right-1 text-white/70 text-[9px] bg-black/50 px-1 rounded">{i + 1}</span>
+                      <button
+                        onClick={() => setCustomSlideImages((prev) => prev.filter((_, j) => j !== i))}
+                        className="absolute top-0.5 right-0.5 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Slide Preview */}
           {slides.length > 0 && (
             <Card>
@@ -510,7 +623,9 @@ export default function VideoStudio() {
                     <div
                       key={i}
                       className="aspect-video rounded-lg overflow-hidden relative flex items-center justify-center p-4"
-                      style={{ background: slide.bg }}
+                      style={{
+                        background: slide.image ? `url(${slide.image}) center/cover` : slide.bg,
+                      }}
                     >
                       <div className="absolute inset-0 bg-black/30" />
                       <p className="relative z-10 text-white text-xs font-medium text-center leading-relaxed line-clamp-4">
@@ -552,19 +667,19 @@ export default function VideoStudio() {
                 <Switch checked={viralMode} onCheckedChange={setViralMode} />
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                Shorter slides, bold typography, emotional pacing, social-first formatting
+                Shorter slides, bold typography, emotional pacing
               </p>
             </CardContent>
           </Card>
 
-          {/* Music */}
+          {/* Music with Fader */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Music className="h-4 w-4" /> Background Music
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
               <Select value={musicStyle} onValueChange={setMusicStyle}>
                 <SelectTrigger><SelectValue placeholder="No Music" /></SelectTrigger>
                 <SelectContent>
@@ -573,6 +688,48 @@ export default function VideoStudio() {
                   ))}
                 </SelectContent>
               </Select>
+              
+              {musicStyle && musicStyle !== "none" && (
+                <div className="space-y-3 pt-1">
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-xs">Volume</Label>
+                      <span className="text-xs text-muted-foreground">{musicVolume}%</span>
+                    </div>
+                    <Slider
+                      value={[musicVolume]}
+                      onValueChange={([v]) => setMusicVolume(v)}
+                      max={100}
+                      min={0}
+                      step={5}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Fade In (s)</Label>
+                      <Slider
+                        value={[musicFadeIn]}
+                        onValueChange={([v]) => setMusicFadeIn(v)}
+                        max={10}
+                        min={0}
+                        step={1}
+                      />
+                      <span className="text-[10px] text-muted-foreground">{musicFadeIn}s</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Fade Out (s)</Label>
+                      <Slider
+                        value={[musicFadeOut]}
+                        onValueChange={([v]) => setMusicFadeOut(v)}
+                        max={10}
+                        min={0}
+                        step={1}
+                      />
+                      <span className="text-[10px] text-muted-foreground">{musicFadeOut}s</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -593,6 +750,30 @@ export default function VideoStudio() {
                   <span className="text-sm">{e.label}</span>
                 </label>
               ))}
+            </CardContent>
+          </Card>
+
+          {/* Transitions */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm">Transition Style</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-2">
+                {TRANSITION_OPTIONS.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setTransition(t.id)}
+                    className={`p-2 rounded-md border text-xs font-medium transition-colors ${
+                      transition === t.id
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border hover:border-primary/40"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
             </CardContent>
           </Card>
 
@@ -646,15 +827,18 @@ export default function VideoStudio() {
           {/* Publish Options (after completion) */}
           {step === "completed" && (
             <div className="space-y-4">
-              {/* Video Renderer */}
               {slides.length > 0 && audioUrl && (
                 <VideoRenderer
                   slides={slides}
                   audioUrl={audioUrl}
                   musicUrl={musicUrl || undefined}
+                  musicVolume={musicVolume / 100}
+                  musicFadeIn={musicFadeIn}
+                  musicFadeOut={musicFadeOut}
                   outputFormat={outputFormat}
                   viralMode={viralMode}
                   effects={effects}
+                  transition={transition}
                   title={contentTitle}
                   onComplete={(url) => setVideoOutputUrl(url)}
                 />
