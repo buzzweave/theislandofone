@@ -151,10 +151,10 @@ Deno.serve(async (req) => {
     if (action === "test_smtp") {
       const { data: emailSettings } = await supabase.from("smtp_settings").select("*").limit(1).single();
 
-      const fromName = emailSettings?.from_name || "The Island of One";
-      const fromEmail = emailSettings?.from_email || "onboarding@resend.dev";
-      const replyTo = emailSettings?.reply_to || fromEmail;
-      const testTo = data?.to || "support@buzzweave.com";
+    const fromName = emailSettings?.from_name || "The Island of One";
+    const fromEmail = emailSettings?.from_email || "noreply@theislandofone.com";
+    const replyTo = emailSettings?.reply_to || "support@buzzweave.com";
+    const testTo = data?.to || "support@buzzweave.com";
 
       try {
         await sendResendEmail(
@@ -259,7 +259,7 @@ Deno.serve(async (req) => {
     const { data: emailSettings } = await supabase.from("smtp_settings").select("*").limit(1).single();
 
     const fromName = emailSettings?.from_name || "The Island of One";
-    const fromEmail = emailSettings?.from_email || "onboarding@resend.dev";
+    const fromEmail = emailSettings?.from_email || "noreply@theislandofone.com";
 
     try {
       await sendResendEmail("support@buzzweave.com", emailSubject, emailBody, fromName, fromEmail, replyTo);

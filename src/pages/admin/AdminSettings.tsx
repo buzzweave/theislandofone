@@ -526,7 +526,7 @@ export default function AdminSettings() {
                         from_email: e.target.value,
                       }))
                     }
-                    placeholder="noreply@yourdomain.com"
+                    placeholder="noreply@theislandofone.com"
                   />
                 </div>
 
@@ -546,9 +546,8 @@ export default function AdminSettings() {
               </div>
 
               <p className="text-xs text-muted-foreground">
-                Note: Your sending domain must be verified in Resend. Until then,
-                use <code className="text-xs">onboarding@resend.dev</code> as the
-                From Email.
+                Your verified Resend domain is <code className="text-xs">theislandofone.com</code>.
+                The From Email must use this domain (e.g. <code className="text-xs">noreply@theislandofone.com</code>).
               </p>
 
               <div className="flex gap-3 pt-2">
