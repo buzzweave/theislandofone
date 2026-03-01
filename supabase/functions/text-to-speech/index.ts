@@ -17,7 +17,7 @@ const ELEVENLABS_VOICE_MAP: Record<string, string> = {
   "gentle-female": "pFZP5JQG7iQjIQuC4Bku",
 };
 
-const OPENAI_VOICE_OPTIONS = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
+const OPENAI_VOICE_OPTIONS = ["alloy", "ash", "ballad", "cedar", "coral", "echo", "fable", "marin", "nova", "onyx", "sage", "shimmer", "verse"];
 
 const rateLimits = new Map<string, { count: number; resetAt: number }>();
 const MAX_REQUESTS = 10;
