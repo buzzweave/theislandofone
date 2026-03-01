@@ -168,15 +168,21 @@ export function processCinematicScript(
   const hookIntro = cinematicStoryMode ? generateHook(text) : "";
 
   if (cinematicStoryMode) {
-    // Shorten sentences for narration clarity
-    sentences = sentences.map((s) => {
-      if (s.length > 150) {
-        // Split long sentences at commas
-        const parts = s.split(/,\s*/);
-        return parts.length > 1 ? parts[0] + "." : s.slice(0, 140) + "…";
+    // Split very long sentences at commas for better visual pacing, but keep all content
+    const expanded: string[] = [];
+    for (const s of sentences) {
+      if (s.length > 200) {
+        const parts = s.split(/,\s*/).filter((p) => p.trim().length > 5);
+        if (parts.length > 1) {
+          expanded.push(...parts.map((p, i) => i < parts.length - 1 ? p + "," : p));
+        } else {
+          expanded.push(s);
+        }
+      } else {
+        expanded.push(s);
       }
-      return s;
-    });
+    }
+    sentences = expanded;
   }
 
   const colors = [
@@ -218,7 +224,7 @@ export function processCinematicScript(
     }
 
     const slide: SceneSlide = {
-      text: chunk.slice(0, 200),
+      text: chunk,
       bg,
       image: customImages[slideIdx] || undefined,
       emotion,
@@ -244,7 +250,7 @@ export function processCinematicScript(
   }
 
   return {
-    slides: slides.slice(0, 40),
+    slides,
     hookIntro,
     totalScenes: slides.length,
   };
