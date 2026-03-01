@@ -155,6 +155,9 @@ export default function VideoStudio() {
   // Custom slides upload
   const [customSlideImages, setCustomSlideImages] = useState<string[]>([]);
   const [customVideoUrl, setCustomVideoUrl] = useState<string>("");
+  const [videoLoop, setVideoLoop] = useState(false);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string>("");
+  const [publishingToYouTube, setPublishingToYouTube] = useState(false);
   // Prompt-to-video
   const [promptText, setPromptText] = useState("");
   const [studioMode, setStudioMode] = useState<"full" | "nano">("full");
@@ -325,6 +328,66 @@ export default function VideoStudio() {
     const { data: pub } = supabase.storage.from("audio-files").getPublicUrl(`videos/uploads/${fileName}`);
     setCustomVideoUrl(pub.publicUrl);
     toast({ title: "Video Uploaded", description: "Video ready for voiceover." });
+  };
+
+  /* ─── Thumbnail upload ─── */
+  const handleThumbnailUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Max thumbnail size is 10MB.", variant: "destructive" });
+      return;
+    }
+    const fileName = `thumb-${Date.now()}.${file.name.split('.').pop()}`;
+    const { error } = await supabase.storage.from("video-thumbnails").upload(fileName, file, {
+      contentType: file.type, upsert: true,
+    });
+    if (error) {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    const { data: pub } = supabase.storage.from("video-thumbnails").getPublicUrl(fileName);
+    setThumbnailUrl(pub.publicUrl);
+    toast({ title: "Thumbnail Uploaded", description: "Thumbnail ready for publishing." });
+  };
+
+  /* ─── Publish to YouTube ─── */
+  const publishToYouTube = async () => {
+    if (!videoOutputUrl) {
+      toast({ title: "No Video", description: "Render the video first before publishing.", variant: "destructive" });
+      return;
+    }
+    setPublishingToYouTube(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      const ytTitle = youtubeMetadata?.titles?.[0] || contentTitle;
+      const ytDesc = youtubeMetadata?.description || `Video created with Island of One Video Studio`;
+      const ytTags = youtubeMetadata?.tags || [];
+
+      const response = await supabase.functions.invoke("publish-to-youtube", {
+        body: {
+          videoUrl: videoOutputUrl,
+          title: ytTitle,
+          description: ytDesc,
+          tags: ytTags,
+          thumbnailUrl: thumbnailUrl || undefined,
+        },
+      });
+
+      if (response.error) throw new Error(response.error.message || "YouTube publish failed");
+
+      const data = response.data as any;
+      toast({
+        title: "Published to YouTube!",
+        description: data?.youtubeUrl ? `Video live at ${data.youtubeUrl}` : "Video uploaded successfully.",
+      });
+    } catch (err: any) {
+      toast({ title: "YouTube Publish Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setPublishingToYouTube(false);
+    }
   };
 
   /* ─── Main pipeline ─── */
@@ -830,7 +893,7 @@ export default function VideoStudio() {
               </label>
               {customVideoUrl && (
                 <div className="space-y-2">
-                  <video src={customVideoUrl} controls className="w-full rounded-md border border-border" style={{ maxHeight: 200 }} />
+                  <video src={customVideoUrl} controls loop={videoLoop} className="w-full rounded-md border border-border" style={{ maxHeight: 200 }} />
                   <div className="flex gap-2">
                     <Badge variant="secondary" className="text-[10px]">Video loaded</Badge>
                     <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => setCustomVideoUrl("")}>
@@ -840,6 +903,40 @@ export default function VideoStudio() {
                   <p className="text-[9px] text-muted-foreground">When rendered, narration audio will be overlaid on this video instead of generated slides.</p>
                 </div>
               )}
+
+              {/* Loop Toggle */}
+              <div className="flex items-center justify-between border border-border rounded-md p-3">
+                <div className="flex items-center gap-2">
+                  <RotateCcw className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-sm">Loop Video</Label>
+                </div>
+                <Switch checked={videoLoop} onCheckedChange={setVideoLoop} />
+              </div>
+
+              {/* Thumbnail Upload */}
+              <div className="space-y-2">
+                <Label className="text-xs flex items-center gap-1.5">
+                  <MonitorPlay className="h-3 w-3" /> Thumbnail Image
+                </Label>
+                <label>
+                  <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" onChange={handleThumbnailUpload} className="hidden" />
+                  <Button variant="outline" size="sm" className="w-full gap-2" asChild>
+                    <span><Upload className="h-3.5 w-3.5" /> Upload Thumbnail</span>
+                  </Button>
+                </label>
+                {thumbnailUrl && (
+                  <div className="relative group">
+                    <img src={thumbnailUrl} alt="Thumbnail" className="w-full rounded-md border border-border" style={{ maxHeight: 120 }} />
+                    <button
+                      onClick={() => setThumbnailUrl("")}
+                      className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
+                <p className="text-[9px] text-muted-foreground">Used as YouTube thumbnail when publishing. PNG/JPG, max 10MB.</p>
+              </div>
             </CardContent>
           </Card>
 
@@ -1179,9 +1276,23 @@ export default function VideoStudio() {
                       </a>
                     </Button>
                   )}
-                  <Button variant="outline" size="sm" className="w-full gap-2" disabled>
-                    <Youtube className="h-3.5 w-3.5" /> Publish to YouTube (coming soon)
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full gap-2"
+                    onClick={publishToYouTube}
+                    disabled={!videoOutputUrl || publishingToYouTube}
+                  >
+                    {publishingToYouTube ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Youtube className="h-3.5 w-3.5" />
+                    )}
+                    {publishingToYouTube ? "Publishing…" : "Publish to YouTube"}
                   </Button>
+                  {thumbnailUrl && (
+                    <p className="text-[9px] text-muted-foreground">✓ Custom thumbnail will be used</p>
+                  )}
                   <Button variant="outline" size="sm" className="w-full gap-2" disabled>
                     <Share2 className="h-3.5 w-3.5" /> Share Link (coming soon)
                   </Button>
