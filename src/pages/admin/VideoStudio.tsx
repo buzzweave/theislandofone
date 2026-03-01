@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import {
   Film, Mic, Wand2, Play, Download, Share2, Sparkles, Music,
   Zap, MonitorPlay, Smartphone, Square, Loader2, AlertCircle,
-  RotateCcw, Volume2, BookOpen, FileText, PenLine, Youtube,
+  RotateCcw, Volume2, BookOpen, FileText, PenLine,
   Newspaper, Library, Upload, Plus, Trash2, Scissors, Brain, Palette,
   Headphones, SlidersHorizontal, Video
 } from "lucide-react";
@@ -33,11 +33,9 @@ import {
   autoMatchVoice,
   applyViralHookBoost,
   EXPORT_PRESETS,
-  generateYouTubeMetadata,
   generateShortsFromSlides,
   type SceneSlide,
   type ExportPreset,
-  type YouTubeMetadata,
   type ShortClip,
 } from "@/lib/cinematicEngine";
 
@@ -157,7 +155,7 @@ export default function VideoStudio() {
   const [customVideoUrl, setCustomVideoUrl] = useState<string>("");
   const [videoLoop, setVideoLoop] = useState(false);
   const [thumbnailUrl, setThumbnailUrl] = useState<string>("");
-  const [publishingToYouTube, setPublishingToYouTube] = useState(false);
+  
   // Prompt-to-video
   const [promptText, setPromptText] = useState("");
   const [studioMode, setStudioMode] = useState<"full" | "nano">("full");
@@ -170,8 +168,6 @@ export default function VideoStudio() {
   const [slides, setSlides] = useState<SceneSlide[]>([]);
   const [errorMsg, setErrorMsg] = useState("");
 
-  // YouTube optimizer
-  const [youtubeMetadata, setYoutubeMetadata] = useState<YouTubeMetadata | null>(null);
 
   // Shorts generator
   const [generatedShorts, setGeneratedShorts] = useState<ShortClip[]>([]);
@@ -351,44 +347,6 @@ export default function VideoStudio() {
     toast({ title: "Thumbnail Uploaded", description: "Thumbnail ready for publishing." });
   };
 
-  /* ─── Publish to YouTube ─── */
-  const publishToYouTube = async () => {
-    if (!videoOutputUrl) {
-      toast({ title: "No Video", description: "Render the video first before publishing.", variant: "destructive" });
-      return;
-    }
-    setPublishingToYouTube(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
-
-      const ytTitle = youtubeMetadata?.titles?.[0] || contentTitle;
-      const ytDesc = youtubeMetadata?.description || `Video created with Island of One Video Studio`;
-      const ytTags = youtubeMetadata?.tags || [];
-
-      const response = await supabase.functions.invoke("publish-to-youtube", {
-        body: {
-          videoUrl: videoOutputUrl,
-          title: ytTitle,
-          description: ytDesc,
-          tags: ytTags,
-          thumbnailUrl: thumbnailUrl || undefined,
-        },
-      });
-
-      if (response.error) throw new Error(response.error.message || "YouTube publish failed");
-
-      const data = response.data as any;
-      toast({
-        title: "Published to YouTube!",
-        description: data?.youtubeUrl ? `Video live at ${data.youtubeUrl}` : "Video uploaded successfully.",
-      });
-    } catch (err: any) {
-      toast({ title: "YouTube Publish Failed", description: err.message, variant: "destructive" });
-    } finally {
-      setPublishingToYouTube(false);
-    }
-  };
 
   /* ─── Main pipeline ─── */
   const runPipeline = async () => {
@@ -399,7 +357,6 @@ export default function VideoStudio() {
     }
 
     setErrorMsg("");
-    setYoutubeMetadata(null);
     setGeneratedShorts([]);
 
     try {
@@ -474,10 +431,6 @@ export default function VideoStudio() {
         prompt: promptText,
       });
 
-      // Generate YouTube metadata
-      const ytMeta = generateYouTubeMetadata(contentTitle, text, tone);
-      setYoutubeMetadata(ytMeta);
-
       // Generate shorts candidates
       const shorts = generateShortsFromSlides(finalSlides);
       setGeneratedShorts(shorts);
@@ -499,7 +452,6 @@ export default function VideoStudio() {
     setErrorMsg("");
     setMusicUrl("");
     setVideoOutputUrl("");
-    setYoutubeMetadata(null);
     setGeneratedShorts([]);
   };
 
@@ -935,7 +887,7 @@ export default function VideoStudio() {
                     </button>
                   </div>
                 )}
-                <p className="text-[9px] text-muted-foreground">Used as YouTube thumbnail when publishing. PNG/JPG, max 10MB.</p>
+                <p className="text-[9px] text-muted-foreground">Custom thumbnail. PNG/JPG, max 10MB.</p>
               </div>
             </CardContent>
           </Card>
@@ -1029,7 +981,7 @@ export default function VideoStudio() {
                 <Switch checked={cinematicStoryMode} onCheckedChange={setCinematicStoryMode} />
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                Documentary-style hooks, emotional pacing, scene-aware pauses, YouTube retention optimization.
+                Documentary-style hooks, emotional pacing, scene-aware pauses, retention optimization.
               </p>
             </CardContent>
           </Card>
@@ -1146,7 +1098,7 @@ export default function VideoStudio() {
             <CardContent>
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { id: "16:9", label: "YouTube 4K", icon: MonitorPlay },
+                  { id: "16:9", label: "Widescreen 4K", icon: MonitorPlay },
                   { id: "9:16", label: "Shorts", icon: Smartphone },
                   { id: "1:1", label: "Square", icon: Square },
                 ].map((f) => (
