@@ -105,6 +105,7 @@ export default function VideoRenderer({
       videoElement.crossOrigin = "anonymous";
       videoElement.src = customVideoUrl;
       videoElement.muted = true;
+      videoElement.loop = true;
       await new Promise<void>((resolve) => {
         videoElement!.oncanplaythrough = () => resolve();
         videoElement!.onerror = () => resolve();
@@ -292,7 +293,7 @@ export default function VideoRenderer({
       ctx.translate(-dims.w / 2, -dims.h / 2);
 
       if (videoElement && videoElement.readyState >= 2) {
-        // Draw uploaded video frame as background
+        // Draw uploaded video as the full background for every frame
         ctx.drawImage(videoElement, 0, 0, dims.w, dims.h);
       } else if (slideImage) {
         const scale = 1 + slideProgress * zoomIntensity;

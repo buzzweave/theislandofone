@@ -899,7 +899,7 @@ export default function VideoStudio() {
                 </label>
                 {thumbnailUrl && (
                   <div className="relative group">
-                    <img src={thumbnailUrl} alt="Thumbnail" className="w-full rounded-md border border-border" style={{ maxHeight: 120 }} />
+                    <img src={thumbnailUrl} alt="Thumbnail" className="w-full rounded-md border border-border aspect-video object-cover" />
                     <button
                       onClick={() => setThumbnailUrl("")}
                       className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -908,7 +908,7 @@ export default function VideoStudio() {
                     </button>
                   </div>
                 )}
-                <p className="text-[9px] text-muted-foreground">Custom thumbnail. PNG/JPG, max 10MB.</p>
+                <p className="text-[9px] text-muted-foreground">YouTube thumbnail (1280×720). PNG/JPG, max 10MB.</p>
               </div>
             </CardContent>
           </Card>
@@ -929,13 +929,22 @@ export default function VideoStudio() {
                       key={i}
                       className="aspect-video rounded-lg overflow-hidden relative flex items-center justify-center p-4"
                       style={{
-                        background: slide.image ? `url(${slide.image}) center/cover` : slide.bg,
+                        background: customVideoUrl
+                          ? "linear-gradient(135deg, #1a1a2e, #16213e)"
+                          : slide.image ? `url(${slide.image}) center/cover` : slide.bg,
                       }}
                     >
                       <div className="absolute inset-0 bg-black/30" />
-                      <p className="relative z-10 text-white text-xs font-medium text-center leading-relaxed line-clamp-4">
-                        {slide.text}
-                      </p>
+                      {customVideoUrl && (
+                        <div className="absolute top-1.5 left-2">
+                          <Badge variant="secondary" className="text-[8px] px-1 py-0">🎥 Video</Badge>
+                        </div>
+                      )}
+                      {showNarrationText && slide.text && (
+                        <p className="relative z-10 text-white text-xs font-medium text-center leading-relaxed line-clamp-4">
+                          {slide.text}
+                        </p>
+                      )}
                       <div className="absolute bottom-1.5 right-2 flex items-center gap-1">
                         {slide.emotion && slide.emotion !== "neutral" && (
                           <Badge variant="secondary" className="text-[8px] px-1 py-0">{slide.emotion}</Badge>
