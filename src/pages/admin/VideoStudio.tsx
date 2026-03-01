@@ -238,7 +238,7 @@ export default function VideoStudio() {
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          text: text.slice(0, 4000),
+          text,
           voice: voiceId,
           title,
           provider: voiceProvider,
@@ -294,12 +294,22 @@ export default function VideoStudio() {
           body: JSON.stringify({ text: sampleText, voice: vId, title: "preview", provider: voiceProvider }),
         }
       );
-      if (!response.ok) throw new Error("Preview failed");
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({ error: `Preview failed (${response.status})` }));
+        throw new Error(errData.error || `Voice preview failed (${response.status})`);
+      }
       const data = await response.json();
       if (data.audioUrl) {
         const audio = new Audio(data.audioUrl);
+        audio.onerror = () => {
+          toast({ title: "Playback Error", description: `Could not play audio for this voice. The voice may not be available.`, variant: "destructive" });
+        };
         audio.playbackRate = voiceMixer.speed;
-        audio.play();
+        audio.play().catch((playErr) => {
+          toast({ title: "Playback Error", description: playErr.message || "Browser blocked audio playback.", variant: "destructive" });
+        });
+      } else {
+        throw new Error("No audio URL returned from preview");
       }
     } catch (e: any) {
       toast({ title: "Preview Error", description: e.message, variant: "destructive" });
