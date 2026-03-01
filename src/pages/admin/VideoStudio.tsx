@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import {
   Film, Mic, Wand2, Play, Download, Share2, Sparkles, Music,
   Zap, MonitorPlay, Smartphone, Square, Loader2, AlertCircle,
-  RotateCcw, Volume2, BookOpen, FileText, PenLine,
+  RotateCcw, Volume2, BookOpen, FileText, PenLine, Youtube,
   Newspaper, Library, Upload, Plus, Trash2, Scissors, Brain, Palette,
   Headphones, SlidersHorizontal, Video
 } from "lucide-react";
@@ -33,9 +33,11 @@ import {
   autoMatchVoice,
   applyViralHookBoost,
   EXPORT_PRESETS,
+  generateYouTubeMetadata,
   generateShortsFromSlides,
   type SceneSlide,
   type ExportPreset,
+  type YouTubeMetadata,
   type ShortClip,
 } from "@/lib/cinematicEngine";
 
@@ -155,6 +157,9 @@ export default function VideoStudio() {
   const [customVideoUrl, setCustomVideoUrl] = useState<string>("");
   const [videoLoop, setVideoLoop] = useState(false);
   const [thumbnailUrl, setThumbnailUrl] = useState<string>("");
+
+  // YouTube optimizer
+  const [youtubeMetadata, setYoutubeMetadata] = useState<YouTubeMetadata | null>(null);
   
   // Prompt-to-video
   const [promptText, setPromptText] = useState("");
@@ -357,6 +362,7 @@ export default function VideoStudio() {
     }
 
     setErrorMsg("");
+    setYoutubeMetadata(null);
     setGeneratedShorts([]);
 
     try {
@@ -431,6 +437,10 @@ export default function VideoStudio() {
         prompt: promptText,
       });
 
+      // Generate YouTube metadata
+      const ytMeta = generateYouTubeMetadata(contentTitle, text, tone);
+      setYoutubeMetadata(ytMeta);
+
       // Generate shorts candidates
       const shorts = generateShortsFromSlides(finalSlides);
       setGeneratedShorts(shorts);
@@ -452,6 +462,7 @@ export default function VideoStudio() {
     setErrorMsg("");
     setMusicUrl("");
     setVideoOutputUrl("");
+    setYoutubeMetadata(null);
     setGeneratedShorts([]);
   };
 
@@ -1232,15 +1243,10 @@ export default function VideoStudio() {
                     variant="outline"
                     size="sm"
                     className="w-full gap-2"
-                    onClick={publishToYouTube}
-                    disabled={!videoOutputUrl || publishingToYouTube}
+                    disabled
                   >
-                    {publishingToYouTube ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Youtube className="h-3.5 w-3.5" />
-                    )}
-                    {publishingToYouTube ? "Publishing…" : "Publish to YouTube"}
+                    <Youtube className="h-3.5 w-3.5" />
+                    Publish to YouTube (coming soon)
                   </Button>
                   {thumbnailUrl && (
                     <p className="text-[9px] text-muted-foreground">✓ Custom thumbnail will be used</p>
