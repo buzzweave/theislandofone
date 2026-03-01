@@ -18,8 +18,10 @@ import {
   Film, Mic, Wand2, Play, Download, Share2, Sparkles, Music,
   Zap, MonitorPlay, Smartphone, Square, Loader2, AlertCircle,
   RotateCcw, Volume2, BookOpen, FileText, PenLine, Youtube,
-  Newspaper, Library, Upload, Plus, Trash2, Scissors, Brain, Palette
+  Newspaper, Library, Upload, Plus, Trash2, Scissors, Brain, Palette,
+  Headphones, SlidersHorizontal, Video
 } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
 import VideoRenderer from "@/components/admin/video-studio/VideoRenderer";
 import NanoStudio from "@/components/admin/video-studio/NanoStudio";
 import BackgroundMusicPanel, { type MusicSettings } from "@/components/admin/video-studio/BackgroundMusicPanel";
@@ -41,12 +43,19 @@ import {
 
 /* ─── Voice configs ─── */
 const OPENAI_VOICES = [
-  { id: "alloy", label: "Alloy", desc: "Neutral, balanced" },
-  { id: "echo", label: "Echo", desc: "Warm, smooth" },
-  { id: "fable", label: "Fable", desc: "Expressive, dynamic" },
-  { id: "onyx", label: "Onyx", desc: "Deep, authoritative" },
-  { id: "nova", label: "Nova", desc: "Friendly, warm" },
-  { id: "shimmer", label: "Shimmer", desc: "Clear, bright" },
+  { id: "alloy", label: "Alloy", desc: "Neutral, balanced, versatile" },
+  { id: "ash", label: "Ash", desc: "Confident, warm male" },
+  { id: "ballad", label: "Ballad", desc: "Smooth, melodic storyteller" },
+  { id: "cedar", label: "Cedar", desc: "Grounded, calm male" },
+  { id: "coral", label: "Coral", desc: "Conversational, friendly female" },
+  { id: "echo", label: "Echo", desc: "Warm, smooth male" },
+  { id: "fable", label: "Fable", desc: "Expressive, dynamic British" },
+  { id: "marin", label: "Marin", desc: "Natural, flowing female" },
+  { id: "nova", label: "Nova", desc: "Friendly, energetic female" },
+  { id: "onyx", label: "Onyx", desc: "Deep, authoritative male" },
+  { id: "sage", label: "Sage", desc: "Wise, measured narrator" },
+  { id: "shimmer", label: "Shimmer", desc: "Clear, bright female" },
+  { id: "verse", label: "Verse", desc: "Rich, poetic male" },
 ];
 
 const ELEVENLABS_VOICES = [
@@ -119,6 +128,8 @@ export default function VideoStudio() {
   const [voiceId, setVoiceId] = useState("onyx");
   const [tone, setTone] = useState("cinematic");
   const [autoVoiceMatch, setAutoVoiceMatch] = useState(true);
+  const [voiceMixer, setVoiceMixer] = useState({ speed: 1.0, pitch: 1.0, depth: 50 });
+  const [previewingVoice, setPreviewingVoice] = useState<string | null>(null);
 
   // Options
   const [viralMode, setViralMode] = useState(false);
@@ -143,7 +154,7 @@ export default function VideoStudio() {
 
   // Custom slides upload
   const [customSlideImages, setCustomSlideImages] = useState<string[]>([]);
-
+  const [customVideoUrl, setCustomVideoUrl] = useState<string>("");
   // Prompt-to-video
   const [promptText, setPromptText] = useState("");
   const [studioMode, setStudioMode] = useState<"full" | "nano">("full");
@@ -262,6 +273,58 @@ export default function VideoStudio() {
     }
     setCustomSlideImages((prev) => [...prev, ...urls]);
     toast({ title: "Slides Uploaded", description: `${urls.length} image(s) added.` });
+  };
+
+  /* ─── Voice preview ─── */
+  const previewVoice = async (vId: string) => {
+    setPreviewingVoice(vId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+      const sampleText = "The truth is not always easy to hear, but it is always worth seeking.";
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/text-to-speech`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ text: sampleText, voice: vId, title: "preview", provider: voiceProvider }),
+        }
+      );
+      if (!response.ok) throw new Error("Preview failed");
+      const data = await response.json();
+      if (data.audioUrl) {
+        const audio = new Audio(data.audioUrl);
+        audio.playbackRate = voiceMixer.speed;
+        audio.play();
+      }
+    } catch (e: any) {
+      toast({ title: "Preview Error", description: e.message, variant: "destructive" });
+    } finally {
+      setPreviewingVoice(null);
+    }
+  };
+
+  /* ─── Video upload for voiceover ─── */
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 100 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Max video size is 100MB.", variant: "destructive" });
+      return;
+    }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const fileName = `voiceover-${Date.now()}.${file.name.split('.').pop()}`;
+    const { error } = await supabase.storage.from("audio-files").upload(`videos/uploads/${fileName}`, file, {
+      contentType: file.type, upsert: true,
+    });
+    if (error) {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    const { data: pub } = supabase.storage.from("audio-files").getPublicUrl(`videos/uploads/${fileName}`);
+    setCustomVideoUrl(pub.publicUrl);
+    toast({ title: "Video Uploaded", description: "Video ready for voiceover." });
   };
 
   /* ─── Main pipeline ─── */
@@ -592,7 +655,7 @@ export default function VideoStudio() {
                   <Select value={voiceProvider} onValueChange={(v) => setVoiceProvider(v as any)} disabled={autoVoiceMatch}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="openai">OpenAI</SelectItem>
+                      <SelectItem value="openai">OpenAI (13 voices)</SelectItem>
                       <SelectItem value="elevenlabs">ElevenLabs</SelectItem>
                     </SelectContent>
                   </Select>
@@ -610,6 +673,80 @@ export default function VideoStudio() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              {/* Voice List with Preview Buttons */}
+              <div className="space-y-1.5">
+                <Label className="text-xs flex items-center gap-1"><Headphones className="h-3 w-3" /> Test Voices</Label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-48 overflow-y-auto pr-1">
+                  {voices.map((v) => (
+                    <button
+                      key={v.id}
+                      onClick={() => {
+                        setVoiceId(v.id);
+                        previewVoice(v.id);
+                      }}
+                      disabled={previewingVoice !== null}
+                      className={`flex items-center gap-1.5 text-left p-2 rounded-md border text-[11px] transition-colors ${
+                        voiceId === v.id
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border hover:border-primary/40"
+                      }`}
+                    >
+                      {previewingVoice === v.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin shrink-0" />
+                      ) : (
+                        <Play className="h-3 w-3 shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{v.label}</div>
+                        <div className="text-muted-foreground truncate text-[9px]">{v.desc}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Voice Mixer */}
+              <div className="border border-border rounded-md p-3 space-y-3">
+                <div className="flex items-center gap-2">
+                  <SlidersHorizontal className="h-4 w-4 text-primary" />
+                  <Label className="text-sm font-medium">Voice Mixer</Label>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[11px]">Speed</Label>
+                    <span className="text-[10px] text-muted-foreground">{voiceMixer.speed.toFixed(1)}x</span>
+                  </div>
+                  <Slider
+                    value={[voiceMixer.speed * 100]}
+                    onValueChange={([v]) => setVoiceMixer((p) => ({ ...p, speed: v / 100 }))}
+                    min={50} max={200} step={5}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[11px]">Depth / Warmth</Label>
+                    <span className="text-[10px] text-muted-foreground">{voiceMixer.depth}%</span>
+                  </div>
+                  <Slider
+                    value={[voiceMixer.depth]}
+                    onValueChange={([v]) => setVoiceMixer((p) => ({ ...p, depth: v }))}
+                    min={0} max={100} step={5}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[11px]">Pitch Shift</Label>
+                    <span className="text-[10px] text-muted-foreground">{voiceMixer.pitch.toFixed(1)}x</span>
+                  </div>
+                  <Slider
+                    value={[voiceMixer.pitch * 100]}
+                    onValueChange={([v]) => setVoiceMixer((p) => ({ ...p, pitch: v / 100 }))}
+                    min={50} max={150} step={5}
+                  />
+                </div>
+                <p className="text-[9px] text-muted-foreground">Mixer adjustments are applied during preview playback and final render. No extra credit consumed.</p>
               </div>
 
               <div className="space-y-2">
@@ -671,6 +808,36 @@ export default function VideoStudio() {
                       </button>
                     </div>
                   ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Video Upload for Voiceover */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Video className="h-4 w-4" /> Video Upload (Voiceover)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">Upload a video file and the studio will place your generated voiceover narration on top of it.</p>
+              <label>
+                <input type="file" accept="video/mp4,video/webm,video/mov,video/quicktime" onChange={handleVideoUpload} className="hidden" />
+                <Button variant="outline" className="w-full gap-2" asChild>
+                  <span><Upload className="h-4 w-4" /> Upload Video</span>
+                </Button>
+              </label>
+              {customVideoUrl && (
+                <div className="space-y-2">
+                  <video src={customVideoUrl} controls className="w-full rounded-md border border-border" style={{ maxHeight: 200 }} />
+                  <div className="flex gap-2">
+                    <Badge variant="secondary" className="text-[10px]">Video loaded</Badge>
+                    <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => setCustomVideoUrl("")}>
+                      <Trash2 className="h-3 w-3 mr-1" /> Remove
+                    </Button>
+                  </div>
+                  <p className="text-[9px] text-muted-foreground">When rendered, narration audio will be overlaid on this video instead of generated slides.</p>
                 </div>
               )}
             </CardContent>
@@ -931,6 +1098,8 @@ export default function VideoStudio() {
                   showNarrationText={showNarrationText}
                   enableBranding={enableBranding}
                   exportPreset={selectedPreset}
+                  customVideoUrl={customVideoUrl || undefined}
+                  voiceMixer={voiceMixer}
                   onComplete={(url) => setVideoOutputUrl(url)}
                 />
               )}

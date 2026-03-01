@@ -34,6 +34,8 @@ interface VideoRendererProps {
   showNarrationText?: boolean;
   enableBranding?: boolean;
   exportPreset?: string;
+  customVideoUrl?: string;
+  voiceMixer?: { speed: number; pitch: number; depth: number };
   onComplete?: (videoUrl: string) => void;
 }
 
@@ -59,6 +61,8 @@ export default function VideoRenderer({
   showNarrationText = true,
   enableBranding = true,
   exportPreset,
+  customVideoUrl,
+  voiceMixer,
   onComplete,
 }: VideoRendererProps) {
   const [rendering, setRendering] = useState(false);
@@ -94,6 +98,20 @@ export default function VideoRenderer({
     canvas.height = dims.h;
     const ctx = canvas.getContext("2d")!;
 
+    // Load custom video element if provided
+    let videoElement: HTMLVideoElement | null = null;
+    if (customVideoUrl) {
+      videoElement = document.createElement("video");
+      videoElement.crossOrigin = "anonymous";
+      videoElement.src = customVideoUrl;
+      videoElement.muted = true;
+      await new Promise<void>((resolve) => {
+        videoElement!.oncanplaythrough = () => resolve();
+        videoElement!.onerror = () => resolve();
+        videoElement!.load();
+      });
+    }
+
     const slideImages = await loadSlideImages(slides);
 
     // Scene-aware: use per-slide holdDuration or default
@@ -119,6 +137,9 @@ export default function VideoRenderer({
     // Load narration
     const narrationAudio = new Audio(audioUrl);
     narrationAudio.crossOrigin = "anonymous";
+    if (voiceMixer) {
+      narrationAudio.playbackRate = voiceMixer.speed;
+    }
     await new Promise<void>((resolve, reject) => {
       narrationAudio.oncanplaythrough = () => resolve();
       narrationAudio.onerror = () => reject(new Error("Failed to load narration audio"));
@@ -208,6 +229,7 @@ export default function VideoRenderer({
     mediaRecorder.start(100);
     narrationAudio.play();
     if (musicAudio) musicAudio.play();
+    if (videoElement) videoElement.play();
 
     let frame = 0;
     const drawFrame = () => {
@@ -215,6 +237,7 @@ export default function VideoRenderer({
         mediaRecorder.stop();
         narrationAudio.pause();
         if (musicAudio) musicAudio.pause();
+        if (videoElement) videoElement.pause();
         audioCtx.close();
         return;
       }
@@ -268,7 +291,10 @@ export default function VideoRenderer({
       ctx.scale(transitionScale, transitionScale);
       ctx.translate(-dims.w / 2, -dims.h / 2);
 
-      if (slideImage) {
+      if (videoElement && videoElement.readyState >= 2) {
+        // Draw uploaded video frame as background
+        ctx.drawImage(videoElement, 0, 0, dims.w, dims.h);
+      } else if (slideImage) {
         const scale = 1 + slideProgress * zoomIntensity;
         ctx.save();
         ctx.translate(dims.w / 2, dims.h / 2);
@@ -474,7 +500,7 @@ export default function VideoRenderer({
     }
 
     setRendering(false);
-  }, [slides, audioUrl, musicUrl, musicVolume, musicFadeIn, musicFadeOut, musicLoop, outputFormat, viralMode, effects, transition, title, showNarrationText, enableBranding, exportPreset, onComplete, toast]);
+  }, [slides, audioUrl, musicUrl, musicVolume, musicFadeIn, musicFadeOut, musicLoop, outputFormat, viralMode, effects, transition, title, showNarrationText, enableBranding, exportPreset, customVideoUrl, voiceMixer, onComplete, toast]);
 
   return (
     <div className="space-y-3">
