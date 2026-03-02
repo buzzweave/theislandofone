@@ -3,40 +3,48 @@ import { useToast } from "@/hooks/use-toast";
 
 interface SocialShareLinksProps {
   title: string;
+  /** Edge-function URL for social crawlers (OG tags) */
   url?: string;
+  /** Human-friendly page URL for copy-to-clipboard */
+  pageUrl?: string;
 }
 
-export default function SocialShareLinks({ title, url }: SocialShareLinksProps) {
+export default function SocialShareLinks({ title, url, pageUrl }: SocialShareLinksProps) {
   const { toast } = useToast();
-  const shareUrl = url || (typeof window !== "undefined" ? window.location.href : "");
-  const encodedUrl = encodeURIComponent(shareUrl);
+
+  // The edge-function URL is used for social share dialogs (crawlers parse OG tags)
+  const crawlerUrl = url || (typeof window !== "undefined" ? window.location.href : "");
+  // The page URL is what humans see when pasting a link (clean URL, no raw HTML)
+  const humanUrl = pageUrl || (typeof window !== "undefined" ? window.location.href : "");
+
+  const encodedCrawlerUrl = encodeURIComponent(crawlerUrl);
   const encodedTitle = encodeURIComponent(title);
 
   const links = [
     {
       label: "Facebook",
       icon: Facebook,
-      href: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
+      href: `https://www.facebook.com/sharer/sharer.php?u=${encodedCrawlerUrl}`,
     },
     {
       label: "X",
       icon: Twitter,
-      href: `https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedTitle}`,
+      href: `https://twitter.com/intent/tweet?url=${encodedCrawlerUrl}&text=${encodedTitle}`,
     },
     {
       label: "LinkedIn",
       icon: Linkedin,
-      href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
+      href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedCrawlerUrl}`,
     },
     {
       label: "WhatsApp",
       icon: MessageCircle,
-      href: `https://wa.me/?text=${encodedTitle}%20${encodedUrl}`,
+      href: `https://wa.me/?text=${encodedTitle}%20${encodedCrawlerUrl}`,
     },
     {
       label: "Instagram",
       icon: Instagram,
-      href: null, // Instagram doesn't support share-via-URL
+      href: null,
       action: "copy",
     },
     {
@@ -58,7 +66,7 @@ export default function SocialShareLinks({ title, url }: SocialShareLinksProps) 
   ];
 
   const copyLink = () => {
-    navigator.clipboard.writeText(shareUrl);
+    navigator.clipboard.writeText(humanUrl);
     toast({ title: "Link copied", description: "Share link copied to clipboard." });
   };
 
