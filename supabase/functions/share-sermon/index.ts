@@ -77,7 +77,7 @@ Deno.serve(async (req: Request) => {
 </body></html>`;
 
     return new Response(page, {
-      headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" },
+      headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=3600" },
     });
   } catch (err) {
     console.error("share-sermon error:", err);
