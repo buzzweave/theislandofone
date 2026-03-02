@@ -250,6 +250,7 @@ export default function BlogPost() {
           <SocialShareLinks
             title={post.title}
             url={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/share-blog?slug=${encodeURIComponent(slug || "")}`}
+            pageUrl={`https://theislandofone.com/blog/${slug}`}
           />
         </div>
 
