@@ -160,7 +160,7 @@ export default function BookDetail() {
                 {renderContent(book.description)}
               </div>
 
-              <Tabs defaultValue={canRead ? "download" : "read"} className="w-full mb-4">
+              <Tabs defaultValue="read" className="w-full mb-4">
                 <TabsList className="mb-4">
                   {canRead && (
                     <TabsTrigger value="download" className="gap-2">
