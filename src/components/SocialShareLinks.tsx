@@ -1,48 +1,46 @@
 import { Facebook, Twitter, Linkedin, Link2, MessageCircle, Instagram, Youtube } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { shareCleanLink } from "@/lib/shareCleanLink";
+import { shareUrlOnly } from "@/lib/shareUrlOnly";
 
 interface SocialShareLinksProps {
   title: string;
   /** Edge-function URL with OG tags for social-crawler share dialogs */
   url?: string;
-  /** Human-friendly canonical page URL */
+  /** Human-friendly canonical page URL (unused now — kept for API compat) */
   pageUrl?: string;
-  /** Plain-text description / excerpt for native share sheet */
+  /** Plain-text description (unused in share payload — kept for API compat) */
   description?: string;
 }
 
-export default function SocialShareLinks({ title, url, pageUrl, description }: SocialShareLinksProps) {
+export default function SocialShareLinks({ title, url, pageUrl }: SocialShareLinksProps) {
   const { toast } = useToast();
 
-  // Crawler URL (edge function) for social share dialogs that scrape OG tags
-  const crawlerUrl = url || (typeof window !== "undefined" ? window.location.href : "");
-  // Clean canonical URL for humans (iMessage, SMS, clipboard)
-  const humanUrl = pageUrl || (typeof window !== "undefined" ? window.location.href : "");
+  // Edge function URL serves OG tags for crawlers then redirects humans
+  const shareUrl = url || (typeof window !== "undefined" ? window.location.href : "");
 
-  const encodedCrawlerUrl = encodeURIComponent(crawlerUrl);
+  const encodedUrl = encodeURIComponent(shareUrl);
   const encodedTitle = encodeURIComponent(title);
 
   const links = [
     {
       label: "Facebook",
       icon: Facebook,
-      href: `https://www.facebook.com/sharer/sharer.php?u=${encodedCrawlerUrl}`,
+      href: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
     },
     {
       label: "X",
       icon: Twitter,
-      href: `https://twitter.com/intent/tweet?url=${encodedCrawlerUrl}&text=${encodedTitle}`,
+      href: `https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedTitle}`,
     },
     {
       label: "LinkedIn",
       icon: Linkedin,
-      href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedCrawlerUrl}`,
+      href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
     },
     {
       label: "WhatsApp",
       icon: MessageCircle,
-      href: `https://wa.me/?text=${encodedTitle}%20${encodedCrawlerUrl}`,
+      href: `https://wa.me/?text=${encodedTitle}%20${encodedUrl}`,
     },
     {
       label: "Instagram",
@@ -68,16 +66,9 @@ export default function SocialShareLinks({ title, url, pageUrl, description }: S
     },
   ];
 
-  // Use the crawler URL (edge function) for ALL share/copy so iMessage gets OG tags
-  const shareUrl = crawlerUrl;
-
-  /** Use Web Share API (iOS share sheet), fallback to clipboard */
+  /** URL-only share via Web Share API, fallback clipboard */
   const handleNativeShare = async () => {
-    const result = await shareCleanLink({
-      title,
-      description: description || "",
-      url: shareUrl,
-    });
+    const result = await shareUrlOnly(shareUrl);
     if (result.shared) {
       toast({ title: "Shared successfully" });
     } else if (result.copied) {
@@ -85,7 +76,7 @@ export default function SocialShareLinks({ title, url, pageUrl, description }: S
     }
   };
 
-  /** Simple clipboard copy for platforms like Instagram/TikTok */
+  /** Clipboard copy — URL only */
   const copyOnly = async () => {
     try {
       await navigator.clipboard.writeText(shareUrl);
