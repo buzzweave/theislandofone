@@ -1,53 +1,83 @@
 import { Facebook, Twitter, Linkedin, Link2, MessageCircle, Instagram, Youtube } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { shareUrlOnly } from "@/lib/shareUrlOnly";
 
 interface SocialShareLinksProps {
   title: string;
-  /** Edge-function URL with OG tags for social-crawler share dialogs */
+  /** Edge-function URL with OG tags — used ONLY for social platform share dialogs */
   url?: string;
-  /** Human-friendly canonical page URL (unused now — kept for API compat) */
+  /** Clean canonical page URL — used for native share / copy / iMessage */
   pageUrl?: string;
-  /** Plain-text description (unused in share payload — kept for API compat) */
+  /** Plain-text description (unused in share payload) */
   description?: string;
+}
+
+/**
+ * Share URL only — no title, no text, no description.
+ * Prevents iOS from fetching and inlining HTML content.
+ */
+async function nativeShareUrl(cleanUrl: string): Promise<{ shared?: boolean; copied?: boolean }> {
+  // Safety: never allow HTML-like content
+  if (/<!doctype|<html|<head|<meta/i.test(cleanUrl)) {
+    console.error("Blocked sharing HTML-like content");
+    return {};
+  }
+
+  try {
+    if (typeof navigator !== "undefined" && "share" in navigator) {
+      await navigator.share({ url: cleanUrl });
+      return { shared: true };
+    }
+  } catch (e: any) {
+    if (e?.name === "AbortError") return {};
+    console.warn("Share failed", e);
+  }
+
+  try {
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(cleanUrl);
+      return { copied: true };
+    }
+  } catch {
+    // fall through
+  }
+
+  prompt("Copy this link:", cleanUrl);
+  return {};
 }
 
 export default function SocialShareLinks({ title, url, pageUrl }: SocialShareLinksProps) {
   const { toast } = useToast();
 
-  // Edge function URL serves OG tags for crawlers then redirects humans
-  const shareUrl = url || (typeof window !== "undefined" ? window.location.href : "");
+  // Edge function URL — ONLY for social platform share dialogs (Facebook, Twitter, etc.)
+  const crawlerUrl = url || (typeof window !== "undefined" ? window.location.href : "");
+  // Clean canonical URL — for native share, copy, iMessage, SMS
+  const cleanUrl = pageUrl || (typeof window !== "undefined" ? window.location.href : "");
 
-  const encodedUrl = encodeURIComponent(shareUrl);
+  const encodedCrawlerUrl = encodeURIComponent(crawlerUrl);
   const encodedTitle = encodeURIComponent(title);
 
   const links = [
     {
       label: "Facebook",
       icon: Facebook,
-      href: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
+      href: `https://www.facebook.com/sharer/sharer.php?u=${encodedCrawlerUrl}`,
     },
     {
       label: "X",
       icon: Twitter,
-      href: `https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedTitle}`,
+      href: `https://twitter.com/intent/tweet?url=${encodedCrawlerUrl}&text=${encodedTitle}`,
     },
     {
       label: "LinkedIn",
       icon: Linkedin,
-      href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
+      href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedCrawlerUrl}`,
     },
     {
       label: "WhatsApp",
       icon: MessageCircle,
-      href: `https://wa.me/?text=${encodedTitle}%20${encodedUrl}`,
+      href: `https://wa.me/?text=${encodedTitle}%20${encodedCrawlerUrl}`,
     },
-    {
-      label: "Instagram",
-      icon: Instagram,
-      href: null,
-      action: "copy",
-    },
+    { label: "Instagram", icon: Instagram, href: null, action: "copy" as const },
     {
       label: "TikTok",
       icon: () => (
@@ -56,19 +86,14 @@ export default function SocialShareLinks({ title, url, pageUrl }: SocialShareLin
         </svg>
       ),
       href: null,
-      action: "copy",
+      action: "copy" as const,
     },
-    {
-      label: "YouTube",
-      icon: Youtube,
-      href: "https://www.youtube.com",
-      action: "open",
-    },
+    { label: "YouTube", icon: Youtube, href: "https://www.youtube.com", action: "open" as const },
   ];
 
-  /** URL-only share via Web Share API, fallback clipboard */
+  /** Native share sheet — shares ONLY the clean canonical URL */
   const handleNativeShare = async () => {
-    const result = await shareUrlOnly(shareUrl);
+    const result = await nativeShareUrl(cleanUrl);
     if (result.shared) {
       toast({ title: "Shared successfully" });
     } else if (result.copied) {
@@ -76,13 +101,13 @@ export default function SocialShareLinks({ title, url, pageUrl }: SocialShareLin
     }
   };
 
-  /** Clipboard copy — URL only */
+  /** Copy clean canonical URL only */
   const copyOnly = async () => {
     try {
-      await navigator.clipboard.writeText(shareUrl);
+      await navigator.clipboard.writeText(cleanUrl);
       toast({ title: "Link copied", description: "Paste it in the app to share." });
     } catch {
-      prompt("Copy this link:", shareUrl);
+      prompt("Copy this link:", cleanUrl);
     }
   };
 
