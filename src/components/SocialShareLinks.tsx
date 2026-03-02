@@ -3,43 +3,40 @@ import { useToast } from "@/hooks/use-toast";
 
 interface SocialShareLinksProps {
   title: string;
-  /** Edge-function URL for social crawlers (OG tags) */
+  /** Edge-function URL with OG tags for rich link previews */
   url?: string;
-  /** Human-friendly page URL for copy-to-clipboard */
   pageUrl?: string;
 }
 
-export default function SocialShareLinks({ title, url, pageUrl }: SocialShareLinksProps) {
+export default function SocialShareLinks({ title, url }: SocialShareLinksProps) {
   const { toast } = useToast();
 
-  // The edge-function URL is used for social share dialogs (crawlers parse OG tags)
-  const crawlerUrl = url || (typeof window !== "undefined" ? window.location.href : "");
-  // The page URL is what humans see when pasting a link (clean URL, no raw HTML)
-  const humanUrl = pageUrl || (typeof window !== "undefined" ? window.location.href : "");
-
-  const encodedCrawlerUrl = encodeURIComponent(crawlerUrl);
+  // Use the edge-function URL everywhere — it serves OG tags (image, title, description)
+  // and then redirects humans to the actual page via JS
+  const shareUrl = url || (typeof window !== "undefined" ? window.location.href : "");
+  const encodedUrl = encodeURIComponent(shareUrl);
   const encodedTitle = encodeURIComponent(title);
 
   const links = [
     {
       label: "Facebook",
       icon: Facebook,
-      href: `https://www.facebook.com/sharer/sharer.php?u=${encodedCrawlerUrl}`,
+      href: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
     },
     {
       label: "X",
       icon: Twitter,
-      href: `https://twitter.com/intent/tweet?url=${encodedCrawlerUrl}&text=${encodedTitle}`,
+      href: `https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedTitle}`,
     },
     {
       label: "LinkedIn",
       icon: Linkedin,
-      href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedCrawlerUrl}`,
+      href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
     },
     {
       label: "WhatsApp",
       icon: MessageCircle,
-      href: `https://wa.me/?text=${encodedTitle}%20${encodedCrawlerUrl}`,
+      href: `https://wa.me/?text=${encodedTitle}%20${encodedUrl}`,
     },
     {
       label: "Instagram",
@@ -66,7 +63,7 @@ export default function SocialShareLinks({ title, url, pageUrl }: SocialShareLin
   ];
 
   const copyLink = () => {
-    navigator.clipboard.writeText(humanUrl);
+    navigator.clipboard.writeText(shareUrl);
     toast({ title: "Link copied", description: "Share link copied to clipboard." });
   };
 
