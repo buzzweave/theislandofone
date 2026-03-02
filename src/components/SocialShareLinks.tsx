@@ -68,12 +68,15 @@ export default function SocialShareLinks({ title, url, pageUrl, description }: S
     },
   ];
 
-  /** Use Web Share API (iOS share sheet) with clean URL, fallback to clipboard */
+  // Use the crawler URL (edge function) for ALL share/copy so iMessage gets OG tags
+  const shareUrl = crawlerUrl;
+
+  /** Use Web Share API (iOS share sheet), fallback to clipboard */
   const handleNativeShare = async () => {
     const result = await shareCleanLink({
       title,
       description: description || "",
-      url: humanUrl,
+      url: shareUrl,
     });
     if (result.shared) {
       toast({ title: "Shared successfully" });
@@ -85,10 +88,10 @@ export default function SocialShareLinks({ title, url, pageUrl, description }: S
   /** Simple clipboard copy for platforms like Instagram/TikTok */
   const copyOnly = async () => {
     try {
-      await navigator.clipboard.writeText(humanUrl);
+      await navigator.clipboard.writeText(shareUrl);
       toast({ title: "Link copied", description: "Paste it in the app to share." });
     } catch {
-      prompt("Copy this link:", humanUrl);
+      prompt("Copy this link:", shareUrl);
     }
   };
 
