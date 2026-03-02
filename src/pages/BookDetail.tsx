@@ -218,7 +218,7 @@ export default function BookDetail() {
                 {!book.is_free && !purchased && ` · Preview first chapter free`}
               </p>
 
-              <SocialShareLinks title={book.title} url={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/share-book?id=${encodeURIComponent(id || '')}`} pageUrl={`https://theislandofone.com/books/${id}`} />
+              <SocialShareLinks title={book.title} url={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/share-book?id=${encodeURIComponent(id || '')}`} pageUrl={`https://theislandofone.com/books/${id}`} description={book.subtitle || book.description || ""} />
 
               {canRead && book.audio_url && (
                 <div className="mt-6">

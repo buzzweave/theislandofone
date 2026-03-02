@@ -1,42 +1,48 @@
 import { Facebook, Twitter, Linkedin, Link2, MessageCircle, Instagram, Youtube } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { shareCleanLink } from "@/lib/shareCleanLink";
 
 interface SocialShareLinksProps {
   title: string;
-  /** Edge-function URL with OG tags for rich link previews */
+  /** Edge-function URL with OG tags for social-crawler share dialogs */
   url?: string;
+  /** Human-friendly canonical page URL */
   pageUrl?: string;
+  /** Plain-text description / excerpt for native share sheet */
+  description?: string;
 }
 
-export default function SocialShareLinks({ title, url }: SocialShareLinksProps) {
+export default function SocialShareLinks({ title, url, pageUrl, description }: SocialShareLinksProps) {
   const { toast } = useToast();
 
-  // Use the edge-function URL everywhere — it serves OG tags (image, title, description)
-  // and then redirects humans to the actual page via JS
-  const shareUrl = url || (typeof window !== "undefined" ? window.location.href : "");
-  const encodedUrl = encodeURIComponent(shareUrl);
+  // Crawler URL (edge function) for social share dialogs that scrape OG tags
+  const crawlerUrl = url || (typeof window !== "undefined" ? window.location.href : "");
+  // Clean canonical URL for humans (iMessage, SMS, clipboard)
+  const humanUrl = pageUrl || (typeof window !== "undefined" ? window.location.href : "");
+
+  const encodedCrawlerUrl = encodeURIComponent(crawlerUrl);
   const encodedTitle = encodeURIComponent(title);
 
   const links = [
     {
       label: "Facebook",
       icon: Facebook,
-      href: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
+      href: `https://www.facebook.com/sharer/sharer.php?u=${encodedCrawlerUrl}`,
     },
     {
       label: "X",
       icon: Twitter,
-      href: `https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedTitle}`,
+      href: `https://twitter.com/intent/tweet?url=${encodedCrawlerUrl}&text=${encodedTitle}`,
     },
     {
       label: "LinkedIn",
       icon: Linkedin,
-      href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
+      href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedCrawlerUrl}`,
     },
     {
       label: "WhatsApp",
       icon: MessageCircle,
-      href: `https://wa.me/?text=${encodedTitle}%20${encodedUrl}`,
+      href: `https://wa.me/?text=${encodedTitle}%20${encodedCrawlerUrl}`,
     },
     {
       label: "Instagram",
@@ -62,9 +68,28 @@ export default function SocialShareLinks({ title, url }: SocialShareLinksProps) 
     },
   ];
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(shareUrl);
-    toast({ title: "Link copied", description: "Share link copied to clipboard." });
+  /** Use Web Share API (iOS share sheet) with clean URL, fallback to clipboard */
+  const handleNativeShare = async () => {
+    const result = await shareCleanLink({
+      title,
+      description: description || "",
+      url: humanUrl,
+    });
+    if (result.shared) {
+      toast({ title: "Shared successfully" });
+    } else if (result.copied) {
+      toast({ title: "Link copied", description: "Share link copied to clipboard." });
+    }
+  };
+
+  /** Simple clipboard copy for platforms like Instagram/TikTok */
+  const copyOnly = async () => {
+    try {
+      await navigator.clipboard.writeText(humanUrl);
+      toast({ title: "Link copied", description: "Paste it in the app to share." });
+    } catch {
+      prompt("Copy this link:", humanUrl);
+    }
   };
 
   return (
@@ -75,8 +100,8 @@ export default function SocialShareLinks({ title, url }: SocialShareLinksProps) 
           return (
             <button
               key={link.label}
-              onClick={() => {
-                copyLink();
+              onClick={async () => {
+                await copyOnly();
                 toast({ title: `Link copied for ${link.label}`, description: "Paste it in the app to share." });
               }}
               title={`Copy link for ${link.label}`}
@@ -100,8 +125,8 @@ export default function SocialShareLinks({ title, url }: SocialShareLinksProps) 
         );
       })}
       <button
-        onClick={copyLink}
-        title="Copy link"
+        onClick={handleNativeShare}
+        title="Share or copy link"
         className="p-2 rounded-lg border border-border bg-card hover:border-primary/40 hover:text-primary transition-colors text-muted-foreground"
       >
         <Link2 className="h-4 w-4" />

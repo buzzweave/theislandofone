@@ -251,6 +251,7 @@ export default function BlogPost() {
             title={post.title}
             url={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/share-blog?slug=${encodeURIComponent(slug || "")}`}
             pageUrl={`https://theislandofone.com/blog/${slug}`}
+            description={post.excerpt || ""}
           />
         </div>
 
