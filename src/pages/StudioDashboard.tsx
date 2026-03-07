@@ -151,14 +151,32 @@ export default function StudioDashboard() {
   }
 
   if (!org) {
+    const handleProvision = async () => {
+      try {
+        const { error } = await supabase.functions.invoke("provision-workspace", {
+          body: { studioName: user?.user_metadata?.full_name ? `${user.user_metadata.full_name}'s Studio` : "My Writing Studio" },
+        });
+        if (error) throw error;
+        await refreshWorkspace();
+        toast({ title: "Studio created!" });
+      } catch (e: any) {
+        toast({ title: "Setup failed", description: e.message, variant: "destructive" });
+      }
+    };
+
     return (
       <div className="min-h-screen bg-background flex items-center justify-center text-center px-6">
         <div>
-          <h2 className="text-2xl font-bold mb-4">No workspace found</h2>
-          <p className="text-muted-foreground mb-6">Subscribe to create your writing studio.</p>
-          <Link to="/studio">
-            <Button className="bg-primary text-primary-foreground">Get Started</Button>
-          </Link>
+          <img src={studioLogo} alt="Studio" className="h-16 w-16 rounded-full object-cover mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-4">Welcome to Your Writing Studio</h2>
+          <p className="text-muted-foreground mb-6">Set up your private workspace to get started.</p>
+          <Button className="bg-primary text-primary-foreground" onClick={handleProvision}>
+            Create My Studio
+          </Button>
+          <p className="text-xs text-muted-foreground mt-4">
+            Logged in as {user?.email} ·{" "}
+            <button onClick={() => { signOut(); navigate("/studio"); }} className="text-primary hover:underline">Sign out</button>
+          </p>
         </div>
       </div>
     );
