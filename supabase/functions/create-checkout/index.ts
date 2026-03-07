@@ -42,17 +42,25 @@ serve(async (req) => {
         reader: "price_1T2OD320LtcjVY26B6ZCvaQ4",
         pastor: "price_1T2ODJ20LtcjVY268Ojs3ahx",
         "inner-circle": "price_1T2ODU20LtcjVY26GSmrHK8g",
+        studio: "price_1T8QEp20LtcjVY26Rybk7MtC",
       };
       const priceId = priceMap[planSlug];
       if (!priceId) throw new Error("Invalid plan");
+
+      const isStudio = planSlug === "studio";
+      const successUrl = isStudio
+        ? `${origin}/studio/payment-success?session_id={CHECKOUT_SESSION_ID}&studio_name=${encodeURIComponent(studioName || "")}`
+        : `${origin}/payment-success?session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl = isStudio ? `${origin}/studio` : `${origin}/membership`;
 
       const session = await stripe.checkout.sessions.create({
         customer: customerId,
         customer_email: customerId ? undefined : user.email,
         line_items: [{ price: priceId, quantity: 1 }],
         mode: "subscription",
-        success_url: `${origin}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${origin}/membership`,
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        metadata: isStudio ? { type: "studio", studio_name: studioName || "" } : undefined,
       });
 
       return new Response(JSON.stringify({ url: session.url }), {
