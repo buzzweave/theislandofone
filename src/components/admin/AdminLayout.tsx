@@ -65,6 +65,14 @@ const navItems = [
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
+const studioNavItems = [
+  { to: "/admin/studio", label: "Studio Overview", icon: LayoutDashboard, end: true },
+  { to: "/admin/studio/subscribers", label: "Subscribers", icon: UserCheck },
+  { to: "/admin/studio/branding", label: "Branding", icon: Palette },
+  { to: "/admin/studio/billing", label: "Billing", icon: CreditCard },
+  { to: "/admin/studio/settings", label: "Studio Settings", icon: Settings },
+];
+
 const aiDevNavItems = [
   { to: "/admin/ai-developer", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/admin/ai-developer/console", label: "AI Console", icon: MessageSquare },
