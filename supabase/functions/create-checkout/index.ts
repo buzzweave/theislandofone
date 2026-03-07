@@ -24,7 +24,7 @@ serve(async (req) => {
     const user = data.user;
     if (!user?.email) throw new Error("User not authenticated");
 
-    const { type, itemId, priceAmount, planSlug, itemTitle } = await req.json();
+    const { type, itemId, priceAmount, planSlug, itemTitle, studioName } = await req.json();
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { apiVersion: "2025-08-27.basil" });
 
     // Find or create customer
