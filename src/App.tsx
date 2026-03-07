@@ -234,9 +234,13 @@ const App = () => (
                     <Route path="notifications" element={<AdminNotifications />} />
                     <Route path="settings" element={<AdminSettings />} />
                     <Route path="studio" element={<AdminStudioManager />} />
-                    <Route path="studio/subscribers" element={<AdminPlaceholder title="Studio Subscribers" />} />
+                    <Route path="studio/chapters" element={<AdminPlaceholder title="Chapter Outlines" />} />
+                    <Route path="studio/workspace" element={<AdminPlaceholder title="Writing Workspace" />} />
+                    <Route path="studio/research" element={<AdminPlaceholder title="Research Library" />} />
+                    <Route path="studio/training" element={<AdminPlaceholder title="Teaching & Training" />} />
+                    <Route path="studio/publishing" element={<AdminPlaceholder title="Publishing Checklist" />} />
+                    <Route path="studio/landing" element={<AdminPlaceholder title="Studio Landing Page" />} />
                     <Route path="studio/branding" element={<AdminPlaceholder title="Studio Branding" />} />
-                    <Route path="studio/billing" element={<AdminPlaceholder title="Studio Billing" />} />
                     <Route path="studio/settings" element={<AdminPlaceholder title="Studio Settings" />} />
                     <Route path="crm" element={<AdminCRM />} />
                     <Route path="video-studio" element={<VideoStudio />} />
