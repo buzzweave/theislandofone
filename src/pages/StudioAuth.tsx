@@ -50,18 +50,17 @@ export default function StudioAuth() {
       return;
     }
 
-    // Create checkout session for $39.99/mo
+    // Provision workspace immediately (free signup) then redirect to dashboard
     try {
-      const { data: checkoutData, error: checkoutErr } = await supabase.functions.invoke("create-checkout", {
-        body: { type: "subscription", planSlug: "studio", studioName },
+      const { data: provData, error: provErr } = await supabase.functions.invoke("provision-workspace", {
+        body: { studioName },
       });
-      if (checkoutErr) throw new Error(checkoutErr.message);
-      if (checkoutData?.url) {
-        window.location.href = checkoutData.url;
-        return;
-      }
+      if (provErr) throw new Error(provErr.message);
+      setLoading(false);
+      navigate("/studio/dashboard");
+      return;
     } catch (e: any) {
-      toast({ title: "Checkout failed", description: e.message, variant: "destructive" });
+      toast({ title: "Setup failed", description: e.message, variant: "destructive" });
     }
     setLoading(false);
   };
