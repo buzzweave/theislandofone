@@ -131,7 +131,7 @@ export default function Studio() {
             <CTAButton className="text-lg px-10 py-7" />
           </div>
           <p className="text-muted-foreground text-sm mt-5">
-            <span className="font-semibold text-foreground">$19.95/month</span> · Cancel anytime · Launch in under 60 seconds
+            <span className="font-semibold text-foreground">7-day free trial</span> · Then $19.95/month · Cancel anytime
           </p>
         </div>
       </section>
