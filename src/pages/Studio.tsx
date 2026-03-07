@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { useState } from "react";
+import studioLogo from "@/assets/studio-logo.jpeg";
 
 const features = [
   { icon: BookOpen, title: "Book Projects", desc: "Organize multiple books and writing projects in one workspace." },
