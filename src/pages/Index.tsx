@@ -460,7 +460,7 @@ export default function Index() {
                 <Link
                   to="/membership"
                   className={`block text-center py-2.5 rounded-full text-sm font-semibold transition-colors ${
-                    plan.id === "inner-circle"
+                    plan.is_featured
                       ? "bg-primary text-primary-foreground hover:bg-primary/90"
                       : "border border-primary/30 text-foreground hover:bg-primary/10"
                   }`}
