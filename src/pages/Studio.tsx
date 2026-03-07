@@ -320,7 +320,7 @@ export default function Studio() {
             Everything you need to write, organize, and publish your books — in one place.
           </p>
           <CTAButton className="text-lg px-10 py-7" />
-          <p className="text-muted-foreground text-sm mt-4">$19.95/month · No contracts · Cancel anytime</p>
+          <p className="text-muted-foreground text-sm mt-4">7-day free trial · $19.95/month · Cancel anytime</p>
         </div>
       </section>
 

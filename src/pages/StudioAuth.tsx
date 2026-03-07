@@ -109,7 +109,7 @@ export default function StudioAuth() {
               <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
             </div>
             <Button type="submit" className="w-full bg-primary text-primary-foreground" disabled={loading}>
-              {loading ? "Please wait…" : mode === "login" ? "Log In" : "Start Your Studio — $39.99/mo"}
+              {loading ? "Please wait…" : mode === "login" ? "Log In" : "Start Your Free Studio"}
             </Button>
           </form>
 
