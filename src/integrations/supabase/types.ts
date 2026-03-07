@@ -884,6 +884,7 @@ export type Database = {
           features: string[]
           id: string
           is_featured: boolean
+          is_visible: boolean
           name: string
           price: number
           slug: string
@@ -895,6 +896,7 @@ export type Database = {
           features?: string[]
           id?: string
           is_featured?: boolean
+          is_visible?: boolean
           name: string
           price?: number
           slug: string
@@ -906,6 +908,7 @@ export type Database = {
           features?: string[]
           id?: string
           is_featured?: boolean
+          is_visible?: boolean
           name?: string
           price?: number
           slug?: string
