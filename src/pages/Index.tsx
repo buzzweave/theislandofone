@@ -148,6 +148,7 @@ export default function Index() {
   const { data: videos = [] } = useHomepageVideos();
   const { data: graphics = [] } = useHomepageGraphics();
   const { data: blogPosts = [] } = useHomepageBlog();
+  const { plans: membershipPlans } = useMembershipPlans();
 
   const featuredBooks = books.filter((b: any) => b.featured);
   const featuredVideos = videos.filter((v: any) => v.featured);
