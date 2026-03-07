@@ -32,6 +32,9 @@ import {
   Globe,
   History,
   Mail,
+  Palette,
+  UserCheck,
+  CreditCard,
 } from "lucide-react";
 import AISidebar from "./AISidebar";
 import NotificationBell from "./NotificationBell";
@@ -60,6 +63,14 @@ const navItems = [
   { to: "/admin/video-studio", label: "Video Studio", icon: Video },
   { to: "/admin/notifications", label: "Notifications", icon: BellIcon },
   { to: "/admin/settings", label: "Settings", icon: Settings },
+];
+
+const studioNavItems = [
+  { to: "/admin/studio", label: "Studio Overview", icon: LayoutDashboard, end: true },
+  { to: "/admin/studio/subscribers", label: "Subscribers", icon: UserCheck },
+  { to: "/admin/studio/branding", label: "Branding", icon: Palette },
+  { to: "/admin/studio/billing", label: "Billing", icon: CreditCard },
+  { to: "/admin/studio/settings", label: "Studio Settings", icon: Settings },
 ];
 
 const aiDevNavItems = [
@@ -114,6 +125,11 @@ export default function AdminLayout() {
     <>
       <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
         {renderNavLinks(navItems)}
+        <div className="my-3 border-t border-border" />
+        <div className="px-3 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+          <Palette className="h-3.5 w-3.5" /> Writing Studio
+        </div>
+        {renderNavLinks(studioNavItems)}
         <div className="my-3 border-t border-border" />
         <div className="px-3 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
           <Bot className="h-3.5 w-3.5" /> AI Developer

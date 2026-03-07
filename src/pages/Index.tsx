@@ -7,6 +7,22 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 
 const SubscribeForm = lazy(() => import("@/components/SubscribeForm"));
+const StudioLanding = lazy(() => import("@/pages/Studio"));
+
+function useStudioLandingEnabled() {
+  return useQuery({
+    queryKey: ["site-setting", "studio_landing_enabled"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "studio_landing_enabled")
+        .maybeSingle();
+      return data?.value === "true";
+    },
+    staleTime: 60_000,
+  });
+}
 
 function getYouTubeId(url: string) {
   const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|live\/|embed\/))([^?&/]+)/);
@@ -126,6 +142,7 @@ const BookCard = memo(({ book }: { book: any }) => (
 BookCard.displayName = "BookCard";
 
 export default function Index() {
+  const { data: studioEnabled, isLoading: studioLoading } = useStudioLandingEnabled();
   const { data: books = [] } = useHomepageBooks();
   const { data: sermons = [] } = useHomepageSermons();
   const { data: videos = [] } = useHomepageVideos();
@@ -135,6 +152,14 @@ export default function Index() {
   const featuredBooks = books.filter((b: any) => b.featured);
   const featuredVideos = videos.filter((v: any) => v.featured);
   const [playingId, setPlayingId] = useState<string | null>(null);
+
+  if (studioEnabled && !studioLoading) {
+    return (
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-pulse text-muted-foreground text-sm">Loading…</div></div>}>
+        <StudioLanding />
+      </Suspense>
+    );
+  }
 
   return (
     <div>

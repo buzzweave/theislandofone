@@ -68,6 +68,7 @@ const AdminNotifications = lazy(() => import("./pages/admin/AdminNotifications")
 const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
 const AdminCRM = lazy(() => import("./pages/admin/AdminCRM"));
 const AdminPlaceholder = lazy(() => import("./pages/admin/AdminPlaceholder"));
+const AdminStudioManager = lazy(() => import("./pages/admin/AdminStudioManager"));
 const VideoStudio = lazy(() => import("./pages/admin/VideoStudio"));
 const VideoLibrary = lazy(() => import("./pages/admin/VideoLibrary"));
 const AIDevDashboard = lazy(() => import("./pages/admin/ai-developer/AIDevDashboard"));
@@ -232,6 +233,11 @@ const App = () => (
                     <Route path="publisher" element={<AdminPublisher />} />
                     <Route path="notifications" element={<AdminNotifications />} />
                     <Route path="settings" element={<AdminSettings />} />
+                    <Route path="studio" element={<AdminStudioManager />} />
+                    <Route path="studio/subscribers" element={<AdminPlaceholder title="Studio Subscribers" />} />
+                    <Route path="studio/branding" element={<AdminPlaceholder title="Studio Branding" />} />
+                    <Route path="studio/billing" element={<AdminPlaceholder title="Studio Billing" />} />
+                    <Route path="studio/settings" element={<AdminPlaceholder title="Studio Settings" />} />
                     <Route path="crm" element={<AdminCRM />} />
                     <Route path="video-studio" element={<VideoStudio />} />
                     <Route path="video-library" element={<VideoLibrary />} />
