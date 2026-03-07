@@ -77,7 +77,6 @@ export default function StudioAuth() {
         <div className="text-center mb-8">
           <Link to="/studio" className="inline-flex flex-col items-center gap-2">
             <img src={studioLogo} alt="Island of One" className="h-16 w-16 rounded-full object-cover" />
-            <span className="text-primary font-bold text-xl">Island of One</span>
           </Link>
           <p className="text-muted-foreground text-sm mt-1">A Book Writer Studio</p>
         </div>
