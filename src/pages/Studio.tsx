@@ -251,7 +251,7 @@ export default function Studio() {
               <h3 className="text-xl font-bold mb-2 mt-2">Island of One Writer Studio</h3>
               <div className="text-5xl font-bold text-primary mb-1">$19.95</div>
               <p className="text-muted-foreground text-sm mb-2">per month</p>
-              <p className="text-xs text-muted-foreground mb-6">Less than $0.66 per day to build and publish your books.</p>
+              <p className="text-xs text-muted-foreground mb-2">7-day free trial · Then less than $0.66 per day.</p>
               <ul className="space-y-3 text-left mb-8">
                 {[
                   "Unlimited book projects",
