@@ -42,7 +42,7 @@ serve(async (req) => {
         reader: "price_1T2OD320LtcjVY26B6ZCvaQ4",
         pastor: "price_1T2ODJ20LtcjVY268Ojs3ahx",
         "inner-circle": "price_1T2ODU20LtcjVY26GSmrHK8g",
-        studio: "price_1T8QEp20LtcjVY26Rybk7MtC",
+        studio: "price_1T8S8y20LtcjVY26F3TjLxnL",
       };
       const priceId = priceMap[planSlug];
       if (!priceId) throw new Error("Invalid plan");

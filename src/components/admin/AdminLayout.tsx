@@ -66,7 +66,7 @@ const navItems = [
 ];
 
 const studioNavItems = [
-  { to: "/admin/studio", label: "Book Projects", icon: BookOpen, end: true },
+  { to: "/admin/studio", label: "Studio Dashboard", icon: LayoutDashboard, end: true },
   { to: "/admin/studio/chapters", label: "Chapter Outlines", icon: FileText },
   { to: "/admin/studio/workspace", label: "Writing Workspace", icon: PenLine },
   { to: "/admin/studio/research", label: "Research Library", icon: Search },
