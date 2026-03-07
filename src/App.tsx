@@ -253,6 +253,7 @@ const App = () => (
             </BrowserRouter>
           </GlobalCopyProtection>
         </AdminAuthProvider>
+        </WorkspaceProvider>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
