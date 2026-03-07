@@ -147,20 +147,35 @@ export default function AdminMembershipPlans() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {plans.map((plan) => (
+      {plans.map((plan) => (
             <Card
               key={plan.id}
-              className={`cursor-pointer hover:border-primary/30 transition-colors ${plan.is_featured ? "border-primary/30" : ""}`}
+              className={`cursor-pointer hover:border-primary/30 transition-colors ${plan.is_featured ? "border-primary/30" : ""} ${!plan.is_visible ? "opacity-60" : ""}`}
               onClick={() => setEditingPlan({ ...plan })}
             >
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-display text-lg font-semibold">{plan.name}</h3>
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={plan.is_visible}
+                      onCheckedChange={async (checked) => {
+                        // Prevent card click from firing
+                        await updatePlan(plan.id, { is_visible: checked } as any);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <h3 className="font-display text-lg font-semibold">{plan.name}</h3>
+                  </div>
                   <span className="text-xl font-bold text-primary">${plan.price}/mo</span>
                 </div>
-                {plan.is_featured && (
-                  <span className="text-[10px] uppercase tracking-widest text-primary font-semibold">Featured</span>
-                )}
+                <div className="flex items-center gap-2 mb-1">
+                  {plan.is_featured && (
+                    <span className="text-[10px] uppercase tracking-widest text-primary font-semibold">Featured</span>
+                  )}
+                  {!plan.is_visible && (
+                    <span className="text-[10px] uppercase tracking-widest text-destructive font-semibold">Hidden</span>
+                  )}
+                </div>
                 <ul className="mt-3 space-y-1">
                   {plan.features.map((f, i) => (
                     <li key={i} className="text-sm text-muted-foreground">• {f}</li>

@@ -132,12 +132,6 @@ export default function AdminLayout() {
 
         <div className="my-3 border-t border-border" />
         <div className="px-3 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-          <Palette className="h-3.5 w-3.5" /> Writing Studio
-        </div>
-        {renderNavLinks(studioNavItems)}
-
-        <div className="my-3 border-t border-border" />
-        <div className="px-3 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
           <Bot className="h-3.5 w-3.5" /> AI Developer
         </div>
         {renderNavLinks(aiDevNavItems)}
