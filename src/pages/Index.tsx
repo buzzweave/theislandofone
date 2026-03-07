@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useState, lazy, Suspense, memo } from "react";
 import { ArrowRight, BookOpen, Mic, Play, PenLine, X } from "lucide-react";
-import { membershipPlans } from "@/data/content";
+import { useMembershipPlans } from "@/hooks/useMembershipPlans";
 import HeroCarousel from "@/components/HeroCarousel";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
