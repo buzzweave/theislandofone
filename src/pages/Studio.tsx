@@ -48,7 +48,7 @@ const faqs = [
   { q: "Can I customize the branding?", a: "Yes. You get full white-label branding — your name, your colors, your logo. It's your studio." },
   { q: "Do I get my own private workspace?", a: "Yes. Each studio is a completely isolated workspace with its own data, projects, and settings. Your content is private to you." },
   { q: "Can I cancel anytime?", a: "Yes. No contracts, no commitments. Cancel anytime from your account settings." },
-  { q: "Is there a free trial?", a: "We don't offer a free trial, but you can cancel anytime within the first month if it's not the right fit." },
+  { q: "Is there a free trial?", a: "Yes! Every new studio comes with a 7-day free trial. You won't be charged until after your trial ends. Cancel anytime during the trial and pay nothing." },
 ];
 
 const stackComparison = [
