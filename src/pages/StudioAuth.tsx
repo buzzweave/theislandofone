@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
-
-const STUDIO_PRICE_ID = "price_1T8QEp20LtcjVY26Rybk7MtC";
+import studioLogo from "@/assets/studio-logo.jpeg";
 
 export default function StudioAuth() {
   const [searchParams] = useSearchParams();
