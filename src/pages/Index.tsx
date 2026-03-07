@@ -7,6 +7,22 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 
 const SubscribeForm = lazy(() => import("@/components/SubscribeForm"));
+const StudioLanding = lazy(() => import("@/pages/Studio"));
+
+function useStudioLandingEnabled() {
+  return useQuery({
+    queryKey: ["site-setting", "studio_landing_enabled"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "studio_landing_enabled")
+        .maybeSingle();
+      return data?.value === "true";
+    },
+    staleTime: 60_000,
+  });
+}
 
 function getYouTubeId(url: string) {
   const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|live\/|embed\/))([^?&/]+)/);
