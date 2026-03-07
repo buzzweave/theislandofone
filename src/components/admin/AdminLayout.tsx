@@ -32,6 +32,9 @@ import {
   Globe,
   History,
   Mail,
+  Palette,
+  UserCheck,
+  CreditCard,
 } from "lucide-react";
 import AISidebar from "./AISidebar";
 import NotificationBell from "./NotificationBell";
