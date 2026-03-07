@@ -61,6 +61,8 @@ export default defineConfig(({ mode }) => ({
     }),
   ].filter(Boolean),
   build: {
+    target: 'es2020',
+    cssCodeSplit: true,
     rollupOptions: {
       output: {
         manualChunks: {
@@ -69,6 +71,7 @@ export default defineConfig(({ mode }) => ({
           query: ['@tanstack/react-query'],
           charts: ['recharts'],
           editor: ['@tiptap/react', '@tiptap/starter-kit'],
+          supabase: ['@supabase/supabase-js'],
         },
       },
     },
