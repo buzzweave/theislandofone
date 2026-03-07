@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout";
 import { AdminAuthProvider } from "./contexts/AdminAuthContext";
 import { AuthProvider } from "./contexts/AuthContext";
+import { WorkspaceProvider } from "./contexts/WorkspaceContext";
 
 // Critical path — loaded eagerly
 import Index from "./pages/Index";
@@ -35,6 +36,13 @@ const ForumCategory = lazy(() => import("./pages/ForumCategory"));
 const ForumThread = lazy(() => import("./pages/ForumThread"));
 const InviteRedirect = lazy(() => import("./pages/InviteRedirect"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+
+// Studio (SaaS) pages
+const Studio = lazy(() => import("./pages/Studio"));
+const StudioAuth = lazy(() => import("./pages/StudioAuth"));
+const StudioDashboard = lazy(() => import("./pages/StudioDashboard"));
+const StudioProject = lazy(() => import("./pages/StudioProject"));
+const StudioPaymentSuccess = lazy(() => import("./pages/StudioPaymentSuccess"));
 
 // Lazy-loaded admin pages
 const AdminLayout = lazy(() => import("./components/admin/AdminLayout"));
@@ -154,6 +162,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <AuthProvider>
+        <WorkspaceProvider>
         <AdminAuthProvider>
           <GlobalCopyProtection>
             <BrowserRouter>
@@ -185,6 +194,13 @@ const App = () => (
                   <Route path="/community/:slug" element={<LazyLayout><ForumCategory /></LazyLayout>} />
                   <Route path="/community/:slug/:postId" element={<LazyLayout><ForumThread /></LazyLayout>} />
                   <Route path="/i/:code" element={<LazyLayout><InviteRedirect /></LazyLayout>} />
+
+                  {/* Studio (SaaS) routes */}
+                  <Route path="/studio" element={<Suspense fallback={<PageFallback />}><Studio /></Suspense>} />
+                  <Route path="/studio/auth" element={<Suspense fallback={<PageFallback />}><StudioAuth /></Suspense>} />
+                  <Route path="/studio/dashboard" element={<Suspense fallback={<PageFallback />}><StudioDashboard /></Suspense>} />
+                  <Route path="/studio/project/:id" element={<Suspense fallback={<PageFallback />}><StudioProject /></Suspense>} />
+                  <Route path="/studio/payment-success" element={<Suspense fallback={<PageFallback />}><StudioPaymentSuccess /></Suspense>} />
 
                   {/* Admin */}
                   <Route path="/admin/login" element={<Suspense fallback={<PageFallback />}><AdminLogin /></Suspense>} />
@@ -237,6 +253,7 @@ const App = () => (
             </BrowserRouter>
           </GlobalCopyProtection>
         </AdminAuthProvider>
+        </WorkspaceProvider>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
