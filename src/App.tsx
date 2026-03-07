@@ -195,6 +195,13 @@ const App = () => (
                   <Route path="/community/:slug/:postId" element={<LazyLayout><ForumThread /></LazyLayout>} />
                   <Route path="/i/:code" element={<LazyLayout><InviteRedirect /></LazyLayout>} />
 
+                  {/* Studio (SaaS) routes */}
+                  <Route path="/studio" element={<Suspense fallback={<PageFallback />}><Studio /></Suspense>} />
+                  <Route path="/studio/auth" element={<Suspense fallback={<PageFallback />}><StudioAuth /></Suspense>} />
+                  <Route path="/studio/dashboard" element={<Suspense fallback={<PageFallback />}><StudioDashboard /></Suspense>} />
+                  <Route path="/studio/project/:id" element={<Suspense fallback={<PageFallback />}><StudioProject /></Suspense>} />
+                  <Route path="/studio/payment-success" element={<Suspense fallback={<PageFallback />}><StudioPaymentSuccess /></Suspense>} />
+
                   {/* Admin */}
                   <Route path="/admin/login" element={<Suspense fallback={<PageFallback />}><AdminLogin /></Suspense>} />
                   <Route
