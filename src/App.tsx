@@ -234,10 +234,10 @@ const App = () => (
                     <Route path="notifications" element={<AdminNotifications />} />
                     <Route path="settings" element={<AdminSettings />} />
                     <Route path="studio" element={<AdminStudioManager />} />
-                    <Route path="studio/subscribers" element={<AdminPlaceholder />} />
-                    <Route path="studio/branding" element={<AdminPlaceholder />} />
-                    <Route path="studio/billing" element={<AdminPlaceholder />} />
-                    <Route path="studio/settings" element={<AdminPlaceholder />} />
+                    <Route path="studio/subscribers" element={<AdminPlaceholder title="Studio Subscribers" />} />
+                    <Route path="studio/branding" element={<AdminPlaceholder title="Studio Branding" />} />
+                    <Route path="studio/billing" element={<AdminPlaceholder title="Studio Billing" />} />
+                    <Route path="studio/settings" element={<AdminPlaceholder title="Studio Settings" />} />
                     <Route path="crm" element={<AdminCRM />} />
                     <Route path="video-studio" element={<VideoStudio />} />
                     <Route path="video-library" element={<VideoLibrary />} />
