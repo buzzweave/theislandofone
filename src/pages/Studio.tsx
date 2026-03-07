@@ -101,7 +101,10 @@ export default function Studio() {
       {/* Nav */}
       <nav className="fixed top-0 inset-x-0 z-50 bg-background/80 backdrop-blur border-b border-border">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-6 h-16">
-          <Link to="/" className="font-bold text-lg text-primary">Island of One</Link>
+          <Link to="/" className="flex items-center gap-2">
+            <img src={studioLogo} alt="Island of One" className="h-10 w-10 rounded-full object-cover" />
+            <span className="font-bold text-lg text-primary">Island of One</span>
+          </Link>
           <div className="flex items-center gap-4">
             <Link to="/studio/auth" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Log In</Link>
             <Button size="sm" onClick={handleCheckout} disabled={loading} className="bg-primary text-primary-foreground hover:bg-primary/90">
