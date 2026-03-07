@@ -122,21 +122,23 @@ export default function AdminLayout() {
     ));
 
   const NavContent = () => (
-    <>
-      <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
+    <div className="flex flex-col h-full min-h-0">
+      <nav className="flex-1 min-h-0 overflow-y-auto py-3 px-2 space-y-0.5">
         {renderNavLinks(navItems)}
+
         <div className="my-3 border-t border-border" />
         <div className="px-3 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
           <Palette className="h-3.5 w-3.5" /> Writing Studio
         </div>
         {renderNavLinks(studioNavItems)}
+
         <div className="my-3 border-t border-border" />
         <div className="px-3 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
           <Bot className="h-3.5 w-3.5" /> AI Developer
         </div>
         {renderNavLinks(aiDevNavItems)}
       </nav>
-      <div className="border-t border-border p-2">
+      <div className="shrink-0 border-t border-border p-2">
         <button
           onClick={() => { logout(); navigate("/admin/login"); setMobileNavOpen(false); }}
           className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors w-full"
@@ -145,7 +147,7 @@ export default function AdminLayout() {
           <span>Sign Out</span>
         </button>
       </div>
-    </>
+    </div>
   );
 
   return (
@@ -153,8 +155,8 @@ export default function AdminLayout() {
       <div className="min-h-screen flex bg-background">
         {/* Desktop sidebar */}
         {!isMobile && (
-          <aside className="shrink-0 flex flex-col border-r border-border bg-card w-56">
-            <div className="h-14 flex items-center px-4 border-b border-border gap-2">
+          <aside className="shrink-0 flex flex-col border-r border-border bg-card w-56 h-screen sticky top-0">
+            <div className="h-14 shrink-0 flex items-center px-4 border-b border-border gap-2">
               <BookOpen className="h-5 w-5 text-primary shrink-0" />
               <span className="font-display text-sm font-semibold truncate">Admin</span>
             </div>
@@ -174,8 +176,8 @@ export default function AdminLayout() {
                       <Menu className="h-5 w-5" />
                     </Button>
                   </SheetTrigger>
-                  <SheetContent side="left" className="p-0 w-64 flex flex-col">
-                    <div className="h-14 flex items-center px-4 border-b border-border gap-2">
+                   <SheetContent side="left" className="p-0 w-64 flex flex-col h-full overflow-hidden">
+                    <div className="h-14 shrink-0 flex items-center px-4 border-b border-border gap-2">
                       <BookOpen className="h-5 w-5 text-primary shrink-0" />
                       <span className="font-display text-sm font-semibold">Admin</span>
                     </div>
