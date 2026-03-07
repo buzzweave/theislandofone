@@ -176,8 +176,8 @@ export default function AdminLayout() {
                       <Menu className="h-5 w-5" />
                     </Button>
                   </SheetTrigger>
-                  <SheetContent side="left" className="p-0 w-64 flex flex-col">
-                    <div className="h-14 flex items-center px-4 border-b border-border gap-2">
+                   <SheetContent side="left" className="p-0 w-64 flex flex-col h-full overflow-hidden">
+                    <div className="h-14 shrink-0 flex items-center px-4 border-b border-border gap-2">
                       <BookOpen className="h-5 w-5 text-primary shrink-0" />
                       <span className="font-display text-sm font-semibold">Admin</span>
                     </div>
