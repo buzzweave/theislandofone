@@ -441,7 +441,7 @@ export default function Index() {
               <div
                 key={plan.id}
                 className={`rounded-xl border p-5 sm:p-6 text-left transition-all duration-300 ${
-                  plan.id === "inner-circle"
+                  plan.is_featured
                     ? "border-primary bg-primary/5 shadow-gold"
                     : "border-border bg-card hover:border-primary/30"
                 }`}
