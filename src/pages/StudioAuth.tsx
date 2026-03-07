@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
-
-const STUDIO_PRICE_ID = "price_1T8QEp20LtcjVY26Rybk7MtC";
+import studioLogo from "@/assets/studio-logo.jpeg";
 
 export default function StudioAuth() {
   const [searchParams] = useSearchParams();
@@ -51,18 +50,17 @@ export default function StudioAuth() {
       return;
     }
 
-    // Create checkout session for $39.99/mo
+    // Provision workspace immediately (free signup) then redirect to dashboard
     try {
-      const { data: checkoutData, error: checkoutErr } = await supabase.functions.invoke("create-checkout", {
-        body: { type: "subscription", planSlug: "studio", studioName },
+      const { data: provData, error: provErr } = await supabase.functions.invoke("provision-workspace", {
+        body: { studioName },
       });
-      if (checkoutErr) throw new Error(checkoutErr.message);
-      if (checkoutData?.url) {
-        window.location.href = checkoutData.url;
-        return;
-      }
+      if (provErr) throw new Error(provErr.message);
+      setLoading(false);
+      navigate("/studio/dashboard");
+      return;
     } catch (e: any) {
-      toast({ title: "Checkout failed", description: e.message, variant: "destructive" });
+      toast({ title: "Setup failed", description: e.message, variant: "destructive" });
     }
     setLoading(false);
   };
@@ -77,7 +75,10 @@ export default function StudioAuth() {
     <div className="min-h-screen bg-background flex items-center justify-center px-6">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <Link to="/studio" className="text-primary font-bold text-xl">Island of One</Link>
+          <Link to="/studio" className="inline-flex flex-col items-center gap-2">
+            <img src={studioLogo} alt="Island of One" className="h-16 w-16 rounded-full object-cover" />
+            <span className="text-primary font-bold text-xl">Island of One</span>
+          </Link>
           <p className="text-muted-foreground text-sm mt-1">A Book Writer Studio</p>
         </div>
 
@@ -108,7 +109,7 @@ export default function StudioAuth() {
               <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
             </div>
             <Button type="submit" className="w-full bg-primary text-primary-foreground" disabled={loading}>
-              {loading ? "Please wait…" : mode === "login" ? "Log In" : "Start Your Studio — $39.99/mo"}
+              {loading ? "Please wait…" : mode === "login" ? "Log In" : "Start Your Free Studio"}
             </Button>
           </form>
 

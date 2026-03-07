@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BookOpen, Layers, PenLine, Library, GraduationCap, CheckCircle, Settings, LogOut, Plus, Trash2, Edit } from "lucide-react";
+import studioLogo from "@/assets/studio-logo.jpeg";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -174,7 +175,10 @@ export default function StudioDashboard() {
     <div className="min-h-screen bg-background">
       {/* Top bar */}
       <header className="border-b border-border bg-card px-6 h-14 flex items-center justify-between">
-        <span className="font-bold text-primary">{displayName}</span>
+        <div className="flex items-center gap-2">
+          <img src={studioLogo} alt="Island of One" className="h-8 w-8 rounded-full object-cover" />
+          <span className="font-bold text-primary">{displayName}</span>
+        </div>
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted-foreground hidden sm:inline">{user?.email}</span>
           <Button variant="ghost" size="sm" onClick={() => { signOut(); navigate("/studio"); }}>

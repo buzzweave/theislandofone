@@ -53,15 +53,22 @@ serve(async (req) => {
         : `${origin}/payment-success?session_id={CHECKOUT_SESSION_ID}`;
       const cancelUrl = isStudio ? `${origin}/studio` : `${origin}/membership`;
 
-      const session = await stripe.checkout.sessions.create({
+      const sessionParams: any = {
         customer: customerId,
         customer_email: customerId ? undefined : user.email,
         line_items: [{ price: priceId, quantity: 1 }],
         mode: "subscription",
         success_url: successUrl,
         cancel_url: cancelUrl,
-        metadata: isStudio ? { type: "studio", studio_name: studioName || "" } : undefined,
-      });
+      };
+
+      // Add 7-day free trial for studio plan
+      if (isStudio) {
+        sessionParams.subscription_data = { trial_period_days: 7 };
+        sessionParams.metadata = { type: "studio", studio_name: studioName || "" };
+      }
+
+      const session = await stripe.checkout.sessions.create(sessionParams);
 
       return new Response(JSON.stringify({ url: session.url }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

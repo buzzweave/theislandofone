@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { useState } from "react";
+import studioLogo from "@/assets/studio-logo.jpeg";
 
 const features = [
   { icon: BookOpen, title: "Book Projects", desc: "Organize multiple books and writing projects in one workspace." },
@@ -47,7 +48,7 @@ const faqs = [
   { q: "Can I customize the branding?", a: "Yes. You get full white-label branding — your name, your colors, your logo. It's your studio." },
   { q: "Do I get my own private workspace?", a: "Yes. Each studio is a completely isolated workspace with its own data, projects, and settings. Your content is private to you." },
   { q: "Can I cancel anytime?", a: "Yes. No contracts, no commitments. Cancel anytime from your account settings." },
-  { q: "Is there a free trial?", a: "We don't offer a free trial, but you can cancel anytime within the first month if it's not the right fit." },
+  { q: "Is there a free trial?", a: "Yes! Every new studio comes with a 7-day free trial. You won't be charged until after your trial ends. Cancel anytime during the trial and pay nothing." },
 ];
 
 const stackComparison = [
@@ -100,7 +101,10 @@ export default function Studio() {
       {/* Nav */}
       <nav className="fixed top-0 inset-x-0 z-50 bg-background/80 backdrop-blur border-b border-border">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-6 h-16">
-          <Link to="/" className="font-bold text-lg text-primary">Island of One</Link>
+          <Link to="/" className="flex items-center gap-2">
+            <img src={studioLogo} alt="Island of One" className="h-10 w-10 rounded-full object-cover" />
+            <span className="font-bold text-lg text-primary">Island of One</span>
+          </Link>
           <div className="flex items-center gap-4">
             <Link to="/studio/auth" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Log In</Link>
             <Button size="sm" onClick={handleCheckout} disabled={loading} className="bg-primary text-primary-foreground hover:bg-primary/90">
@@ -127,7 +131,7 @@ export default function Studio() {
             <CTAButton className="text-lg px-10 py-7" />
           </div>
           <p className="text-muted-foreground text-sm mt-5">
-            <span className="font-semibold text-foreground">$19.95/month</span> · Cancel anytime · Launch in under 60 seconds
+            <span className="font-semibold text-foreground">7-day free trial</span> · Then $19.95/month · Cancel anytime
           </p>
         </div>
       </section>
@@ -247,7 +251,7 @@ export default function Studio() {
               <h3 className="text-xl font-bold mb-2 mt-2">Island of One Writer Studio</h3>
               <div className="text-5xl font-bold text-primary mb-1">$19.95</div>
               <p className="text-muted-foreground text-sm mb-2">per month</p>
-              <p className="text-xs text-muted-foreground mb-6">Less than $0.66 per day to build and publish your books.</p>
+              <p className="text-xs text-muted-foreground mb-2">7-day free trial · Then less than $0.66 per day.</p>
               <ul className="space-y-3 text-left mb-8">
                 {[
                   "Unlimited book projects",
@@ -316,7 +320,7 @@ export default function Studio() {
             Everything you need to write, organize, and publish your books — in one place.
           </p>
           <CTAButton className="text-lg px-10 py-7" />
-          <p className="text-muted-foreground text-sm mt-4">$19.95/month · No contracts · Cancel anytime</p>
+          <p className="text-muted-foreground text-sm mt-4">7-day free trial · $19.95/month · Cancel anytime</p>
         </div>
       </section>
 
