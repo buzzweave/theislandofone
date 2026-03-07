@@ -18,6 +18,12 @@ export const MEMBERSHIP_TIERS = {
     name: "Inner Circle",
     price: 39.99,
   },
+  studio: {
+    product_id: "prod_U6fT0FJaRzBv1r",
+    price_id: "price_1T8S8y20LtcjVY26F3TjLxnL",
+    name: "Writer Studio",
+    price: 19.95,
+  },
 } as const;
 
 export type MembershipSlug = keyof typeof MEMBERSHIP_TIERS;
