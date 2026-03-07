@@ -66,11 +66,15 @@ const navItems = [
 ];
 
 const studioNavItems = [
-  { to: "/admin/studio", label: "Studio Overview", icon: LayoutDashboard, end: true },
-  { to: "/admin/studio/subscribers", label: "Subscribers", icon: UserCheck },
+  { to: "/admin/studio", label: "Book Projects", icon: BookOpen, end: true },
+  { to: "/admin/studio/chapters", label: "Chapter Outlines", icon: FileText },
+  { to: "/admin/studio/workspace", label: "Writing Workspace", icon: PenLine },
+  { to: "/admin/studio/research", label: "Research Library", icon: Search },
+  { to: "/admin/studio/training", label: "Teaching & Training", icon: ScrollText },
+  { to: "/admin/studio/publishing", label: "Publishing Checklist", icon: ClipboardList },
+  { to: "/admin/studio/landing", label: "Studio Landing Page", icon: Globe },
   { to: "/admin/studio/branding", label: "Branding", icon: Palette },
-  { to: "/admin/studio/billing", label: "Billing", icon: CreditCard },
-  { to: "/admin/studio/settings", label: "Studio Settings", icon: Settings },
+  { to: "/admin/studio/settings", label: "Settings", icon: Settings },
 ];
 
 const aiDevNavItems = [
