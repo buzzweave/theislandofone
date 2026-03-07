@@ -153,7 +153,15 @@ export default function Index() {
   const featuredVideos = videos.filter((v: any) => v.featured);
   const [playingId, setPlayingId] = useState<string | null>(null);
 
-  if (studioEnabled && !studioLoading) {
+  if (studioLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse text-muted-foreground text-sm">Loading…</div>
+      </div>
+    );
+  }
+
+  if (studioEnabled) {
     return (
       <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-pulse text-muted-foreground text-sm">Loading…</div></div>}>
         <StudioLanding />
