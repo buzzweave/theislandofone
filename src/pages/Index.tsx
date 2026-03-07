@@ -437,7 +437,7 @@ export default function Index() {
             Get exclusive access to sermons, books, live sessions, and a community of believers walking the same path.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 max-w-4xl mx-auto">
-            {membershipPlans.map((plan) => (
+            {membershipPlans.filter((p) => p.is_visible).map((plan) => (
               <div
                 key={plan.id}
                 className={`rounded-xl border p-5 sm:p-6 text-left transition-all duration-300 ${
