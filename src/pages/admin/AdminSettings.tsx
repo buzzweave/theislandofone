@@ -378,6 +378,45 @@ export default function AdminSettings() {
         </CardContent>
       </Card>
 
+      {/* Writer Studio Landing Page */}
+      <Card className="border-primary/20">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <PenLine className="h-4 w-4 text-primary" />
+            Public Writer Studio Landing Page
+          </CardTitle>
+          <CardDescription>
+            When enabled, the Writer Studio landing page will be shown as the first page on theislandofone.com.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Enable Writer Studio Landing Page</p>
+              <p className="text-xs text-muted-foreground">
+                Replaces the ministry homepage with the Writer Studio sales page
+              </p>
+            </div>
+            <Switch
+              checked={studioLanding.value === "true"}
+              onCheckedChange={(checked) => toggleSetting(studioLanding, checked)}
+              disabled={studioLanding.isLoading}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            {studioLanding.value === "true" ? (
+              <span className="text-xs text-primary flex items-center gap-1">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Live on homepage
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground">
+                Hidden from homepage
+              </span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Integrations */}
       <Card>
         <CardHeader>
