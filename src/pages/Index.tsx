@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useState, lazy, Suspense, memo } from "react";
 import { ArrowRight, BookOpen, Mic, Play, PenLine, X } from "lucide-react";
-import { membershipPlans } from "@/data/content";
+import { useMembershipPlans } from "@/hooks/useMembershipPlans";
 import HeroCarousel from "@/components/HeroCarousel";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -148,6 +148,7 @@ export default function Index() {
   const { data: videos = [] } = useHomepageVideos();
   const { data: graphics = [] } = useHomepageGraphics();
   const { data: blogPosts = [] } = useHomepageBlog();
+  const { plans: membershipPlans } = useMembershipPlans();
 
   const featuredBooks = books.filter((b: any) => b.featured);
   const featuredVideos = videos.filter((v: any) => v.featured);
@@ -436,11 +437,11 @@ export default function Index() {
             Get exclusive access to sermons, books, live sessions, and a community of believers walking the same path.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 max-w-4xl mx-auto">
-            {membershipPlans.map((plan) => (
+            {membershipPlans.filter((p) => p.is_visible).map((plan) => (
               <div
                 key={plan.id}
                 className={`rounded-xl border p-5 sm:p-6 text-left transition-all duration-300 ${
-                  plan.id === "inner-circle"
+                  plan.is_featured
                     ? "border-primary bg-primary/5 shadow-gold"
                     : "border-border bg-card hover:border-primary/30"
                 }`}
@@ -459,7 +460,7 @@ export default function Index() {
                 <Link
                   to="/membership"
                   className={`block text-center py-2.5 rounded-full text-sm font-semibold transition-colors ${
-                    plan.id === "inner-circle"
+                    plan.is_featured
                       ? "bg-primary text-primary-foreground hover:bg-primary/90"
                       : "border border-primary/30 text-foreground hover:bg-primary/10"
                   }`}
