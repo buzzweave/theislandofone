@@ -61,6 +61,8 @@ export default function Books() {
                     src={book.cover_image}
                     alt={book.title}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    loading="lazy"
+                    decoding="async"
                   />
                 ) : (
                   <div className="w-full h-full bg-muted flex items-center justify-center">

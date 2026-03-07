@@ -1,45 +1,140 @@
 import { Link } from "react-router-dom";
-import { useState } from "react";
-import { ArrowRight, BookOpen, Mic, Play, Users, PenLine, X, Image, ShoppingCart } from "lucide-react";
+import { useState, lazy, Suspense, memo } from "react";
+import { ArrowRight, BookOpen, Mic, Play, PenLine, X } from "lucide-react";
 import { membershipPlans } from "@/data/content";
-import { useBooks } from "@/hooks/useBooks";
-import { useSermons } from "@/hooks/useSermons";
-import { useVideos } from "@/hooks/useVideos";
-import { useGraphics } from "@/hooks/useGraphics";
 import HeroCarousel from "@/components/HeroCarousel";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import SubscribeForm from "@/components/SubscribeForm";
 
+const SubscribeForm = lazy(() => import("@/components/SubscribeForm"));
 
 function getYouTubeId(url: string) {
   const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|live\/|embed\/))([^?&/]+)/);
   return match ? match[1] : "";
 }
 
-export default function Index() {
-  const { data: books = [] } = useBooks();
-  const { data: sermons = [] } = useSermons();
-  const { data: videos = [] } = useVideos();
-  const { graphics } = useGraphics();
-  const featuredBooks = books.filter((b) => b.featured);
-  const featuredSermons = sermons.filter((s) => s.featured);
-  const featuredVideos = videos.filter((v) => v.featured);
-  const [playingId, setPlayingId] = useState<string | null>(null);
+/** Fetch only the columns the homepage actually uses */
+function useHomepageBooks() {
+  return useQuery({
+    queryKey: ["books_homepage"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("books")
+        .select("id, title, subtitle, price, is_free, category, cover_image, featured")
+        .eq("is_published", true)
+        .order("sort_order", { ascending: true });
+      if (error) throw new Error(error.message);
+      return data || [];
+    },
+  });
+}
 
-  const { data: blogPosts = [] } = useQuery({
+function useHomepageSermons() {
+  return useQuery({
+    queryKey: ["sermons_homepage"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sermons")
+        .select("id, title, scripture, excerpt, category, access_level, featured")
+        .eq("featured", true)
+        .order("sort_order", { ascending: true })
+        .limit(3);
+      if (error) throw new Error(error.message);
+      return data || [];
+    },
+  });
+}
+
+function useHomepageVideos() {
+  return useQuery({
+    queryKey: ["videos_homepage"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("videos")
+        .select("id, title, youtube_url, thumbnail, duration, category, featured, is_free, price")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
+      if (error) throw new Error(error.message);
+      return data || [];
+    },
+  });
+}
+
+function useHomepageGraphics() {
+  return useQuery({
+    queryKey: ["graphics_homepage"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("graphics")
+        .select("id, title, category, price, preview_url")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true })
+        .limit(6);
+      if (error) throw new Error(error.message);
+      return data || [];
+    },
+  });
+}
+
+function useHomepageBlog() {
+  return useQuery({
     queryKey: ["blog_posts_homepage"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("blog_posts")
-        .select("*")
+        .select("id, title, slug, author, excerpt, image_url, published_at")
         .eq("is_published", true)
         .order("published_at", { ascending: false })
         .limit(3);
       if (error) throw new Error(error.message);
-      return data;
+      return data || [];
     },
   });
+}
+
+const BookCard = memo(({ book }: { book: any }) => (
+  <Link
+    to="/books"
+    className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300 hover:shadow-gold"
+  >
+    <div className="aspect-[2/3] overflow-hidden">
+      {book.cover_image ? (
+        <img
+          src={book.cover_image}
+          alt={book.title}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          loading="lazy"
+          decoding="async"
+          width={400}
+          height={600}
+        />
+      ) : (
+        <div className="w-full h-full bg-muted flex items-center justify-center">
+          <BookOpen className="h-12 w-12 text-muted-foreground" />
+        </div>
+      )}
+    </div>
+    <div className="p-4 sm:p-5">
+      <h3 className="font-display text-lg font-semibold mb-1">{book.title}</h3>
+      <p className="text-muted-foreground text-sm mb-3 line-clamp-2">{book.subtitle}</p>
+      <span className="text-primary text-sm font-semibold">
+        {book.is_free ? "Free Download" : `$${book.price}`}
+      </span>
+    </div>
+  </Link>
+));
+BookCard.displayName = "BookCard";
+
+export default function Index() {
+  const { data: books = [] } = useHomepageBooks();
+  const { data: sermons = [] } = useHomepageSermons();
+  const { data: videos = [] } = useHomepageVideos();
+  const { data: graphics = [] } = useHomepageGraphics();
+  const { data: blogPosts = [] } = useHomepageBlog();
+
+  const featuredBooks = books.filter((b: any) => b.featured);
+  const featuredVideos = videos.filter((v: any) => v.featured);
+  const [playingId, setPlayingId] = useState<string | null>(null);
 
   return (
     <div>
@@ -54,34 +149,8 @@ export default function Index() {
             <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold">Featured Books</h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 max-w-5xl mx-auto">
-            {featuredBooks.map((book) => (
-              <Link
-                key={book.id}
-                to={`/books`}
-                className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300 hover:shadow-gold"
-              >
-                <div className="aspect-[2/3] overflow-hidden">
-                  {book.cover_image ? (
-                    <img
-                      src={book.cover_image}
-                      alt={book.title}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-muted flex items-center justify-center">
-                      <BookOpen className="h-12 w-12 text-muted-foreground" />
-                    </div>
-                  )}
-                </div>
-                <div className="p-4 sm:p-5">
-                  <h3 className="font-display text-lg font-semibold mb-1">{book.title}</h3>
-                  <p className="text-muted-foreground text-sm mb-3 line-clamp-2">{book.subtitle}</p>
-                  <span className="text-primary text-sm font-semibold">
-                    {book.is_free ? "Free Download" : `$${book.price}`}
-                  </span>
-                </div>
-              </Link>
+            {featuredBooks.map((book: any) => (
+              <BookCard key={book.id} book={book} />
             ))}
           </div>
           <div className="text-center mt-10 sm:mt-12">
@@ -93,46 +162,48 @@ export default function Index() {
       </section>
 
       {/* FEATURED SERMONS */}
-      <section className="py-16 sm:py-24">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-10 sm:mb-16">
-            <p className="text-primary text-sm tracking-[0.2em] uppercase mb-3">For Pastors</p>
-            <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold">Latest Sermons</h2>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-w-5xl mx-auto">
-            {featuredSermons.slice(0, 3).map((sermon) => (
-              <Link
-                key={sermon.id}
-                to={`/sermons/${sermon.id}`}
-                className="group p-5 sm:p-6 rounded-xl bg-card border border-border hover:border-primary/30 transition-all duration-300"
-              >
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-primary">{sermon.category}</span>
-                  {sermon.access_level !== "free" && (
-                    <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                      {sermon.access_level}
-                    </span>
-                  )}
-                </div>
-                <h3 className="font-display text-lg sm:text-xl font-semibold mb-2 group-hover:text-primary transition-colors">{sermon.title}</h3>
-                <p className="text-sm text-muted-foreground mb-3">{sermon.scripture}</p>
-                <p className="text-sm text-muted-foreground line-clamp-2">{sermon.excerpt}</p>
+      {sermons.length > 0 && (
+        <section className="py-16 sm:py-24">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-10 sm:mb-16">
+              <p className="text-primary text-sm tracking-[0.2em] uppercase mb-3">For Pastors</p>
+              <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold">Latest Sermons</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-w-5xl mx-auto">
+              {sermons.slice(0, 3).map((sermon: any) => (
+                <Link
+                  key={sermon.id}
+                  to={`/sermons/${sermon.id}`}
+                  className="group p-5 sm:p-6 rounded-xl bg-card border border-border hover:border-primary/30 transition-all duration-300"
+                >
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-primary">{sermon.category}</span>
+                    {sermon.access_level !== "free" && (
+                      <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                        {sermon.access_level}
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="font-display text-lg sm:text-xl font-semibold mb-2 group-hover:text-primary transition-colors">{sermon.title}</h3>
+                  <p className="text-sm text-muted-foreground mb-3">{sermon.scripture}</p>
+                  <p className="text-sm text-muted-foreground line-clamp-2">{sermon.excerpt}</p>
+                </Link>
+              ))}
+            </div>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 mt-10 sm:mt-12">
+              <Link to="/sermons" className="text-primary text-sm font-semibold hover:underline inline-flex items-center gap-1">
+                Browse Sermon Library <ArrowRight className="h-4 w-4" />
               </Link>
-            ))}
+              <Link
+                to="/blog"
+                className="inline-flex items-center gap-2 px-5 py-2 rounded-full border border-primary/30 text-sm font-semibold text-foreground hover:bg-primary/10 transition-colors"
+              >
+                <PenLine className="h-4 w-4 text-primary" /> Visit the Blog
+              </Link>
+            </div>
           </div>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 mt-10 sm:mt-12">
-            <Link to="/sermons" className="text-primary text-sm font-semibold hover:underline inline-flex items-center gap-1">
-              Browse Sermon Library <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link
-              to="/blog"
-              className="inline-flex items-center gap-2 px-5 py-2 rounded-full border border-primary/30 text-sm font-semibold text-foreground hover:bg-primary/10 transition-colors"
-            >
-              <PenLine className="h-4 w-4 text-primary" /> Visit the Blog
-            </Link>
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* LATEST BLOG POSTS */}
       {blogPosts.length > 0 && (
@@ -143,7 +214,7 @@ export default function Index() {
               <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold">Latest Blog Posts</h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
-              {blogPosts.map((post) => (
+              {blogPosts.map((post: any) => (
                 <Link
                   key={post.id}
                   to={`/blog/${post.slug}`}
@@ -151,7 +222,7 @@ export default function Index() {
                 >
                   {post.image_url && (
                     <div className="aspect-video overflow-hidden bg-muted">
-                      <img src={post.image_url} alt={post.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+                      <img src={post.image_url} alt={post.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" decoding="async" />
                     </div>
                   )}
                   <div className="p-4 sm:p-5">
@@ -180,7 +251,7 @@ export default function Index() {
               <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold">Featured Videos</h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-w-5xl mx-auto">
-              {featuredVideos.map((video) => {
+              {featuredVideos.map((video: any) => {
                 const ytId = getYouTubeId(video.youtube_url);
                 const thumb = video.thumbnail || (ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : "");
                 const isPlaying = playingId === video.id;
@@ -198,6 +269,7 @@ export default function Index() {
                             className="w-full h-full"
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                             allowFullScreen
+                            loading="lazy"
                           />
                           <button
                             onClick={() => setPlayingId(null)}
@@ -209,7 +281,7 @@ export default function Index() {
                       ) : (
                         <div className="cursor-pointer" onClick={() => ytId && setPlayingId(video.id)}>
                           {thumb ? (
-                            <img src={thumb} alt={video.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+                            <img src={thumb} alt={video.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" decoding="async" />
                           ) : (
                             <div className="w-full h-full bg-muted flex items-center justify-center">
                               <Play className="h-10 w-10 text-muted-foreground" />
@@ -251,14 +323,14 @@ export default function Index() {
               <p className="text-muted-foreground mt-3 max-w-lg mx-auto">Professional graphics for your church screens and social media.</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
-              {graphics.slice(0, 6).map((graphic) => (
+              {graphics.slice(0, 6).map((graphic: any) => (
                 <Link
                   key={graphic.id}
                   to="/graphics"
                   className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300"
                 >
                   <div className="aspect-video overflow-hidden bg-muted">
-                    <img src={graphic.preview_url} alt={graphic.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+                    <img src={graphic.preview_url} alt={graphic.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" decoding="async" />
                   </div>
                   <div className="p-4">
                     <p className="text-xs text-primary uppercase tracking-wider mb-1">{graphic.category}</p>
@@ -277,7 +349,7 @@ export default function Index() {
         </section>
       )}
 
-      {/* VIDEOS FOR SALE */}
+      {/* VIDEOS FOR SALE — only render if premium videos exist */}
       {videos.filter((v: any) => !v.is_free && v.price > 0).length > 0 && (
         <section className="bg-gradient-section py-16 sm:py-24">
           <div className="container mx-auto px-4">
@@ -298,7 +370,7 @@ export default function Index() {
                   >
                     <div className="relative aspect-video overflow-hidden bg-muted">
                       {thumb ? (
-                        <img src={thumb} alt={video.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+                        <img src={thumb} alt={video.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" decoding="async" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center"><Play className="h-10 w-10 text-muted-foreground" /></div>
                       )}
@@ -393,7 +465,9 @@ export default function Index() {
           <p className="text-muted-foreground mb-6 sm:mb-8 max-w-lg mx-auto text-sm sm:text-base">
             Get weekly devotionals, book updates, and exclusive content delivered to your inbox.
           </p>
-          <SubscribeForm />
+          <Suspense fallback={<div className="h-12" />}>
+            <SubscribeForm />
+          </Suspense>
         </div>
       </section>
     </div>
