@@ -155,8 +155,8 @@ export default function AdminLayout() {
       <div className="min-h-screen flex bg-background">
         {/* Desktop sidebar */}
         {!isMobile && (
-          <aside className="shrink-0 flex flex-col border-r border-border bg-card w-56">
-            <div className="h-14 flex items-center px-4 border-b border-border gap-2">
+          <aside className="shrink-0 flex flex-col border-r border-border bg-card w-56 h-screen sticky top-0">
+            <div className="h-14 shrink-0 flex items-center px-4 border-b border-border gap-2">
               <BookOpen className="h-5 w-5 text-primary shrink-0" />
               <span className="font-display text-sm font-semibold truncate">Admin</span>
             </div>
