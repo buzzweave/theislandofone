@@ -70,7 +70,7 @@ export default function Membership() {
             <div className="text-center text-muted-foreground">Loading plans…</div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-              {plans.map((plan) => {
+              {plans.filter((p) => p.is_visible).map((plan) => {
                 const slug = plan.slug || plan.name.toLowerCase().replace(/\s+/g, "-");
                 const isCurrentPlan = isSubscribed && currentTier === slug;
 

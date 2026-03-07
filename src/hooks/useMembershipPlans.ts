@@ -8,6 +8,7 @@ export interface MembershipPlan {
   price: number;
   features: string[];
   is_featured: boolean;
+  is_visible: boolean;
   sort_order: number;
 }
 
