@@ -34,7 +34,8 @@ export default function Graphics() {
     });
   }, [user, graphics, checkPurchase]);
 
-  const categories = ["All", ...Array.from(new Set(graphics.map((g) => g.category)))];
+  const isFoldersView = activeCategory === "Folders";
+  const categories = ["All", ...Array.from(new Set(graphics.map((g) => g.category))), ...(org ? ["Folders"] : [])];
   const filtered = graphics.filter((g) => {
     const matchesCategory = activeCategory === "All" || g.category === activeCategory;
     const lq = searchQuery.toLowerCase();
