@@ -17,6 +17,14 @@ export default function Graphics() {
   const [purchasedIds, setPurchasedIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
+  // Get workspace org for Folders tab
+  let orgId: string | undefined;
+  try {
+    const { useWorkspace } = require("@/contexts/WorkspaceContext");
+    const { org } = useWorkspace();
+    orgId = org?.id;
+  } catch { /* not in workspace */ }
+
   const userTier = getTierByProductId(subscription.product_id);
 
   // Check purchases for all paid graphics
