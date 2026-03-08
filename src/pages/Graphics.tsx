@@ -2,10 +2,12 @@ import { useState, useEffect } from "react";
 import { useGraphics } from "@/hooks/useGraphics";
 import { useAuth } from "@/contexts/AuthContext";
 import { getTierByProductId, tierHasAccess, MEMBERSHIP_TIERS } from "@/lib/stripe";
-import { Image, Search, Download, ShoppingCart } from "lucide-react";
+import { Image, Search, Download, ShoppingCart, FolderOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import GraphicsFolders from "@/components/graphics/GraphicsFolders";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 export default function Graphics() {
   const { graphics, isLoading } = useGraphics();
@@ -15,6 +17,7 @@ export default function Graphics() {
   const [buyingId, setBuyingId] = useState<string | null>(null);
   const [purchasedIds, setPurchasedIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+  const { org } = useWorkspace();
 
   const userTier = getTierByProductId(subscription.product_id);
 
@@ -31,7 +34,8 @@ export default function Graphics() {
     });
   }, [user, graphics, checkPurchase]);
 
-  const categories = ["All", ...Array.from(new Set(graphics.map((g) => g.category)))];
+  const isFoldersView = activeCategory === "Folders";
+  const categories = ["All", ...Array.from(new Set(graphics.map((g) => g.category))), ...(org ? ["Folders"] : [])];
   const filtered = graphics.filter((g) => {
     const matchesCategory = activeCategory === "All" || g.category === activeCategory;
     const lq = searchQuery.toLowerCase();
@@ -90,34 +94,45 @@ export default function Graphics() {
 
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-5xl mx-auto mb-8 space-y-4">
-          <div className="relative max-w-md mx-auto">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search graphics…"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-full bg-card border border-border text-sm text-foreground focus:outline-none focus:border-primary/40"
-            />
-          </div>
+          {!isFoldersView && (
+            <div className="relative max-w-md mx-auto">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search graphics…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 rounded-full bg-card border border-border text-sm text-foreground focus:outline-none focus:border-primary/40"
+              />
+            </div>
+          )}
           <div className="flex flex-wrap gap-2 justify-center">
             {categories.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
                   activeCategory === cat
                     ? "bg-primary text-primary-foreground"
                     : "bg-card border border-border text-muted-foreground hover:text-foreground"
                 }`}
               >
+                {cat === "Folders" && <FolderOpen className="h-3.5 w-3.5" />}
                 {cat}
               </button>
             ))}
           </div>
         </div>
 
-        {isLoading ? (
+        {/* Folders view */}
+        {isFoldersView && org ? (
+          <GraphicsFolders orgId={org.id} />
+        ) : isFoldersView ? (
+          <div className="text-center py-16">
+            <FolderOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">Sign in to your studio to view folders.</p>
+          </div>
+        ) : isLoading ? (
           <div className="text-center text-muted-foreground py-12">Loading graphics…</div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16">

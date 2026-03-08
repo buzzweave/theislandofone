@@ -45,11 +45,15 @@ export function useMediaFolders(orgId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("media_folders")
-        .select("*")
+        .select("*, media_images(count)")
         .eq("org_id", orgId!)
         .order("name");
       if (error) throw error;
-      return data as MediaFolder[];
+      return (data as any[]).map((f) => ({
+        ...f,
+        image_count: f.media_images?.[0]?.count ?? 0,
+        media_images: undefined,
+      })) as MediaFolder[];
     },
   });
 }
