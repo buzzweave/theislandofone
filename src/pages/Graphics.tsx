@@ -2,10 +2,11 @@ import { useState, useEffect } from "react";
 import { useGraphics } from "@/hooks/useGraphics";
 import { useAuth } from "@/contexts/AuthContext";
 import { getTierByProductId, tierHasAccess, MEMBERSHIP_TIERS } from "@/lib/stripe";
-import { Image, Search, Download, ShoppingCart } from "lucide-react";
+import { Image, Search, Download, ShoppingCart, FolderOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import GraphicsFolders from "@/components/graphics/GraphicsFolders";
 
 export default function Graphics() {
   const { graphics, isLoading } = useGraphics();
