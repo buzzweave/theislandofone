@@ -94,16 +94,18 @@ export default function Graphics() {
 
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-5xl mx-auto mb-8 space-y-4">
-          <div className="relative max-w-md mx-auto">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search graphics…"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-full bg-card border border-border text-sm text-foreground focus:outline-none focus:border-primary/40"
-            />
-          </div>
+          {!isFoldersView && (
+            <div className="relative max-w-md mx-auto">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search graphics…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 rounded-full bg-card border border-border text-sm text-foreground focus:outline-none focus:border-primary/40"
+              />
+            </div>
+          )}
           <div className="flex flex-wrap gap-2 justify-center">
             {categories.map((cat) => (
               <button
