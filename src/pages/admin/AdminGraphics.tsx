@@ -9,7 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import ImageResizeDialog from "@/components/admin/ImageResizeDialog";
-
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import MediaImagesTab from "@/components/admin/media/MediaImagesTab";
+import MediaVideosTab from "@/components/admin/media/MediaVideosTab";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 /** Compress an image file to a smaller preview (max 800px, 70% quality JPEG) */
 async function createCompressedPreview(file: File): Promise<File> {
   return new Promise((resolve) => {
