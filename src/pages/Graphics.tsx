@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import GraphicsFolders from "@/components/graphics/GraphicsFolders";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 export default function Graphics() {
   const { graphics, isLoading } = useGraphics();
@@ -16,14 +17,7 @@ export default function Graphics() {
   const [buyingId, setBuyingId] = useState<string | null>(null);
   const [purchasedIds, setPurchasedIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
-
-  // Get workspace org for Folders tab
-  let orgId: string | undefined;
-  try {
-    const { useWorkspace } = require("@/contexts/WorkspaceContext");
-    const { org } = useWorkspace();
-    orgId = org?.id;
-  } catch { /* not in workspace */ }
+  const { org } = useWorkspace();
 
   const userTier = getTierByProductId(subscription.product_id);
 
