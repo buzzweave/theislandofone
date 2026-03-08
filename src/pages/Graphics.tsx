@@ -109,12 +109,13 @@ export default function Graphics() {
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
                   activeCategory === cat
                     ? "bg-primary text-primary-foreground"
                     : "bg-card border border-border text-muted-foreground hover:text-foreground"
                 }`}
               >
+                {cat === "Folders" && <FolderOpen className="h-3.5 w-3.5" />}
                 {cat}
               </button>
             ))}
