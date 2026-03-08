@@ -122,7 +122,15 @@ export default function Graphics() {
           </div>
         </div>
 
-        {isLoading ? (
+        {/* Folders view */}
+        {isFoldersView && org ? (
+          <GraphicsFolders orgId={org.id} />
+        ) : isFoldersView ? (
+          <div className="text-center py-16">
+            <FolderOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">Sign in to your studio to view folders.</p>
+          </div>
+        ) : isLoading ? (
           <div className="text-center text-muted-foreground py-12">Loading graphics…</div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16">
