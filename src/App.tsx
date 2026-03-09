@@ -160,7 +160,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <AuthProvider>
-        <WorkspaceProvider>
+        
         <AdminAuthProvider>
           <GlobalCopyProtection>
             <BrowserRouter>
