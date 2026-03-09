@@ -62,6 +62,21 @@
 
   <body>
     <div id="root"></div>
+    <noscript>
+      <div style="color:white;padding:2rem;font-family:sans-serif;text-align:center">
+        <h1>JavaScript Required</h1>
+        <p>Please enable JavaScript to use this site.</p>
+      </div>
+    </noscript>
+    <script>
+      window.__APP_LOAD_START = Date.now();
+      window.onerror = function(msg, url, line, col, err) {
+        var root = document.getElementById('root');
+        if (root && !root.innerHTML.trim()) {
+          root.innerHTML = '<div style="color:white;padding:2rem;font-family:sans-serif"><h1>Load Error</h1><p>' + msg + '</p><p>File: ' + url + '</p><p>Line: ' + line + '</p></div>';
+        }
+      };
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
