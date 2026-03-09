@@ -153,10 +153,22 @@ export default function AdminOpenAIStudio() {
                   rows={3}
                 />
               </div>
-              <Button onClick={() => generateDraft("book")} disabled={generating !== null}>
-                {generating === "book" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wand2 className="h-4 w-4 mr-2" />}
-                Generate Book Draft
-              </Button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button onClick={() => generateDraft("book")} disabled={generating !== null}>
+                  {generating === "book" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wand2 className="h-4 w-4 mr-2" />}
+                  Generate Book Draft
+                </Button>
+                {lastGeneratedBookId && (
+                  <Button variant="outline" size="sm" onClick={() => navigate("/admin/books")}>
+                    <ExternalLink className="h-3 w-3 mr-1.5" /> Open in Books
+                  </Button>
+                )}
+                {generationFailed?.type === "book" && (
+                  <Button variant="destructive" size="sm" onClick={() => { setBookTopic(generationFailed.topic); generateDraft("book"); }}>
+                    Retry
+                  </Button>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">This will create a new unpublished book with AI-generated chapters.</p>
             </CardContent>
           </Card>
