@@ -47,7 +47,7 @@ export default function AdminGraphics() {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const [resizeGraphic, setResizeGraphic] = useState<Graphic | null>(null);
-  const { org } = useWorkspace();
+  
   const handleAddClick = () => {
     const input = document.createElement("input");
     input.type = "file";
