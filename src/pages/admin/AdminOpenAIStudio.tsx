@@ -68,6 +68,9 @@ export default function AdminOpenAIStudio() {
     }
 
     setGenerating(type);
+    setGenerationFailed(null);
+    setLastGeneratedSermonId(null);
+    setLastGeneratedBookId(null);
     const systemPrompt = type === "book" ? bookPrompt : sermonPrompt;
 
     try {
@@ -92,13 +95,27 @@ export default function AdminOpenAIStudio() {
 
       const result = await resp.json();
       if (result.success) {
-        toast({ title: `${type === "book" ? "Book" : "Sermon"} draft created!`, description: `"${result.title}" has been saved as a draft.` });
+        // Invalidate caches so lists update immediately
+        if (type === "sermon") {
+          queryClient.invalidateQueries({ queryKey: ["sermons"] });
+          setLastGeneratedSermonId(result.id);
+        } else {
+          queryClient.invalidateQueries({ queryKey: ["books"] });
+          setLastGeneratedBookId(result.id);
+        }
+
+        toast({
+          title: `${type === "book" ? "Book" : "Sermon"} draft created!`,
+          description: `"${result.title}" has been saved as a draft and added to ${type === "book" ? "Books" : "Sermons"}.`,
+        });
+
         if (type === "book") setBookTopic("");
         else setSermonTopic("");
       } else {
         throw new Error(result.error || "Unknown error");
       }
     } catch (err: any) {
+      setGenerationFailed({ type, topic });
       toast({ title: "Generation failed", description: err.message, variant: "destructive" });
     } finally {
       setGenerating(null);
