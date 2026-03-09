@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { supabaseImageUrl } from "@/lib/supabaseImage";
+
 import { Link } from "react-router-dom";
 import { BookOpen, Lock } from "lucide-react";
 import { useBooks } from "@/hooks/useBooks";
