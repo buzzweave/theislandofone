@@ -6,8 +6,7 @@ import { Image, Search, Download, ShoppingCart, FolderOpen } from "lucide-react"
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
-import GraphicsFolders from "@/components/graphics/GraphicsFolders";
-import { useWorkspace } from "@/contexts/WorkspaceContext";
+import PublicGraphicsFolders from "@/components/graphics/PublicGraphicsFolders";
 
 export default function Graphics() {
   const { graphics, isLoading } = useGraphics();
@@ -17,7 +16,6 @@ export default function Graphics() {
   const [buyingId, setBuyingId] = useState<string | null>(null);
   const [purchasedIds, setPurchasedIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
-  const { org } = useWorkspace();
 
   const userTier = getTierByProductId(subscription.product_id);
 
@@ -35,7 +33,7 @@ export default function Graphics() {
   }, [user, graphics, checkPurchase]);
 
   const isFoldersView = activeCategory === "Folders";
-  const categories = ["All", ...Array.from(new Set(graphics.map((g) => g.category))), ...(org ? ["Folders"] : [])];
+  const categories = ["All", ...Array.from(new Set(graphics.map((g) => g.category))), "Folders"];
   const filtered = graphics.filter((g) => {
     const matchesCategory = activeCategory === "All" || g.category === activeCategory;
     const lq = searchQuery.toLowerCase();
@@ -125,13 +123,8 @@ export default function Graphics() {
         </div>
 
         {/* Folders view */}
-        {isFoldersView && org ? (
-          <GraphicsFolders orgId={org.id} />
-        ) : isFoldersView ? (
-          <div className="text-center py-16">
-            <FolderOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">Sign in to your studio to view folders.</p>
-          </div>
+        {isFoldersView ? (
+          <PublicGraphicsFolders />
         ) : isLoading ? (
           <div className="text-center text-muted-foreground py-12">Loading graphics…</div>
         ) : filtered.length === 0 ? (
