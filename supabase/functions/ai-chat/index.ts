@@ -99,7 +99,8 @@ serve(async (req) => {
         });
       }
 
-      console.log(`[generate_draft] Parsed ${draftType} JSON successfully. Title: "${parsed.title}"`);
+      // Log actual keys returned by AI for debugging
+      console.log(`[generate_draft] Parsed ${draftType} JSON keys:`, Object.keys(parsed).join(", "));
 
       // Safe-string helper: guarantees a string, never null/undefined/object
       const safeStr = (val: unknown, fallback = ""): string => {
@@ -109,11 +110,18 @@ serve(async (req) => {
         try { return JSON.stringify(val); } catch { return fallback; }
       };
 
+      // Robust field resolver: tries multiple possible field names from AI response
+      const pick = (...keys: string[]): unknown => {
+        for (const k of keys) {
+          if (parsed[k] != null && parsed[k] !== "") return parsed[k];
+        }
+        return undefined;
+      };
+
       // Extract scripture reference: if AI returned an object like {reference, text}, extract just the reference string
       const extractScriptureRef = (val: unknown): string => {
         if (val == null) return "";
         if (typeof val === "string") {
-          // Check if the string is actually a JSON object
           if (val.trim().startsWith("{")) {
             try {
               const obj = JSON.parse(val);
@@ -129,73 +137,26 @@ serve(async (req) => {
         return String(val);
       };
 
-      // Save draft to DB
-      if (draftType === "book") {
-        const bookPayload = {
-          title: safeStr(parsed.title, "Untitled Book"),
-          subtitle: safeStr(parsed.subtitle),
-          author: safeStr(parsed.author, "Bryant Clark"),
-          description: safeStr(parsed.description),
-          is_published: false,
-          is_free: true,
-          price: 0,
-          category: "Faith",
-        };
-        console.log("[generate_draft] Inserting book:", JSON.stringify(bookPayload));
-
-        const { data: book, error: bookErr } = await supabase.from("books").insert(bookPayload).select().single();
-
-        if (bookErr) {
-          console.error("[generate_draft] Book insert FAILED:", JSON.stringify(bookErr));
-          throw bookErr;
+      // Extract manuscript/body content: try multiple field names, combine if needed
+      const extractManuscript = (): string => {
+        const raw = pick("manuscript", "content", "body", "sermon_body", "sermon_content", "sermon", "text", "full_text");
+        if (raw != null) return safeStr(raw);
+        // If AI returned sections/points as an array, join them
+        const sections = pick("sections", "points", "main_points");
+        if (Array.isArray(sections)) {
+          return sections.map((s: any) => typeof s === "string" ? s : `${s.title || s.heading || ""}\n${s.content || s.text || s.body || ""}`).join("\n\n");
         }
+        return "";
+      };
 
-        console.log(`[generate_draft] Book created successfully. ID: ${book.id}`);
-
-        if (parsed.chapters?.length && book) {
-          const chapterRows = parsed.chapters.map((ch: any, i: number) => ({
-            book_id: book.id,
-            title: ch.title || `Chapter ${i + 1}`,
-            content: ch.content || "",
-            sort_order: i,
-          }));
-          const { error: chapErr } = await supabase.from("book_chapters").insert(chapterRows);
-          if (chapErr) {
-            console.error("[generate_draft] Chapter insert error (non-fatal):", JSON.stringify(chapErr));
-          } else {
-            console.log(`[generate_draft] ${chapterRows.length} chapters inserted for book ${book.id}`);
-          }
-        }
-
-        return new Response(JSON.stringify({ success: true, title: parsed.title, id: book?.id }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      } else {
-        // SERMON DRAFT CREATION
-        const sermonPayload = {
-          title: safeStr(parsed.title, "Untitled Sermon"),
-          scripture: extractScriptureRef(parsed.scripture),
-          excerpt: safeStr(parsed.excerpt),
-          manuscript: safeStr(parsed.manuscript),
-          category: safeStr(parsed.category, "Faith"),
-          is_free: true,
-          price: 0,
-          is_published: false,
-          access_level: "free",
-          access_tiers: [],
-          featured: false,
-          preview_cutoff: 2,
-          sort_order: 0,
-          date: new Date().toISOString().slice(0, 10),
-        };
-
-        console.log("[generate_draft] Inserting sermon with payload:", JSON.stringify({
-          title: sermonPayload.title,
-          category: sermonPayload.category,
-          is_published: sermonPayload.is_published,
-          scripture: sermonPayload.scripture,
-          manuscript_length: sermonPayload.manuscript.length,
-        }));
+      // Extract title robustly
+      const extractTitle = (fallback: string): string => {
+        const raw = pick("title", "sermon_title", "name", "heading");
+        const title = safeStr(raw);
+        if (title && title !== "undefined" && title.length > 2) return title;
+        // Fallback to user's topic
+        return fallback;
+      };
 
         const { data: sermon, error: sermonErr } = await supabase
           .from("sermons")
