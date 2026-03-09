@@ -1,25 +1,32 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BookOpen, FileText, Loader2, Save, Wand2 } from "lucide-react";
+import { BookOpen, FileText, Loader2, Save, Wand2, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 const DEFAULT_BOOK_PROMPT = `You are a Christian book author assistant. Generate a complete book outline with chapters. Return a JSON object with: title, subtitle, author (use "Bryant Clark"), description, and chapters (array of {title, content}). Each chapter should have substantial content (at least 500 words). Write in an engaging, faith-driven style.`;
 
 const DEFAULT_SERMON_PROMPT = `You are a sermon writing assistant for a Christian ministry. Generate a complete sermon manuscript. Return a JSON object with: title, scripture, excerpt (2-3 sentence summary), manuscript (full sermon text with rich formatting), category (one of: Faith, Worship, Calling, Leadership, Deliverance, Prayer, Family). Write with passion and biblical depth.`;
 
 export default function AdminOpenAIStudio() {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [bookPrompt, setBookPrompt] = useState(DEFAULT_BOOK_PROMPT);
   const [sermonPrompt, setSermonPrompt] = useState(DEFAULT_SERMON_PROMPT);
   const [bookTopic, setBookTopic] = useState("");
   const [sermonTopic, setSermonTopic] = useState("");
   const [generating, setGenerating] = useState<"book" | "sermon" | null>(null);
   const [savedPrompts, setSavedPrompts] = useState(false);
+  const [lastGeneratedSermonId, setLastGeneratedSermonId] = useState<string | null>(null);
+  const [lastGeneratedBookId, setLastGeneratedBookId] = useState<string | null>(null);
+  const [generationFailed, setGenerationFailed] = useState<{ type: string; topic: string } | null>(null);
 
   // Load saved prompts from site_settings
   useEffect(() => {
@@ -61,6 +68,9 @@ export default function AdminOpenAIStudio() {
     }
 
     setGenerating(type);
+    setGenerationFailed(null);
+    setLastGeneratedSermonId(null);
+    setLastGeneratedBookId(null);
     const systemPrompt = type === "book" ? bookPrompt : sermonPrompt;
 
     try {
@@ -85,13 +95,27 @@ export default function AdminOpenAIStudio() {
 
       const result = await resp.json();
       if (result.success) {
-        toast({ title: `${type === "book" ? "Book" : "Sermon"} draft created!`, description: `"${result.title}" has been saved as a draft.` });
+        // Invalidate caches so lists update immediately
+        if (type === "sermon") {
+          queryClient.invalidateQueries({ queryKey: ["sermons"] });
+          setLastGeneratedSermonId(result.id);
+        } else {
+          queryClient.invalidateQueries({ queryKey: ["books"] });
+          setLastGeneratedBookId(result.id);
+        }
+
+        toast({
+          title: `${type === "book" ? "Book" : "Sermon"} draft created!`,
+          description: `"${result.title}" has been saved as a draft and added to ${type === "book" ? "Books" : "Sermons"}.`,
+        });
+
         if (type === "book") setBookTopic("");
         else setSermonTopic("");
       } else {
         throw new Error(result.error || "Unknown error");
       }
     } catch (err: any) {
+      setGenerationFailed({ type, topic });
       toast({ title: "Generation failed", description: err.message, variant: "destructive" });
     } finally {
       setGenerating(null);
@@ -129,10 +153,22 @@ export default function AdminOpenAIStudio() {
                   rows={3}
                 />
               </div>
-              <Button onClick={() => generateDraft("book")} disabled={generating !== null}>
-                {generating === "book" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wand2 className="h-4 w-4 mr-2" />}
-                Generate Book Draft
-              </Button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button onClick={() => generateDraft("book")} disabled={generating !== null}>
+                  {generating === "book" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wand2 className="h-4 w-4 mr-2" />}
+                  Generate Book Draft
+                </Button>
+                {lastGeneratedBookId && (
+                  <Button variant="outline" size="sm" onClick={() => navigate("/admin/books")}>
+                    <ExternalLink className="h-3 w-3 mr-1.5" /> Open in Books
+                  </Button>
+                )}
+                {generationFailed?.type === "book" && (
+                  <Button variant="destructive" size="sm" onClick={() => { setBookTopic(generationFailed.topic); generateDraft("book"); }}>
+                    Retry
+                  </Button>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">This will create a new unpublished book with AI-generated chapters.</p>
             </CardContent>
           </Card>
@@ -154,10 +190,22 @@ export default function AdminOpenAIStudio() {
                   rows={3}
                 />
               </div>
-              <Button onClick={() => generateDraft("sermon")} disabled={generating !== null}>
-                {generating === "sermon" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wand2 className="h-4 w-4 mr-2" />}
-                Generate Sermon Draft
-              </Button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button onClick={() => generateDraft("sermon")} disabled={generating !== null}>
+                  {generating === "sermon" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wand2 className="h-4 w-4 mr-2" />}
+                  Generate Sermon Draft
+                </Button>
+                {lastGeneratedSermonId && (
+                  <Button variant="outline" size="sm" onClick={() => navigate("/admin/sermons")}>
+                    <ExternalLink className="h-3 w-3 mr-1.5" /> Open in Sermons
+                  </Button>
+                )}
+                {generationFailed?.type === "sermon" && (
+                  <Button variant="destructive" size="sm" onClick={() => { setSermonTopic(generationFailed.topic); generateDraft("sermon"); }}>
+                    Retry
+                  </Button>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">This will create a new sermon draft with AI-generated manuscript.</p>
             </CardContent>
           </Card>
