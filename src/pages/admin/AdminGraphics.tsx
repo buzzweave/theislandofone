@@ -240,6 +240,11 @@ export default function AdminGraphics() {
           </div>
         </TabsContent>
 
+        {/* Folders tab */}
+        <TabsContent value="folders">
+          <AdminGraphicsFoldersTab />
+        </TabsContent>
+
         {/* Media Library - Images */}
         <TabsContent value="images">
           <div className="pt-2">
