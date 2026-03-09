@@ -152,8 +152,8 @@ export default function Index() {
       {/* HERO */}
       <HeroCarousel />
 
-      {/* FEATURED BOOKS */}
-      <section className="bg-gradient-section py-16 sm:py-24">
+      {/* FEATURED BOOKS - min-height prevents CLS */}
+      <section className="bg-gradient-section py-16 sm:py-24 min-h-[600px] sm:min-h-[800px]">
         <div className="container mx-auto px-4">
           <div className="text-center mb-10 sm:mb-16">
             <p className="text-primary text-sm tracking-[0.2em] uppercase mb-3">Library</p>
@@ -216,9 +216,9 @@ export default function Index() {
         </section>
       )}
 
-      {/* LATEST BLOG POSTS */}
+      {/* LATEST BLOG POSTS - min-height prevents CLS */}
       {blogPosts.length > 0 && (
-        <section className="bg-gradient-section py-16 sm:py-24">
+        <section className="bg-gradient-section py-16 sm:py-24 min-h-[500px] sm:min-h-[600px]">
           <div className="container mx-auto px-4">
             <div className="text-center mb-10 sm:mb-16">
               <p className="text-primary text-sm tracking-[0.2em] uppercase mb-3">Blog</p>
@@ -324,9 +324,9 @@ export default function Index() {
         </section>
       )}
 
-      {/* SOCIAL MEDIA GRAPHICS */}
+      {/* SOCIAL MEDIA GRAPHICS - min-height prevents CLS */}
       {graphics.length > 0 && (
-        <section className="py-16 sm:py-24">
+        <section className="py-16 sm:py-24 min-h-[500px] sm:min-h-[700px]">
           <div className="container mx-auto px-4">
             <div className="text-center mb-10 sm:mb-16">
               <p className="text-primary text-sm tracking-[0.2em] uppercase mb-3">Church Media</p>
@@ -405,8 +405,8 @@ export default function Index() {
         </section>
       )}
 
-      {/* MEMBERSHIP CTA */}
-      <section className="py-16 sm:py-24">
+      {/* MEMBERSHIP CTA - min-height prevents CLS */}
+      <section className="py-16 sm:py-24 min-h-[400px] sm:min-h-[500px]">
         <div className="container mx-auto px-4 text-center">
           <p className="text-primary text-sm tracking-[0.2em] uppercase mb-3">Community</p>
           <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold mb-4 sm:mb-6">Join the Inner Circle</h2>
