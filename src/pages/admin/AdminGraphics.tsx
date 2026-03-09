@@ -10,8 +10,6 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import ImageResizeDialog from "@/components/admin/ImageResizeDialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import MediaImagesTab from "@/components/admin/media/MediaImagesTab";
-import MediaVideosTab from "@/components/admin/media/MediaVideosTab";
 
 import AdminGraphicsFoldersTab from "@/components/admin/graphics/AdminGraphicsFoldersTab";
 /** Compress an image file to a smaller preview (max 800px, 70% quality JPEG) */
@@ -123,8 +121,6 @@ export default function AdminGraphics() {
         <TabsList>
           <TabsTrigger value="store">Store Graphics</TabsTrigger>
           <TabsTrigger value="folders">Folders</TabsTrigger>
-          <TabsTrigger value="images">Image Library</TabsTrigger>
-          <TabsTrigger value="videos">Video Uploads</TabsTrigger>
         </TabsList>
 
         {/* Existing store graphics tab */}
