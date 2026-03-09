@@ -137,6 +137,7 @@ export default function AdminSermonEditor() {
         category: draft.category,
         price: draft.price,
         is_free: draft.is_free ? 1 : 0,
+        is_published: !!draft.is_published,
         preview_cutoff: draft.preview_cutoff,
         featured: draft.featured ? 1 : 0,
         audio_url: draft.audio_url || "",
@@ -182,6 +183,9 @@ export default function AdminSermonEditor() {
                 <div className="flex items-center gap-2">
                   {s.featured && <Star className="h-3 w-3 text-primary shrink-0" />}
                   <span className="truncate font-medium">{s.title}</span>
+                  {s.is_published === false && (
+                    <span className="text-[9px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-semibold uppercase shrink-0">Draft</span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="text-[10px] text-muted-foreground">{s.category}</span>
@@ -298,6 +302,17 @@ export default function AdminSermonEditor() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Publish Sermon</p>
+                  <p className="text-xs text-muted-foreground">When off, this sermon is a draft and hidden from visitors.</p>
+                </div>
+                <Switch
+                  checked={!!draft.is_published}
+                  onCheckedChange={(v) => update({ is_published: v })}
+                />
+              </div>
+
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium">Feature on Front Page</p>
