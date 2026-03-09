@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-
+import { supabaseImageUrl } from "@/lib/supabaseImage";
 import { useState, lazy, Suspense, memo } from "react";
 import { ArrowRight, BookOpen, Mic, Play, PenLine, X } from "lucide-react";
 import { useMembershipPlans } from "@/hooks/useMembershipPlans";
@@ -103,7 +103,7 @@ function useHomepageBlog() {
   });
 }
 
-const BookCard = memo(({ book, index }: { book: any; index: number }) => (
+const BookCard = memo(({ book }: { book: any }) => (
   <Link
     to="/books"
     className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300 hover:shadow-gold"
@@ -111,12 +111,11 @@ const BookCard = memo(({ book, index }: { book: any; index: number }) => (
     <div className="aspect-[2/3] overflow-hidden">
       {book.cover_image ? (
          <img
-           src={book.cover_image}
+           src={supabaseImageUrl(book.cover_image, { width: 700, quality: 75 })}
            alt={book.title}
            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-           loading={index === 0 ? "eager" : "lazy"}
-           decoding={index === 0 ? "sync" : "async"}
-           fetchPriority={index === 0 ? "high" : undefined}
+           loading="lazy"
+           decoding="async"
            width={400}
            height={600}
          />
@@ -162,8 +161,8 @@ export default function Index() {
             <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold">Featured Books</h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 max-w-5xl mx-auto">
-            {featuredBooks.map((book: any, i: number) => (
-              <BookCard key={book.id} book={book} index={i} />
+            {featuredBooks.map((book: any) => (
+              <BookCard key={book.id} book={book} />
             ))}
           </div>
           <div className="text-center mt-10 sm:mt-12">

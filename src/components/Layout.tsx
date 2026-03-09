@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-
+import { supabaseImageUrl } from "@/lib/supabaseImage";
 import { Link, useLocation } from "react-router-dom";
 import { Menu, X, BookOpen, User, LogOut } from "lucide-react";
 import { useSiteLogo } from "@/hooks/useSiteLogo";
@@ -44,7 +44,7 @@ function SiteLogo({ sizeOverride }: { sizeOverride?: number }) {
     >
       {logoUrl ? (
         <img
-          src={logoUrl}
+          src={supabaseImageUrl(logoUrl, { width: size * 2, quality: 80 })}
           alt="Site Logo"
           width={size}
           height={size}
