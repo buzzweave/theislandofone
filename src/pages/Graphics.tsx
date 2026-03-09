@@ -6,8 +6,7 @@ import { Image, Search, Download, ShoppingCart, FolderOpen } from "lucide-react"
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
-import GraphicsFolders from "@/components/graphics/GraphicsFolders";
-import { useWorkspace } from "@/contexts/WorkspaceContext";
+import PublicGraphicsFolders from "@/components/graphics/PublicGraphicsFolders";
 
 export default function Graphics() {
   const { graphics, isLoading } = useGraphics();
