@@ -68,6 +68,8 @@ const AdminBlogManager = lazy(() => import("./pages/admin/AdminBlogManager"));
 const AdminPublisher = lazy(() => import("./pages/admin/AdminPublisher"));
 const AdminNotifications = lazy(() => import("./pages/admin/AdminNotifications"));
 const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
+const AdminAccessCodes = lazy(() => import("./pages/admin/AdminAccessCodes"));
+const AdminUserAccess = lazy(() => import("./pages/admin/AdminUserAccess"));
 const AdminCRM = lazy(() => import("./pages/admin/AdminCRM"));
 const AdminPlaceholder = lazy(() => import("./pages/admin/AdminPlaceholder"));
 const AdminStudioManager = lazy(() => import("./pages/admin/AdminStudioManager"));
