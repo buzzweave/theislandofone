@@ -6,15 +6,17 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY not configured");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    const model = Deno.env.get("OPENAI_MODEL") || "gpt-4o-mini";
-    const systemPrompt = Deno.env.get("AI_SYSTEM_PROMPT") || "You are a helpful AI assistant for The Island of One ministry. Be warm, encouraging, and faith-driven. Keep answers clear and concise.";
+    const model = "google/gemini-2.5-flash";
+    const systemPrompt = "You are a helpful AI assistant for The Island of One ministry. Be warm, encouraging, and faith-driven. Keep answers clear and concise.";
 
     const body = await req.json();
     const { messages, conversationId, action, draftType, systemPrompt: customSystemPrompt, userPrompt } = body;
@@ -57,9 +59,9 @@ serve(async (req) => {
         ? "You are a Christian book author. Return valid JSON with: title, subtitle, author, description, chapters (array of {title, content}). Each chapter should have at least 300 words."
         : "You are a sermon writer. Return valid JSON with: title, scripture, excerpt, manuscript, category.");
 
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      const response = await fetch(AI_GATEWAY, {
         method: "POST",
-        headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model,
           messages: [
@@ -73,7 +75,17 @@ serve(async (req) => {
 
       if (!response.ok) {
         const errText = await response.text();
-        console.error("OpenAI error:", response.status, errText);
+        console.error("AI gateway error:", response.status, errText);
+        if (response.status === 429) {
+          return new Response(JSON.stringify({ error: "Rate limit exceeded, please try again later." }), {
+            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        if (response.status === 402) {
+          return new Response(JSON.stringify({ error: "AI credits exhausted. Please add funds in Settings." }), {
+            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
         return new Response(JSON.stringify({ error: "AI service error" }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -191,9 +203,9 @@ serve(async (req) => {
       });
     }
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch(AI_GATEWAY, {
       method: "POST",
-      headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model,
         messages: [{ role: "system", content: systemPrompt }, ...messages],
@@ -203,7 +215,17 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error("OpenAI error:", response.status, errText);
+      console.error("AI gateway error:", response.status, errText);
+      if (response.status === 429) {
+        return new Response(JSON.stringify({ error: "Rate limit exceeded, please try again later." }), {
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (response.status === 402) {
+        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add funds in Settings." }), {
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       return new Response(JSON.stringify({ error: "AI service error" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
