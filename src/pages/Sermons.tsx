@@ -21,6 +21,7 @@ export default function Sermons() {
   const [accessFilter, setAccessFilter] = useState("All");
 
   const filtered = sermons.filter((s: any) => {
+    if (s.is_published === false) return false;
     if (activeCategory !== "All" && s.category !== activeCategory) return false;
     if (accessFilter !== "All" && (s.access_level ?? "free") !== accessFilter) return false;
     return true;

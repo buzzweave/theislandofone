@@ -12,6 +12,7 @@ export interface Sermon {
   audio_url: string | null;
   featured: number | boolean;
   is_free: number | boolean;
+  is_published: boolean;
   price: number;
   sort_order: number;
   access_level: string;

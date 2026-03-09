@@ -137,6 +137,7 @@ serve(async (req) => {
           category: parsed.category || "Faith",
           is_free: true,
           price: 0,
+          is_published: false,
         }).select().single();
 
         if (sermonErr) throw sermonErr;
