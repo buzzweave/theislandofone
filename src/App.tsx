@@ -7,7 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout";
 import { AdminAuthProvider } from "./contexts/AdminAuthContext";
 import { AuthProvider } from "./contexts/AuthContext";
-import { WorkspaceProvider } from "./contexts/WorkspaceContext";
+
 
 // Critical path — loaded eagerly
 import Index from "./pages/Index";
@@ -39,13 +39,6 @@ const Login = lazy(() => import("./pages/Login"));
 const RedeemCode = lazy(() => import("./pages/RedeemCode"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
-// Studio (SaaS) pages
-const Studio = lazy(() => import("./pages/Studio"));
-const StudioAuth = lazy(() => import("./pages/StudioAuth"));
-const StudioDashboard = lazy(() => import("./pages/StudioDashboard"));
-const StudioProject = lazy(() => import("./pages/StudioProject"));
-const StudioPaymentSuccess = lazy(() => import("./pages/StudioPaymentSuccess"));
-
 // Lazy-loaded admin pages
 const AdminLayout = lazy(() => import("./components/admin/AdminLayout"));
 const AdminGuard = lazy(() => import("./components/admin/AdminGuard"));
@@ -72,7 +65,7 @@ const AdminAccessCodes = lazy(() => import("./pages/admin/AdminAccessCodes"));
 const AdminUserAccess = lazy(() => import("./pages/admin/AdminUserAccess"));
 const AdminCRM = lazy(() => import("./pages/admin/AdminCRM"));
 const AdminPlaceholder = lazy(() => import("./pages/admin/AdminPlaceholder"));
-const AdminStudioManager = lazy(() => import("./pages/admin/AdminStudioManager"));
+
 const VideoStudio = lazy(() => import("./pages/admin/VideoStudio"));
 const VideoLibrary = lazy(() => import("./pages/admin/VideoLibrary"));
 const AIDevDashboard = lazy(() => import("./pages/admin/ai-developer/AIDevDashboard"));
@@ -167,7 +160,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <AuthProvider>
-        <WorkspaceProvider>
+        
         <AdminAuthProvider>
           <GlobalCopyProtection>
             <BrowserRouter>
@@ -202,13 +195,6 @@ const App = () => (
                   <Route path="/login" element={<LazyLayout><Login /></LazyLayout>} />
                   <Route path="/redeem" element={<LazyLayout><RedeemCode /></LazyLayout>} />
 
-                  {/* Studio (SaaS) routes */}
-                  <Route path="/studio" element={<Suspense fallback={<PageFallback />}><Studio /></Suspense>} />
-                  <Route path="/studio/auth" element={<Suspense fallback={<PageFallback />}><StudioAuth /></Suspense>} />
-                  <Route path="/studio/dashboard" element={<Suspense fallback={<PageFallback />}><StudioDashboard /></Suspense>} />
-                  <Route path="/studio/project/:id" element={<Suspense fallback={<PageFallback />}><StudioProject /></Suspense>} />
-                  <Route path="/studio/payment-success" element={<Suspense fallback={<PageFallback />}><StudioPaymentSuccess /></Suspense>} />
-
                   {/* Admin */}
                   <Route path="/admin/login" element={<Suspense fallback={<PageFallback />}><AdminLogin /></Suspense>} />
                   <Route
@@ -241,15 +227,6 @@ const App = () => (
                     <Route path="settings" element={<AdminSettings />} />
                     <Route path="access-codes" element={<AdminAccessCodes />} />
                     <Route path="user-access" element={<AdminUserAccess />} />
-                    <Route path="studio" element={<AdminStudioManager />} />
-                    <Route path="studio/chapters" element={<AdminPlaceholder title="Chapter Outlines" />} />
-                    <Route path="studio/workspace" element={<AdminPlaceholder title="Writing Workspace" />} />
-                    <Route path="studio/research" element={<AdminPlaceholder title="Research Library" />} />
-                    <Route path="studio/training" element={<AdminPlaceholder title="Teaching & Training" />} />
-                    <Route path="studio/publishing" element={<AdminPlaceholder title="Publishing Checklist" />} />
-                    <Route path="studio/landing" element={<AdminPlaceholder title="Studio Landing Page" />} />
-                    <Route path="studio/branding" element={<AdminPlaceholder title="Studio Branding" />} />
-                    <Route path="studio/settings" element={<AdminPlaceholder title="Studio Settings" />} />
                     <Route path="crm" element={<AdminCRM />} />
                     <Route path="video-studio" element={<VideoStudio />} />
                     <Route path="video-library" element={<VideoLibrary />} />
@@ -271,7 +248,7 @@ const App = () => (
             </BrowserRouter>
           </GlobalCopyProtection>
         </AdminAuthProvider>
-        </WorkspaceProvider>
+        
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>

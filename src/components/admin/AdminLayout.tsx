@@ -68,17 +68,6 @@ const navItems = [
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
-const studioNavItems = [
-  { to: "/admin/studio", label: "Studio Dashboard", icon: LayoutDashboard, end: true },
-  { to: "/admin/studio/chapters", label: "Chapter Outlines", icon: FileText },
-  { to: "/admin/studio/workspace", label: "Writing Workspace", icon: PenLine },
-  { to: "/admin/studio/research", label: "Research Library", icon: Search },
-  { to: "/admin/studio/training", label: "Teaching & Training", icon: ScrollText },
-  { to: "/admin/studio/publishing", label: "Publishing Checklist", icon: ClipboardList },
-  { to: "/admin/studio/landing", label: "Studio Landing Page", icon: Globe },
-  { to: "/admin/studio/branding", label: "Branding", icon: Palette },
-  { to: "/admin/studio/settings", label: "Settings", icon: Settings },
-];
 
 const aiDevNavItems = [
   { to: "/admin/ai-developer", label: "Dashboard", icon: LayoutDashboard, end: true },

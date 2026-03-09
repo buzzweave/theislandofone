@@ -12,7 +12,7 @@ import ImageResizeDialog from "@/components/admin/ImageResizeDialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import MediaImagesTab from "@/components/admin/media/MediaImagesTab";
 import MediaVideosTab from "@/components/admin/media/MediaVideosTab";
-import { useWorkspace } from "@/contexts/WorkspaceContext";
+
 import AdminGraphicsFoldersTab from "@/components/admin/graphics/AdminGraphicsFoldersTab";
 /** Compress an image file to a smaller preview (max 800px, 70% quality JPEG) */
 async function createCompressedPreview(file: File): Promise<File> {
@@ -47,7 +47,7 @@ export default function AdminGraphics() {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const [resizeGraphic, setResizeGraphic] = useState<Graphic | null>(null);
-  const { org } = useWorkspace();
+  
   const handleAddClick = () => {
     const input = document.createElement("input");
     input.type = "file";
@@ -245,31 +245,6 @@ export default function AdminGraphics() {
           <AdminGraphicsFoldersTab />
         </TabsContent>
 
-        {/* Media Library - Images */}
-        <TabsContent value="images">
-          <div className="pt-2">
-            {org ? (
-              <MediaImagesTab orgId={org.id} />
-            ) : (
-              <div className="rounded-lg border border-dashed border-border p-12 text-center text-muted-foreground">
-                <p>Create a studio workspace first to use the media library.</p>
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
-        {/* Media Library - Videos */}
-        <TabsContent value="videos">
-          <div className="pt-2">
-            {org ? (
-              <MediaVideosTab orgId={org.id} />
-            ) : (
-              <div className="rounded-lg border border-dashed border-border p-12 text-center text-muted-foreground">
-                <p>Create a studio workspace first to use the media library.</p>
-              </div>
-            )}
-          </div>
-        </TabsContent>
       </Tabs>
 
       <ImageResizeDialog title={resizeGraphic?.title || ""} imageUrl={resizeGraphic?.preview_url || null} open={!!resizeGraphic} onClose={() => setResizeGraphic(null)} />
