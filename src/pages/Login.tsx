@@ -151,7 +151,7 @@ export default function Login() {
                     <KeyRound className="h-6 w-6 text-primary" />
                   </div>
                   <CardDescription>
-                    We sent a 6-digit code to <strong>{email}</strong>
+                    Enter your 6-digit login code or lifetime access code for <strong>{email}</strong>
                   </CardDescription>
                 </div>
                 <div className="flex justify-center">
