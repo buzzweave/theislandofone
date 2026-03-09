@@ -47,6 +47,9 @@ export default function HeroCarousel() {
           key={s.id}
           src={s.image_url || heroBgFallback}
           alt=""
+          fetchPriority={i === 0 ? "high" : "auto"}
+          loading={i === 0 ? "eager" : "lazy"}
+          decoding={i === 0 ? "sync" : "async"}
           className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-1000 ${
             i === current ? "opacity-100" : "opacity-0"
           }`}
