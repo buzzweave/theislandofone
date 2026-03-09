@@ -55,7 +55,7 @@ serve(async (req) => {
 
       const sysPrompt = customSystemPrompt || (draftType === "book"
         ? "You are a Christian book author. Return valid JSON with: title, subtitle, author, description, chapters (array of {title, content}). Each chapter should have at least 300 words."
-        : "You are a sermon writer. Return valid JSON with: title, scripture, excerpt, manuscript, category.");
+        : "You are a sermon writer. Return valid JSON with: title, scripture (plain scripture reference string like \"Romans 8:28\" — do NOT return an object or include the verse text here), excerpt (2-3 sentence summary), manuscript (full sermon text), category (one of: Faith, Worship, Calling, Leadership, Deliverance, Prayer, Family).");
 
       console.log(`[generate_draft] Starting ${draftType} generation with model: ${model}`);
 
