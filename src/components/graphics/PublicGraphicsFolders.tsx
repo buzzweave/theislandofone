@@ -15,8 +15,10 @@ const FolderImageCard = memo(function FolderImageCard({ img }: { img: any }) {
     <div className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300">
       <div className="aspect-square bg-muted overflow-hidden">
         <img
-          src={img.file_url}
+          src={`${img.file_url}?width=600&quality=70`}
           alt={img.file_name}
+          width={600}
+          height={600}
           loading="lazy"
           decoding="async"
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
