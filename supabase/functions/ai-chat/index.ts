@@ -81,7 +81,7 @@ serve(async (req) => {
 
       const sysPrompt = customSystemPrompt || (draftType === "book"
         ? "You are a Christian book author. Return valid JSON with: title, subtitle, author, description, chapters (array of {title, content}). Each chapter should have at least 300 words."
-        : "You are a sermon writer for a Christian ministry. Return valid JSON with these exact keys: title (string), scripture (plain scripture reference string like \"Romans 8:28\"), excerpt (2-3 sentence summary string), manuscript (the full sermon text as a single string — this is the most important field and must contain the complete sermon body), category (one of: Faith, Worship, Calling, Leadership, Deliverance, Prayer, Family). The manuscript field MUST contain the entire sermon content.");
+        : "You are a sermon writer for a Christian ministry. Return valid JSON with these exact keys: title (string — a strong, memorable sermon title), scripture (plain scripture reference string like \"Romans 8:28\" — do NOT return an object), excerpt (a compelling 2-3 sentence summary of the sermon that captures the main theme and draws the reader in), manuscript (the full sermon text as a single string — this is the most important field and must contain the complete sermon body with headings, bullet points, and all content), category (one of: Faith, Worship, Calling, Leadership, Deliverance, Prayer, Family — choose the best fit for the sermon topic). ALL fields are required. The excerpt MUST be a meaningful summary, not empty.");
 
       console.log(`[generate_draft] Starting ${draftType} generation with model: ${model}`);
 
@@ -305,8 +305,22 @@ serve(async (req) => {
         const sermonTitle = extractTitle(userPrompt);
         const sermonManuscript = renderSermonManuscript();
         const sermonScripture = extractScriptureRef(pick("scripture", "scripture_reference", "verse", "reference"));
-        const sermonExcerpt = safeStr(pick("excerpt", "summary", "description"));
+        let sermonExcerpt = safeStr(pick("excerpt", "summary", "description"));
         const sermonCategory = safeStr(pick("category"), "Faith");
+
+        // Auto-generate excerpt from manuscript if AI didn't provide one
+        if (!sermonExcerpt || sermonExcerpt.length < 10) {
+          // Extract first meaningful paragraph (skip headings/bullets)
+          const lines = sermonManuscript.split("\n").filter((l: string) => {
+            const t = l.trim();
+            return t.length > 30 && !t.startsWith("•") && !t.startsWith("-") && !t.startsWith("*") && t !== t.toUpperCase();
+          });
+          if (lines.length > 0) {
+            // Take first 2 sentences or 250 chars
+            const raw = lines.slice(0, 2).join(" ");
+            sermonExcerpt = raw.length > 250 ? raw.substring(0, 247) + "..." : raw;
+          }
+        }
 
         console.log("[generate_draft] Rendered manuscript length:", sermonManuscript.length);
         console.log("[generate_draft] Title:", sermonTitle);
