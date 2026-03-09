@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabaseImageUrl } from "@/lib/supabaseImage";
+
 import { Link, useLocation } from "react-router-dom";
 import { Menu, X, BookOpen, User, LogOut } from "lucide-react";
 import { useSiteLogo } from "@/hooks/useSiteLogo";
