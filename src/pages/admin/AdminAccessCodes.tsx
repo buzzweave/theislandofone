@@ -25,7 +25,7 @@ export default function AdminAccessCodes() {
   const [isSingleUse, setIsSingleUse] = useState(true);
 
   const invokeAdmin = async (body: any) => {
-    const adminToken = api.hasToken() ? localStorage.getItem("admin_token") : undefined;
+    const adminToken = localStorage.getItem("admin_token");
     const { data, error } = await supabase.functions.invoke("access-codes-admin", {
       body,
       headers: adminToken ? { "x-admin-token": adminToken } : {},
