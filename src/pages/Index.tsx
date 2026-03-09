@@ -324,9 +324,9 @@ export default function Index() {
         </section>
       )}
 
-      {/* SOCIAL MEDIA GRAPHICS */}
+      {/* SOCIAL MEDIA GRAPHICS - min-height prevents CLS */}
       {graphics.length > 0 && (
-        <section className="py-16 sm:py-24">
+        <section className="py-16 sm:py-24 min-h-[500px] sm:min-h-[700px]">
           <div className="container mx-auto px-4">
             <div className="text-center mb-10 sm:mb-16">
               <p className="text-primary text-sm tracking-[0.2em] uppercase mb-3">Church Media</p>
