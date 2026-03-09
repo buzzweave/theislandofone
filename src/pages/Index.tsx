@@ -136,7 +136,6 @@ const BookCard = memo(({ book }: { book: any }) => (
 BookCard.displayName = "BookCard";
 
 export default function Index() {
-  const { data: studioEnabled, isLoading: studioLoading } = useStudioLandingEnabled();
   const { data: books = [] } = useHomepageBooks();
   const { data: sermons = [] } = useHomepageSermons();
   const { data: videos = [] } = useHomepageVideos();
@@ -147,15 +146,6 @@ export default function Index() {
   const featuredBooks = books.filter((b: any) => b.featured);
   const featuredVideos = videos.filter((v: any) => v.featured);
   const [playingId, setPlayingId] = useState<string | null>(null);
-
-  // Don't block render for studio check — show homepage immediately
-  if (studioEnabled) {
-    return (
-      <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-pulse text-muted-foreground text-sm">Loading…</div></div>}>
-        <StudioLanding />
-      </Suspense>
-    );
-  }
 
   return (
     <div>
