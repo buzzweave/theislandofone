@@ -151,7 +151,7 @@ export default function Login() {
                     <KeyRound className="h-6 w-6 text-primary" />
                   </div>
                   <CardDescription>
-                    Enter your email and code to sign in.
+                    Enter your 6-digit login code or lifetime access code.
                   </CardDescription>
                 </div>
                 <div className="space-y-2">
