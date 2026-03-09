@@ -109,6 +109,26 @@ serve(async (req) => {
         try { return JSON.stringify(val); } catch { return fallback; }
       };
 
+      // Extract scripture reference: if AI returned an object like {reference, text}, extract just the reference string
+      const extractScriptureRef = (val: unknown): string => {
+        if (val == null) return "";
+        if (typeof val === "string") {
+          // Check if the string is actually a JSON object
+          if (val.trim().startsWith("{")) {
+            try {
+              const obj = JSON.parse(val);
+              return String(obj.reference || obj.ref || obj.scripture || obj.verse || "");
+            } catch { return val; }
+          }
+          return val;
+        }
+        if (typeof val === "object" && val !== null) {
+          const obj = val as Record<string, unknown>;
+          return String(obj.reference || obj.ref || obj.scripture || obj.verse || "");
+        }
+        return String(val);
+      };
+
       // Save draft to DB
       if (draftType === "book") {
         const bookPayload = {
