@@ -190,10 +190,22 @@ export default function AdminOpenAIStudio() {
                   rows={3}
                 />
               </div>
-              <Button onClick={() => generateDraft("sermon")} disabled={generating !== null}>
-                {generating === "sermon" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wand2 className="h-4 w-4 mr-2" />}
-                Generate Sermon Draft
-              </Button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button onClick={() => generateDraft("sermon")} disabled={generating !== null}>
+                  {generating === "sermon" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wand2 className="h-4 w-4 mr-2" />}
+                  Generate Sermon Draft
+                </Button>
+                {lastGeneratedSermonId && (
+                  <Button variant="outline" size="sm" onClick={() => navigate("/admin/sermons")}>
+                    <ExternalLink className="h-3 w-3 mr-1.5" /> Open in Sermons
+                  </Button>
+                )}
+                {generationFailed?.type === "sermon" && (
+                  <Button variant="destructive" size="sm" onClick={() => { setSermonTopic(generationFailed.topic); generateDraft("sermon"); }}>
+                    Retry
+                  </Button>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">This will create a new sermon draft with AI-generated manuscript.</p>
             </CardContent>
           </Card>
