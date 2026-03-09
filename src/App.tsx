@@ -39,13 +39,6 @@ const Login = lazy(() => import("./pages/Login"));
 const RedeemCode = lazy(() => import("./pages/RedeemCode"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
-// Studio (SaaS) pages
-const Studio = lazy(() => import("./pages/Studio"));
-const StudioAuth = lazy(() => import("./pages/StudioAuth"));
-const StudioDashboard = lazy(() => import("./pages/StudioDashboard"));
-const StudioProject = lazy(() => import("./pages/StudioProject"));
-const StudioPaymentSuccess = lazy(() => import("./pages/StudioPaymentSuccess"));
-
 // Lazy-loaded admin pages
 const AdminLayout = lazy(() => import("./components/admin/AdminLayout"));
 const AdminGuard = lazy(() => import("./components/admin/AdminGuard"));
