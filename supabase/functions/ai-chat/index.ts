@@ -6,6 +6,33 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Safe-string helper: guarantees a string, never null/undefined/object
+const safeStr = (val: unknown, fallback = ""): string => {
+  if (val == null) return fallback;
+  if (typeof val === "string") return val;
+  if (typeof val === "number" || typeof val === "boolean") return String(val);
+  try { return JSON.stringify(val); } catch { return fallback; }
+};
+
+// Extract scripture reference: if AI returned an object like {reference, text}, extract just the reference string
+const extractScriptureRef = (val: unknown): string => {
+  if (val == null) return "";
+  if (typeof val === "string") {
+    if (val.trim().startsWith("{")) {
+      try {
+        const obj = JSON.parse(val);
+        return String(obj.reference || obj.ref || obj.scripture || obj.verse || "");
+      } catch { return val; }
+    }
+    return val;
+  }
+  if (typeof val === "object" && val !== null) {
+    const obj = val as Record<string, unknown>;
+    return String(obj.reference || obj.ref || obj.scripture || obj.verse || "");
+  }
+  return String(val);
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -39,7 +66,6 @@ serve(async (req) => {
       }
     }
 
-    // For actions that modify data, require admin auth OR allow if session expired
     const needsAuth = action === "generate_draft" || action === "delete_conversation";
     if (needsAuth && !isAdmin && token && token !== anonKey) {
       console.log("Auth soft-pass: session may be expired, allowing action:", action);
@@ -55,7 +81,7 @@ serve(async (req) => {
 
       const sysPrompt = customSystemPrompt || (draftType === "book"
         ? "You are a Christian book author. Return valid JSON with: title, subtitle, author, description, chapters (array of {title, content}). Each chapter should have at least 300 words."
-        : "You are a sermon writer. Return valid JSON with: title, scripture (plain scripture reference string like \"Romans 8:28\" — do NOT return an object or include the verse text here), excerpt (2-3 sentence summary), manuscript (full sermon text), category (one of: Faith, Worship, Calling, Leadership, Deliverance, Prayer, Family).");
+        : "You are a sermon writer for a Christian ministry. Return valid JSON with these exact keys: title (string), scripture (plain scripture reference string like \"Romans 8:28\"), excerpt (2-3 sentence summary string), manuscript (the full sermon text as a single string — this is the most important field and must contain the complete sermon body), category (one of: Faith, Worship, Calling, Leadership, Deliverance, Prayer, Family). The manuscript field MUST contain the entire sermon content.");
 
       console.log(`[generate_draft] Starting ${draftType} generation with model: ${model}`);
 
@@ -89,7 +115,7 @@ serve(async (req) => {
       // Clean markdown code blocks if present
       content = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
       
-      let parsed;
+      let parsed: Record<string, any>;
       try {
         parsed = JSON.parse(content);
       } catch (parseErr) {
@@ -99,18 +125,10 @@ serve(async (req) => {
         });
       }
 
-      // Log actual keys returned by AI for debugging
+      // Log actual keys for debugging
       console.log(`[generate_draft] Parsed ${draftType} JSON keys:`, Object.keys(parsed).join(", "));
 
-      // Safe-string helper: guarantees a string, never null/undefined/object
-      const safeStr = (val: unknown, fallback = ""): string => {
-        if (val == null) return fallback;
-        if (typeof val === "string") return val;
-        if (typeof val === "number" || typeof val === "boolean") return String(val);
-        try { return JSON.stringify(val); } catch { return fallback; }
-      };
-
-      // Robust field resolver: tries multiple possible field names from AI response
+      // Robust field resolver: tries multiple possible field names
       const pick = (...keys: string[]): unknown => {
         for (const k of keys) {
           if (parsed[k] != null && parsed[k] !== "") return parsed[k];
@@ -118,26 +136,15 @@ serve(async (req) => {
         return undefined;
       };
 
-      // Extract scripture reference: if AI returned an object like {reference, text}, extract just the reference string
-      const extractScriptureRef = (val: unknown): string => {
-        if (val == null) return "";
-        if (typeof val === "string") {
-          if (val.trim().startsWith("{")) {
-            try {
-              const obj = JSON.parse(val);
-              return String(obj.reference || obj.ref || obj.scripture || obj.verse || "");
-            } catch { return val; }
-          }
-          return val;
-        }
-        if (typeof val === "object" && val !== null) {
-          const obj = val as Record<string, unknown>;
-          return String(obj.reference || obj.ref || obj.scripture || obj.verse || "");
-        }
-        return String(val);
+      // Extract title robustly with fallback to user topic
+      const extractTitle = (fallback: string): string => {
+        const raw = pick("title", "sermon_title", "name", "heading");
+        const title = safeStr(raw);
+        if (title && title !== "undefined" && title.length > 2) return title;
+        return fallback;
       };
 
-      // Extract manuscript/body content: try multiple field names, combine if needed
+      // Extract manuscript/body: try multiple field names
       const extractManuscript = (): string => {
         const raw = pick("manuscript", "content", "body", "sermon_body", "sermon_content", "sermon", "text", "full_text");
         if (raw != null) return safeStr(raw);
@@ -149,14 +156,92 @@ serve(async (req) => {
         return "";
       };
 
-      // Extract title robustly
-      const extractTitle = (fallback: string): string => {
-        const raw = pick("title", "sermon_title", "name", "heading");
-        const title = safeStr(raw);
-        if (title && title !== "undefined" && title.length > 2) return title;
-        // Fallback to user's topic
-        return fallback;
-      };
+      // Save draft to DB
+      if (draftType === "book") {
+        const bookPayload = {
+          title: extractTitle(userPrompt),
+          subtitle: safeStr(pick("subtitle")),
+          author: safeStr(pick("author"), "Bryant Clark"),
+          description: safeStr(pick("description", "summary")),
+          is_published: false,
+          is_free: true,
+          price: 0,
+          category: "Faith",
+        };
+        console.log("[generate_draft] Inserting book:", JSON.stringify(bookPayload));
+
+        const { data: book, error: bookErr } = await supabase.from("books").insert(bookPayload).select().single();
+
+        if (bookErr) {
+          console.error("[generate_draft] Book insert FAILED:", JSON.stringify(bookErr));
+          throw bookErr;
+        }
+
+        console.log(`[generate_draft] Book created. ID: ${book.id}`);
+
+        if (parsed.chapters?.length && book) {
+          const chapterRows = parsed.chapters.map((ch: any, i: number) => ({
+            book_id: book.id,
+            title: ch.title || `Chapter ${i + 1}`,
+            content: ch.content || "",
+            sort_order: i,
+          }));
+          const { error: chapErr } = await supabase.from("book_chapters").insert(chapterRows);
+          if (chapErr) {
+            console.error("[generate_draft] Chapter insert error (non-fatal):", JSON.stringify(chapErr));
+          } else {
+            console.log(`[generate_draft] ${chapterRows.length} chapters inserted`);
+          }
+        }
+
+        return new Response(JSON.stringify({ success: true, title: bookPayload.title, id: book?.id }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } else {
+        // SERMON DRAFT
+        const sermonTitle = extractTitle(userPrompt);
+        const sermonManuscript = extractManuscript();
+        const sermonScripture = extractScriptureRef(pick("scripture", "scripture_reference", "verse", "reference"));
+        const sermonExcerpt = safeStr(pick("excerpt", "summary", "description"));
+        const sermonCategory = safeStr(pick("category"), "Faith");
+
+        // Validate: do not save empty sermons
+        if (!sermonManuscript || sermonManuscript.length < 50) {
+          console.error("[generate_draft] Sermon manuscript too short! Length:", sermonManuscript.length);
+          console.error("[generate_draft] Parsed keys:", Object.keys(parsed).join(", "));
+          console.error("[generate_draft] Raw preview:", content.substring(0, 1000));
+          return new Response(JSON.stringify({ 
+            error: "Generated sermon content was empty or too short. The AI may have used unexpected field names. Please try again.", 
+            raw_keys: Object.keys(parsed),
+          }), {
+            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const sermonPayload = {
+          title: sermonTitle,
+          scripture: sermonScripture,
+          excerpt: sermonExcerpt,
+          manuscript: sermonManuscript,
+          category: sermonCategory,
+          is_free: true,
+          price: 0,
+          is_published: false,
+          access_level: "free",
+          access_tiers: [] as string[],
+          featured: false,
+          preview_cutoff: 2,
+          sort_order: 0,
+          date: new Date().toISOString().slice(0, 10),
+        };
+
+        console.log("[generate_draft] Inserting sermon:", JSON.stringify({
+          title: sermonPayload.title,
+          category: sermonPayload.category,
+          scripture: sermonPayload.scripture,
+          manuscript_length: sermonPayload.manuscript.length,
+          excerpt_length: sermonPayload.excerpt.length,
+        }));
 
         const { data: sermon, error: sermonErr } = await supabase
           .from("sermons")
@@ -169,8 +254,6 @@ serve(async (req) => {
           return new Response(JSON.stringify({ 
             success: false, 
             error: `Database save failed: ${sermonErr.message}`,
-            code: sermonErr.code,
-            details: sermonErr.details,
             generatedContent: {
               title: sermonPayload.title,
               scripture: sermonPayload.scripture,
@@ -183,7 +266,7 @@ serve(async (req) => {
           });
         }
 
-        console.log(`[generate_draft] Sermon draft created successfully! ID: ${sermon.id}, Title: "${sermon.title}"`);
+        console.log(`[generate_draft] Sermon saved! ID: ${sermon.id}, Title: "${sermon.title}", Manuscript: ${sermonPayload.manuscript.length} chars`);
 
         return new Response(JSON.stringify({ success: true, title: sermon.title, id: sermon.id }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -275,8 +358,8 @@ serve(async (req) => {
             for (const line of chunk.split("\n")) {
               if (!line.startsWith("data: ") || line.includes("[DONE]")) continue;
               try {
-                const parsed = JSON.parse(line.slice(6));
-                const c = parsed.choices?.[0]?.delta?.content;
+                const p = JSON.parse(line.slice(6));
+                const c = p.choices?.[0]?.delta?.content;
                 if (c) fullContent += c;
               } catch {}
             }
