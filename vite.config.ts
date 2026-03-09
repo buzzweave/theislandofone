@@ -67,24 +67,15 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          // Core framework — always needed
           if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/') || id.includes('node_modules/react-router-dom/')) {
             return 'vendor';
           }
-          // Query client — used on most pages
           if (id.includes('@tanstack/react-query')) {
             return 'query';
           }
-          // Charts — heavy, rarely needed on initial load
           if (id.includes('recharts')) {
             return 'charts';
           }
-          // Editor — admin only
-          if (id.includes('@tiptap')) {
-            return 'editor';
-          }
-          // Let Vite naturally split supabase and radix-ui
-          // into shared chunks loaded only when needed
         },
       },
     },
