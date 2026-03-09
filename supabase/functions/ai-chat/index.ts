@@ -6,6 +6,33 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Safe-string helper: guarantees a string, never null/undefined/object
+const safeStr = (val: unknown, fallback = ""): string => {
+  if (val == null) return fallback;
+  if (typeof val === "string") return val;
+  if (typeof val === "number" || typeof val === "boolean") return String(val);
+  try { return JSON.stringify(val); } catch { return fallback; }
+};
+
+// Extract scripture reference: if AI returned an object like {reference, text}, extract just the reference string
+const extractScriptureRef = (val: unknown): string => {
+  if (val == null) return "";
+  if (typeof val === "string") {
+    if (val.trim().startsWith("{")) {
+      try {
+        const obj = JSON.parse(val);
+        return String(obj.reference || obj.ref || obj.scripture || obj.verse || "");
+      } catch { return val; }
+    }
+    return val;
+  }
+  if (typeof val === "object" && val !== null) {
+    const obj = val as Record<string, unknown>;
+    return String(obj.reference || obj.ref || obj.scripture || obj.verse || "");
+  }
+  return String(val);
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -39,12 +66,8 @@ serve(async (req) => {
       }
     }
 
-    // For actions that modify data, require admin auth OR allow if session expired
-    // (the admin UI is already gated client-side)
     const needsAuth = action === "generate_draft" || action === "delete_conversation";
     if (needsAuth && !isAdmin && token && token !== anonKey) {
-      // Token was provided but session invalid - allow anyway for draft generation
-      // since the admin panel is already protected client-side
       console.log("Auth soft-pass: session may be expired, allowing action:", action);
     }
 
@@ -58,9 +81,9 @@ serve(async (req) => {
 
       const sysPrompt = customSystemPrompt || (draftType === "book"
         ? "You are a Christian book author. Return valid JSON with: title, subtitle, author, description, chapters (array of {title, content}). Each chapter should have at least 300 words."
-        : "You are a sermon writer. Return valid JSON with: title, scripture, excerpt, manuscript, category.");
+        : "You are a sermon writer for a Christian ministry. Return valid JSON with these exact keys: title (string — a strong, memorable sermon title), scripture (plain scripture reference string like \"Romans 8:28\" — do NOT return an object), excerpt (a compelling 2-3 sentence summary of the sermon that captures the main theme and draws the reader in), manuscript (the full sermon text as a single string — this is the most important field and must contain the complete sermon body with headings, bullet points, and all content), category (one of: Faith, Worship, Calling, Leadership, Deliverance, Prayer, Family — choose the best fit for the sermon topic). ALL fields are required. The excerpt MUST be a meaningful summary, not empty.");
 
-      console.log("Calling OpenAI for draft generation, model:", model);
+      console.log(`[generate_draft] Starting ${draftType} generation with model: ${model}`);
 
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -78,7 +101,7 @@ serve(async (req) => {
 
       if (!response.ok) {
         const errText = await response.text();
-        console.error("OpenAI error:", response.status, errText);
+        console.error(`[generate_draft] OpenAI API error: ${response.status}`, errText.substring(0, 300));
         return new Response(JSON.stringify({ error: `OpenAI error (${response.status}): ${errText.substring(0, 200)}` }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -87,33 +110,177 @@ serve(async (req) => {
       const aiResult = await response.json();
       let content = aiResult.choices?.[0]?.message?.content || "";
       
+      console.log(`[generate_draft] OpenAI response received, length: ${content.length}`);
+
       // Clean markdown code blocks if present
       content = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
       
-      let parsed;
+      let parsed: Record<string, any>;
       try {
         parsed = JSON.parse(content);
-      } catch {
-        console.error("Failed to parse AI JSON:", content.substring(0, 500));
+      } catch (parseErr) {
+        console.error("[generate_draft] JSON parse failed:", content.substring(0, 500));
         return new Response(JSON.stringify({ error: "Failed to parse AI response as JSON", raw: content.substring(0, 500) }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
+      // Log actual keys for debugging
+      console.log(`[generate_draft] Parsed ${draftType} JSON keys:`, Object.keys(parsed).join(", "));
+
+      // Unwrap nested sermon object if present (e.g. { sermon: { title, ... } })
+      const root: Record<string, any> = parsed.sermon && typeof parsed.sermon === "object" ? { ...parsed, ...parsed.sermon } : parsed;
+
+      // Robust field resolver: tries multiple possible field names on root
+      const pick = (...keys: string[]): unknown => {
+        for (const k of keys) {
+          if (root[k] != null && root[k] !== "") return root[k];
+        }
+        return undefined;
+      };
+
+      // Extract title robustly with fallback to user topic
+      const extractTitle = (fallback: string): string => {
+        const raw = pick("title", "sermon_title", "name", "heading");
+        const title = safeStr(raw);
+        if (title && title !== "undefined" && title.length > 2) return title;
+        return fallback;
+      };
+
+      // Render structured AI response into a full manuscript string
+      const renderSermonManuscript = (): string => {
+        // 1. Check for a direct flat manuscript/content string first
+        for (const k of ["manuscript", "content", "body", "sermon_body", "sermonBody", "sermon_content", "text", "full_text"]) {
+          const v = root[k];
+          if (typeof v === "string" && v.length > 50) return v;
+        }
+
+        // 2. Build manuscript from structured fields
+        const parts: string[] = [];
+
+        // Title
+        const title = safeStr(pick("title", "sermon_title"));
+        if (title) parts.push(title.toUpperCase());
+
+        // Subtitle
+        const subtitle = safeStr(pick("subtitle"));
+        if (subtitle) parts.push(subtitle);
+
+        // Scripture
+        const scriptureRef = extractScriptureRef(pick("scripture", "scripture_reference", "verse", "reference"));
+        const scriptureTextRaw = pick("scripture");
+        let scriptureText = "";
+        if (scriptureTextRaw && typeof scriptureTextRaw === "object" && (scriptureTextRaw as any).text) {
+          scriptureText = safeStr((scriptureTextRaw as any).text);
+        }
+        if (scriptureRef || scriptureText) {
+          let s = "SCRIPTURE";
+          if (scriptureRef) s += `\n${scriptureRef}`;
+          if (scriptureText) s += `\n\n${scriptureText}`;
+          parts.push(s);
+        }
+
+        // Opening illustration
+        const illRaw = pick("opening_illustration", "openingIllustration", "illustration");
+        if (illRaw) {
+          const illText = typeof illRaw === "object" && (illRaw as any).content
+            ? safeStr((illRaw as any).content)
+            : safeStr(illRaw);
+          if (illText) parts.push(`OPENING ILLUSTRATION\n\n${illText}`);
+        }
+
+        // Main points
+        const pointsRaw = pick("main_points", "mainPoints", "points", "sections") as any[];
+        if (Array.isArray(pointsRaw)) {
+          pointsRaw.forEach((p: any, i: number) => {
+            if (typeof p === "string") { parts.push(p); return; }
+            const pTitle = safeStr(p.main_point || p.title || p.name || p.heading || `MAIN POINT ${i + 1}`);
+            const teaching = safeStr(p.teaching_paragraph || p.teaching || p.content || p.text || p.body || "");
+            let section = pTitle;
+            if (teaching) section += `\n\n${teaching}`;
+            const bullets = p.bullet_points || p.bullets || p.key_points || [];
+            if (Array.isArray(bullets)) {
+              section += "\n" + bullets.map((b: any) => `• ${safeStr(b)}`).join("\n");
+            }
+            parts.push(section);
+          });
+        }
+
+        // Sermon body (some responses use sermonBody as an object with sections)
+        const sermonBodyRaw = pick("sermonBody", "sermon_body");
+        if (sermonBodyRaw && typeof sermonBodyRaw === "object" && !Array.isArray(sermonBodyRaw)) {
+          const sb = sermonBodyRaw as Record<string, any>;
+          for (const [key, val] of Object.entries(sb)) {
+            if (typeof val === "string") {
+              parts.push(`${key.replace(/([A-Z])/g, " $1").toUpperCase()}\n\n${val}`);
+            } else if (typeof val === "object" && val !== null) {
+              const heading = safeStr(val.header || val.title || key);
+              const body = safeStr(val.content || val.text || "");
+              if (body) parts.push(`${heading}\n\n${body}`);
+            }
+          }
+        }
+
+        // Application
+        const appRaw = pick("application", "applicationMoments", "application_moments");
+        if (appRaw) {
+          const appText = typeof appRaw === "string" ? appRaw : safeStr(appRaw);
+          if (appText) parts.push(`APPLICATION\n\n${appText}`);
+        }
+
+        // Illustration callback
+        const cbRaw = pick("illustration_callback", "illustrationCallback");
+        if (cbRaw) {
+          const cbText = typeof cbRaw === "object" && (cbRaw as any).content ? safeStr((cbRaw as any).content) : safeStr(cbRaw);
+          if (cbText) parts.push(`ILLUSTRATION CALLBACK\n\n${cbText}`);
+        }
+
+        // Power declarations
+        const declRaw = pick("power_declarations", "powerDeclarations", "declaration_moments");
+        if (declRaw) {
+          if (Array.isArray(declRaw)) {
+            parts.push("POWER DECLARATIONS\n\n" + declRaw.map((d: any) => `• ${safeStr(d)}`).join("\n"));
+          } else {
+            parts.push(`POWER DECLARATIONS\n\n${safeStr(declRaw)}`);
+          }
+        }
+
+        // Closing
+        const closeRaw = pick("closing_declaration", "closingDeclaration", "closing", "closing_structure", "closingStructure");
+        if (closeRaw) {
+          const closeText = typeof closeRaw === "object" && (closeRaw as any).content
+            ? safeStr((closeRaw as any).content)
+            : typeof closeRaw === "object" && (closeRaw as any).declaration
+              ? safeStr((closeRaw as any).declaration)
+              : safeStr(closeRaw);
+          if (closeText) parts.push(`CLOSING DECLARATION\n\n${closeText}`);
+        }
+
+        return parts.join("\n\n");
+      };
+
       // Save draft to DB
       if (draftType === "book") {
-        const { data: book, error: bookErr } = await supabase.from("books").insert({
-          title: parsed.title || "Untitled Book",
-          subtitle: parsed.subtitle || "",
-          author: parsed.author || "Bryant Clark",
-          description: parsed.description || "",
+        const bookPayload = {
+          title: extractTitle(userPrompt),
+          subtitle: safeStr(pick("subtitle")),
+          author: safeStr(pick("author"), "Bryant Clark"),
+          description: safeStr(pick("description", "summary")),
           is_published: false,
           is_free: true,
           price: 0,
           category: "Faith",
-        }).select().single();
+        };
+        console.log("[generate_draft] Inserting book:", JSON.stringify(bookPayload));
 
-        if (bookErr) throw bookErr;
+        const { data: book, error: bookErr } = await supabase.from("books").insert(bookPayload).select().single();
+
+        if (bookErr) {
+          console.error("[generate_draft] Book insert FAILED:", JSON.stringify(bookErr));
+          throw bookErr;
+        }
+
+        console.log(`[generate_draft] Book created. ID: ${book.id}`);
 
         if (parsed.chapters?.length && book) {
           const chapterRows = parsed.chapters.map((ch: any, i: number) => ({
@@ -122,27 +289,106 @@ serve(async (req) => {
             content: ch.content || "",
             sort_order: i,
           }));
-          await supabase.from("book_chapters").insert(chapterRows);
+          const { error: chapErr } = await supabase.from("book_chapters").insert(chapterRows);
+          if (chapErr) {
+            console.error("[generate_draft] Chapter insert error (non-fatal):", JSON.stringify(chapErr));
+          } else {
+            console.log(`[generate_draft] ${chapterRows.length} chapters inserted`);
+          }
         }
 
-        return new Response(JSON.stringify({ success: true, title: parsed.title, id: book?.id }), {
+        return new Response(JSON.stringify({ success: true, title: bookPayload.title, id: book?.id }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       } else {
-        const { data: sermon, error: sermonErr } = await supabase.from("sermons").insert({
-          title: parsed.title || "Untitled Sermon",
-          scripture: parsed.scripture || "",
-          excerpt: parsed.excerpt || "",
-          manuscript: parsed.manuscript || "",
-          category: parsed.category || "Faith",
+        // SERMON DRAFT
+        const sermonTitle = extractTitle(userPrompt);
+        const sermonManuscript = renderSermonManuscript();
+        const sermonScripture = extractScriptureRef(pick("scripture", "scripture_reference", "verse", "reference"));
+        let sermonExcerpt = safeStr(pick("excerpt", "summary", "description"));
+        const sermonCategory = safeStr(pick("category"), "Faith");
+
+        // Auto-generate excerpt from manuscript if AI didn't provide one
+        if (!sermonExcerpt || sermonExcerpt.length < 10) {
+          // Extract first meaningful paragraph (skip headings/bullets)
+          const lines = sermonManuscript.split("\n").filter((l: string) => {
+            const t = l.trim();
+            return t.length > 30 && !t.startsWith("•") && !t.startsWith("-") && !t.startsWith("*") && t !== t.toUpperCase();
+          });
+          if (lines.length > 0) {
+            // Take first 2 sentences or 250 chars
+            const raw = lines.slice(0, 2).join(" ");
+            sermonExcerpt = raw.length > 250 ? raw.substring(0, 247) + "..." : raw;
+          }
+        }
+
+        console.log("[generate_draft] Rendered manuscript length:", sermonManuscript.length);
+        console.log("[generate_draft] Title:", sermonTitle);
+
+        // Validate: do not save empty sermons
+        if (!sermonManuscript || sermonManuscript.length < 50) {
+          console.error("[generate_draft] Sermon manuscript too short! Length:", sermonManuscript.length);
+          console.error("[generate_draft] Root keys:", Object.keys(root).join(", "));
+          console.error("[generate_draft] Raw preview:", content.substring(0, 1000));
+          return new Response(JSON.stringify({ 
+            error: "Generated sermon content was empty or too short. The AI may have used unexpected field names. Please try again.", 
+            raw_keys: Object.keys(root),
+          }), {
+            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const sermonPayload = {
+          title: sermonTitle,
+          scripture: sermonScripture,
+          excerpt: sermonExcerpt,
+          manuscript: sermonManuscript,
+          category: sermonCategory,
           is_free: true,
           price: 0,
           is_published: false,
-        }).select().single();
+          access_level: "free",
+          access_tiers: [] as string[],
+          featured: false,
+          preview_cutoff: 2,
+          sort_order: 0,
+          date: new Date().toISOString().slice(0, 10),
+        };
 
-        if (sermonErr) throw sermonErr;
+        console.log("[generate_draft] Inserting sermon:", JSON.stringify({
+          title: sermonPayload.title,
+          category: sermonPayload.category,
+          scripture: sermonPayload.scripture,
+          manuscript_length: sermonPayload.manuscript.length,
+          excerpt_length: sermonPayload.excerpt.length,
+        }));
 
-        return new Response(JSON.stringify({ success: true, title: parsed.title, id: sermon?.id }), {
+        const { data: sermon, error: sermonErr } = await supabase
+          .from("sermons")
+          .insert(sermonPayload)
+          .select()
+          .single();
+
+        if (sermonErr) {
+          console.error("[generate_draft] Sermon insert FAILED:", JSON.stringify(sermonErr));
+          return new Response(JSON.stringify({ 
+            success: false, 
+            error: `Database save failed: ${sermonErr.message}`,
+            generatedContent: {
+              title: sermonPayload.title,
+              scripture: sermonPayload.scripture,
+              excerpt: sermonPayload.excerpt,
+              manuscript: sermonPayload.manuscript,
+              category: sermonPayload.category,
+            }
+          }), {
+            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        console.log(`[generate_draft] Sermon saved! ID: ${sermon.id}, Title: "${sermon.title}", Manuscript: ${sermonPayload.manuscript.length} chars`);
+
+        return new Response(JSON.stringify({ success: true, title: sermon.title, id: sermon.id }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -232,8 +478,8 @@ serve(async (req) => {
             for (const line of chunk.split("\n")) {
               if (!line.startsWith("data: ") || line.includes("[DONE]")) continue;
               try {
-                const parsed = JSON.parse(line.slice(6));
-                const c = parsed.choices?.[0]?.delta?.content;
+                const p = JSON.parse(line.slice(6));
+                const c = p.choices?.[0]?.delta?.content;
                 if (c) fullContent += c;
               } catch {}
             }
