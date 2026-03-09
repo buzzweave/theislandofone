@@ -124,8 +124,10 @@ export default function PublicGraphicsFolders() {
           {folder.cover_image && (
             <div className="aspect-video bg-muted overflow-hidden">
               <img
-                src={folder.cover_image}
+                src={`${folder.cover_image}?width=600&quality=70`}
                 alt={folder.name}
+                width={600}
+                height={338}
                 loading="lazy"
                 decoding="async"
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
