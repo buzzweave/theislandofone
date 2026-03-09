@@ -1,13 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BookOpen, FileText, Loader2, Save, Wand2 } from "lucide-react";
+import { BookOpen, FileText, Loader2, Save, Wand2, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 const DEFAULT_BOOK_PROMPT = `You are a Christian book author assistant. Generate a complete book outline with chapters. Return a JSON object with: title, subtitle, author (use "Bryant Clark"), description, and chapters (array of {title, content}). Each chapter should have substantial content (at least 500 words). Write in an engaging, faith-driven style.`;
 
