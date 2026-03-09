@@ -29,7 +29,7 @@ const GraphicCard = memo(function GraphicCard({
     <div className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300">
       <div className="relative aspect-video overflow-hidden bg-muted">
         <img
-          src={`${graphic.preview_url}?width=800&quality=70`}
+          src={graphic.preview_url}
           alt={graphic.title}
           width={800}
           height={450}
