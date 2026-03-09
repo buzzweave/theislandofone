@@ -12,6 +12,7 @@ import ImageResizeDialog from "@/components/admin/ImageResizeDialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 import AdminGraphicsFoldersTab from "@/components/admin/graphics/AdminGraphicsFoldersTab";
+import AIGraphicGenerator from "@/components/admin/graphics/AIGraphicGenerator";
 /** Compress an image file to a smaller preview (max 800px, 70% quality JPEG) */
 async function createCompressedPreview(file: File): Promise<File> {
   return new Promise((resolve) => {
