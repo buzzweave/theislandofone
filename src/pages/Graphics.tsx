@@ -16,7 +16,6 @@ export default function Graphics() {
   const [buyingId, setBuyingId] = useState<string | null>(null);
   const [purchasedIds, setPurchasedIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
-  const { org } = useWorkspace();
 
   const userTier = getTierByProductId(subscription.product_id);
 
