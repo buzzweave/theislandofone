@@ -779,6 +779,77 @@ export type Database = {
         }
         Relationships: []
       }
+      graphics_folder_images: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_size: number
+          file_url: string
+          folder_id: string
+          id: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          file_name?: string
+          file_size?: number
+          file_url?: string
+          folder_id: string
+          id?: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_size?: number
+          file_url?: string
+          folder_id?: string
+          id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "graphics_folder_images_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "graphics_folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      graphics_folders: {
+        Row: {
+          cover_image: string
+          created_at: string
+          description: string
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          cover_image?: string
+          created_at?: string
+          description?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          cover_image?: string
+          created_at?: string
+          description?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       hero_banners: {
         Row: {
           created_at: string
