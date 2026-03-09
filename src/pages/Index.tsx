@@ -405,8 +405,8 @@ export default function Index() {
         </section>
       )}
 
-      {/* MEMBERSHIP CTA */}
-      <section className="py-16 sm:py-24">
+      {/* MEMBERSHIP CTA - min-height prevents CLS */}
+      <section className="py-16 sm:py-24 min-h-[400px] sm:min-h-[500px]">
         <div className="container mx-auto px-4 text-center">
           <p className="text-primary text-sm tracking-[0.2em] uppercase mb-3">Community</p>
           <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold mb-4 sm:mb-6">Join the Inner Circle</h2>

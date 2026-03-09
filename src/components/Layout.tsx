@@ -35,18 +35,25 @@ function SiteLogo({ sizeOverride }: { sizeOverride?: number }) {
   const { value: logoSize } = useSiteSettings("logo_size", "28");
   const size = sizeOverride ?? (parseInt(logoSize) || 28);
 
-  if (logoUrl) {
-    return (
-      <img
-        src={logoUrl}
-        alt="Site Logo"
-        className="object-contain transition-all"
-        style={{ width: `${size}px`, height: `${size}px` }}
-      />
-    );
-  }
-
-  return <BookOpen className="text-primary" style={{ width: `${size}px`, height: `${size}px` }} />;
+  // Always reserve space to prevent CLS
+  return (
+    <div 
+      className="flex-shrink-0" 
+      style={{ width: `${size}px`, height: `${size}px` }}
+    >
+      {logoUrl ? (
+        <img
+          src={logoUrl}
+          alt="Site Logo"
+          width={size}
+          height={size}
+          className="object-contain w-full h-full"
+        />
+      ) : (
+        <BookOpen className="text-primary w-full h-full" />
+      )}
+    </div>
+  );
 }
 
 export default function Layout({ children }: { children: React.ReactNode }) {
