@@ -183,6 +183,9 @@ export default function AdminSermonEditor() {
                 <div className="flex items-center gap-2">
                   {s.featured && <Star className="h-3 w-3 text-primary shrink-0" />}
                   <span className="truncate font-medium">{s.title}</span>
+                  {s.is_published === false && (
+                    <span className="text-[9px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-semibold uppercase shrink-0">Draft</span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="text-[10px] text-muted-foreground">{s.category}</span>
