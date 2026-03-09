@@ -104,6 +104,8 @@ function useHomepageGraphics() {
 function useHomepageBlog() {
   return useQuery({
     queryKey: ["blog_posts_homepage"],
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("blog_posts")
