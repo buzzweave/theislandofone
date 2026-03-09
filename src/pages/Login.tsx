@@ -48,7 +48,7 @@ export default function Login() {
 
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (code.trim().length < 6) { setError("Please enter your code."); return; }
+    if (code.length !== 6) { setError("Please enter the full 6-character code."); return; }
     setError("");
     setLoading(true);
 
