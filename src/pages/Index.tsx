@@ -103,7 +103,7 @@ function useHomepageBlog() {
   });
 }
 
-const BookCard = memo(({ book }: { book: any }) => (
+const BookCard = memo(({ book, index }: { book: any; index: number }) => (
   <Link
     to="/books"
     className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300 hover:shadow-gold"
@@ -111,11 +111,12 @@ const BookCard = memo(({ book }: { book: any }) => (
     <div className="aspect-[2/3] overflow-hidden">
       {book.cover_image ? (
          <img
-           src={supabaseImageUrl(book.cover_image, { width: 700, quality: 75 })}
+           src={book.cover_image}
            alt={book.title}
            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-           loading="lazy"
-           decoding="async"
+           loading={index === 0 ? "eager" : "lazy"}
+           decoding={index === 0 ? "sync" : "async"}
+           fetchPriority={index === 0 ? "high" : undefined}
            width={400}
            height={600}
          />
