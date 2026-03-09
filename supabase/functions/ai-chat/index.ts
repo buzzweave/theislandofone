@@ -55,7 +55,7 @@ serve(async (req) => {
 
       const sysPrompt = customSystemPrompt || (draftType === "book"
         ? "You are a Christian book author. Return valid JSON with: title, subtitle, author, description, chapters (array of {title, content}). Each chapter should have at least 300 words."
-        : "You are a sermon writer. Return valid JSON with: title, scripture, excerpt, manuscript, category.");
+        : "You are a sermon writer. Return valid JSON with: title, scripture (plain scripture reference string like \"Romans 8:28\" — do NOT return an object or include the verse text here), excerpt (2-3 sentence summary), manuscript (full sermon text), category (one of: Faith, Worship, Calling, Leadership, Deliverance, Prayer, Family).");
 
       console.log(`[generate_draft] Starting ${draftType} generation with model: ${model}`);
 
@@ -109,6 +109,26 @@ serve(async (req) => {
         try { return JSON.stringify(val); } catch { return fallback; }
       };
 
+      // Extract scripture reference: if AI returned an object like {reference, text}, extract just the reference string
+      const extractScriptureRef = (val: unknown): string => {
+        if (val == null) return "";
+        if (typeof val === "string") {
+          // Check if the string is actually a JSON object
+          if (val.trim().startsWith("{")) {
+            try {
+              const obj = JSON.parse(val);
+              return String(obj.reference || obj.ref || obj.scripture || obj.verse || "");
+            } catch { return val; }
+          }
+          return val;
+        }
+        if (typeof val === "object" && val !== null) {
+          const obj = val as Record<string, unknown>;
+          return String(obj.reference || obj.ref || obj.scripture || obj.verse || "");
+        }
+        return String(val);
+      };
+
       // Save draft to DB
       if (draftType === "book") {
         const bookPayload = {
@@ -154,7 +174,7 @@ serve(async (req) => {
         // SERMON DRAFT CREATION
         const sermonPayload = {
           title: safeStr(parsed.title, "Untitled Sermon"),
-          scripture: safeStr(parsed.scripture),
+          scripture: extractScriptureRef(parsed.scripture),
           excerpt: safeStr(parsed.excerpt),
           manuscript: safeStr(parsed.manuscript),
           category: safeStr(parsed.category, "Faith"),
@@ -173,7 +193,7 @@ serve(async (req) => {
           title: sermonPayload.title,
           category: sermonPayload.category,
           is_published: sermonPayload.is_published,
-          scripture: sermonPayload.scripture.substring(0, 50),
+          scripture: sermonPayload.scripture,
           manuscript_length: sermonPayload.manuscript.length,
         }));
 
