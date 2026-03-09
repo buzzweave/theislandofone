@@ -254,6 +254,7 @@ const App = () => (
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
+  </AppErrorBoundary>
 );
 
 export default App;
