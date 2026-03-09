@@ -121,6 +121,7 @@ export default function AdminGraphics() {
       <Tabs defaultValue="store" className="w-full">
         <TabsList>
           <TabsTrigger value="store">Store Graphics</TabsTrigger>
+          <TabsTrigger value="ai-generate">AI Generate</TabsTrigger>
           <TabsTrigger value="folders">Folders</TabsTrigger>
         </TabsList>
 
