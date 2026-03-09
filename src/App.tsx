@@ -239,6 +239,8 @@ const App = () => (
                     <Route path="publisher" element={<AdminPublisher />} />
                     <Route path="notifications" element={<AdminNotifications />} />
                     <Route path="settings" element={<AdminSettings />} />
+                    <Route path="access-codes" element={<AdminAccessCodes />} />
+                    <Route path="user-access" element={<AdminUserAccess />} />
                     <Route path="studio" element={<AdminStudioManager />} />
                     <Route path="studio/chapters" element={<AdminPlaceholder title="Chapter Outlines" />} />
                     <Route path="studio/workspace" element={<AdminPlaceholder title="Writing Workspace" />} />
