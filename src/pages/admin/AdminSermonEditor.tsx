@@ -300,6 +300,17 @@ export default function AdminSermonEditor() {
             <CardContent className="space-y-5">
               <div className="flex items-center justify-between">
                 <div>
+                  <p className="text-sm font-medium">Publish Sermon</p>
+                  <p className="text-xs text-muted-foreground">When off, this sermon is a draft and hidden from visitors.</p>
+                </div>
+                <Switch
+                  checked={!!draft.is_published}
+                  onCheckedChange={(v) => update({ is_published: v })}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
                   <p className="text-sm font-medium">Feature on Front Page</p>
                   <p className="text-xs text-muted-foreground">Show this sermon in the featured section.</p>
                 </div>
