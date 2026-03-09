@@ -24,28 +24,29 @@ export default function AdminAccessCodes() {
   const [notes, setNotes] = useState("");
   const [isSingleUse, setIsSingleUse] = useState(true);
 
+  const invokeAdmin = async (body: any) => {
+    const adminToken = api.hasToken() ? localStorage.getItem("admin_token") : undefined;
+    const { data, error } = await supabase.functions.invoke("access-codes-admin", {
+      body,
+      headers: adminToken ? { "x-admin-token": adminToken } : {},
+    });
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+    return data;
+  };
+
   const { data: codes = [], isLoading } = useQuery({
     queryKey: ["admin-access-codes"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("access_codes")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => invokeAdmin({ action: "list" }),
   });
 
   const createCode = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.from("access_codes").insert({
-        plan_type: planType,
-        notes,
-        is_single_use: isSingleUse,
-        access_type: "lifetime",
-      });
-      if (error) throw error;
-    },
+    mutationFn: () => invokeAdmin({
+      action: "create",
+      plan_type: planType,
+      notes,
+      is_single_use: isSingleUse,
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-access-codes"] });
       setNotes("");
@@ -55,10 +56,7 @@ export default function AdminAccessCodes() {
   });
 
   const deleteCode = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("access_codes").delete().eq("id", id);
-      if (error) throw error;
-    },
+    mutationFn: (id: string) => invokeAdmin({ action: "delete", id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-access-codes"] });
       toast({ title: "Code deleted" });
