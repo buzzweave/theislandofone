@@ -172,7 +172,7 @@ export default function Login() {
                 <div className="space-y-2">
                   <Label>6-Character Code</Label>
                   <div className="flex justify-center">
-                    <InputOTP maxLength={6} value={code} onChange={setCode} pattern="[a-zA-Z0-9]*">
+                    <InputOTP maxLength={6} value={code} onChange={setCode} inputMode="text" pattern="^[a-zA-Z0-9]+$">
                       <InputOTPGroup>
                         <InputOTPSlot index={0} />
                         <InputOTPSlot index={1} />
