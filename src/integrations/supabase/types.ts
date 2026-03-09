@@ -1333,6 +1333,7 @@ export type Database = {
           featured: boolean
           id: string
           is_free: boolean
+          is_published: boolean
           manuscript: string
           preview_cutoff: number
           price: number
@@ -1352,6 +1353,7 @@ export type Database = {
           featured?: boolean
           id?: string
           is_free?: boolean
+          is_published?: boolean
           manuscript?: string
           preview_cutoff?: number
           price?: number
@@ -1371,6 +1373,7 @@ export type Database = {
           featured?: boolean
           id?: string
           is_free?: boolean
+          is_published?: boolean
           manuscript?: string
           preview_cutoff?: number
           price?: number
