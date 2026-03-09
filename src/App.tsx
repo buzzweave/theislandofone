@@ -65,7 +65,7 @@ const AdminAccessCodes = lazy(() => import("./pages/admin/AdminAccessCodes"));
 const AdminUserAccess = lazy(() => import("./pages/admin/AdminUserAccess"));
 const AdminCRM = lazy(() => import("./pages/admin/AdminCRM"));
 const AdminPlaceholder = lazy(() => import("./pages/admin/AdminPlaceholder"));
-const AdminStudioManager = lazy(() => import("./pages/admin/AdminStudioManager"));
+
 const VideoStudio = lazy(() => import("./pages/admin/VideoStudio"));
 const VideoLibrary = lazy(() => import("./pages/admin/VideoLibrary"));
 const AIDevDashboard = lazy(() => import("./pages/admin/ai-developer/AIDevDashboard"));
