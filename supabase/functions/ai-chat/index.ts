@@ -40,11 +40,8 @@ serve(async (req) => {
     }
 
     // For actions that modify data, require admin auth OR allow if session expired
-    // (the admin UI is already gated client-side)
     const needsAuth = action === "generate_draft" || action === "delete_conversation";
     if (needsAuth && !isAdmin && token && token !== anonKey) {
-      // Token was provided but session invalid - allow anyway for draft generation
-      // since the admin panel is already protected client-side
       console.log("Auth soft-pass: session may be expired, allowing action:", action);
     }
 
@@ -60,7 +57,7 @@ serve(async (req) => {
         ? "You are a Christian book author. Return valid JSON with: title, subtitle, author, description, chapters (array of {title, content}). Each chapter should have at least 300 words."
         : "You are a sermon writer. Return valid JSON with: title, scripture, excerpt, manuscript, category.");
 
-      console.log("Calling OpenAI for draft generation, model:", model);
+      console.log(`[generate_draft] Starting ${draftType} generation with model: ${model}`);
 
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -78,7 +75,7 @@ serve(async (req) => {
 
       if (!response.ok) {
         const errText = await response.text();
-        console.error("OpenAI error:", response.status, errText);
+        console.error(`[generate_draft] OpenAI API error: ${response.status}`, errText.substring(0, 300));
         return new Response(JSON.stringify({ error: `OpenAI error (${response.status}): ${errText.substring(0, 200)}` }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -87,22 +84,26 @@ serve(async (req) => {
       const aiResult = await response.json();
       let content = aiResult.choices?.[0]?.message?.content || "";
       
+      console.log(`[generate_draft] OpenAI response received, length: ${content.length}`);
+
       // Clean markdown code blocks if present
       content = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
       
       let parsed;
       try {
         parsed = JSON.parse(content);
-      } catch {
-        console.error("Failed to parse AI JSON:", content.substring(0, 500));
+      } catch (parseErr) {
+        console.error("[generate_draft] JSON parse failed:", content.substring(0, 500));
         return new Response(JSON.stringify({ error: "Failed to parse AI response as JSON", raw: content.substring(0, 500) }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
+      console.log(`[generate_draft] Parsed ${draftType} JSON successfully. Title: "${parsed.title}"`);
+
       // Save draft to DB
       if (draftType === "book") {
-        const { data: book, error: bookErr } = await supabase.from("books").insert({
+        const bookPayload = {
           title: parsed.title || "Untitled Book",
           subtitle: parsed.subtitle || "",
           author: parsed.author || "Bryant Clark",
@@ -111,9 +112,17 @@ serve(async (req) => {
           is_free: true,
           price: 0,
           category: "Faith",
-        }).select().single();
+        };
+        console.log("[generate_draft] Inserting book:", JSON.stringify(bookPayload));
 
-        if (bookErr) throw bookErr;
+        const { data: book, error: bookErr } = await supabase.from("books").insert(bookPayload).select().single();
+
+        if (bookErr) {
+          console.error("[generate_draft] Book insert FAILED:", JSON.stringify(bookErr));
+          throw bookErr;
+        }
+
+        console.log(`[generate_draft] Book created successfully. ID: ${book.id}`);
 
         if (parsed.chapters?.length && book) {
           const chapterRows = parsed.chapters.map((ch: any, i: number) => ({
@@ -122,14 +131,20 @@ serve(async (req) => {
             content: ch.content || "",
             sort_order: i,
           }));
-          await supabase.from("book_chapters").insert(chapterRows);
+          const { error: chapErr } = await supabase.from("book_chapters").insert(chapterRows);
+          if (chapErr) {
+            console.error("[generate_draft] Chapter insert error (non-fatal):", JSON.stringify(chapErr));
+          } else {
+            console.log(`[generate_draft] ${chapterRows.length} chapters inserted for book ${book.id}`);
+          }
         }
 
         return new Response(JSON.stringify({ success: true, title: parsed.title, id: book?.id }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       } else {
-        const { data: sermon, error: sermonErr } = await supabase.from("sermons").insert({
+        // SERMON DRAFT CREATION
+        const sermonPayload = {
           title: parsed.title || "Untitled Sermon",
           scripture: parsed.scripture || "",
           excerpt: parsed.excerpt || "",
@@ -138,11 +153,50 @@ serve(async (req) => {
           is_free: true,
           price: 0,
           is_published: false,
-        }).select().single();
+          access_level: "free",
+          access_tiers: [],
+          featured: false,
+          preview_cutoff: 2,
+          sort_order: 0,
+          date: new Date().toISOString().slice(0, 10),
+        };
 
-        if (sermonErr) throw sermonErr;
+        console.log("[generate_draft] Inserting sermon with payload:", JSON.stringify({
+          title: sermonPayload.title,
+          category: sermonPayload.category,
+          is_published: sermonPayload.is_published,
+          scripture: sermonPayload.scripture?.substring(0, 50),
+          manuscript_length: sermonPayload.manuscript?.length,
+        }));
 
-        return new Response(JSON.stringify({ success: true, title: parsed.title, id: sermon?.id }), {
+        const { data: sermon, error: sermonErr } = await supabase
+          .from("sermons")
+          .insert(sermonPayload)
+          .select()
+          .single();
+
+        if (sermonErr) {
+          console.error("[generate_draft] Sermon insert FAILED:", JSON.stringify(sermonErr));
+          return new Response(JSON.stringify({ 
+            success: false, 
+            error: `Database save failed: ${sermonErr.message}`,
+            code: sermonErr.code,
+            details: sermonErr.details,
+            generatedContent: {
+              title: sermonPayload.title,
+              scripture: sermonPayload.scripture,
+              excerpt: sermonPayload.excerpt,
+              manuscript: sermonPayload.manuscript,
+              category: sermonPayload.category,
+            }
+          }), {
+            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        console.log(`[generate_draft] Sermon draft created successfully! ID: ${sermon.id}, Title: "${sermon.title}"`);
+
+        return new Response(JSON.stringify({ success: true, title: sermon.title, id: sermon.id }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
