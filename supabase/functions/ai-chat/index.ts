@@ -101,13 +101,21 @@ serve(async (req) => {
 
       console.log(`[generate_draft] Parsed ${draftType} JSON successfully. Title: "${parsed.title}"`);
 
+      // Safe-string helper: guarantees a string, never null/undefined/object
+      const safeStr = (val: unknown, fallback = ""): string => {
+        if (val == null) return fallback;
+        if (typeof val === "string") return val;
+        if (typeof val === "number" || typeof val === "boolean") return String(val);
+        try { return JSON.stringify(val); } catch { return fallback; }
+      };
+
       // Save draft to DB
       if (draftType === "book") {
         const bookPayload = {
-          title: parsed.title || "Untitled Book",
-          subtitle: parsed.subtitle || "",
-          author: parsed.author || "Bryant Clark",
-          description: parsed.description || "",
+          title: safeStr(parsed.title, "Untitled Book"),
+          subtitle: safeStr(parsed.subtitle),
+          author: safeStr(parsed.author, "Bryant Clark"),
+          description: safeStr(parsed.description),
           is_published: false,
           is_free: true,
           price: 0,
