@@ -415,7 +415,7 @@ function GraphicsSection() {
               className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300"
             >
               <div className="aspect-video overflow-hidden bg-muted">
-                <img src={graphic.preview_url} alt={graphic.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" decoding="async" />
+                <img src={graphic.preview_url} alt={graphic.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" decoding="async" width={600} height={338} sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" />
               </div>
               <div className="p-4">
                 <p className="text-xs text-primary uppercase tracking-wider mb-1">{graphic.category}</p>
