@@ -100,7 +100,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <div className="flex items-center gap-3">
                 <Link
                   to="/membership"
-                  className="px-5 py-2 text-sm font-semibold rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                  className="px-5 py-2 text-sm font-semibold rounded-full bg-[hsl(50,90%,50%)] text-[hsl(220,20%,7%)] hover:bg-[hsl(50,90%,45%)] transition-colors"
                 >
                   Join
                 </Link>
@@ -115,14 +115,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             ) : (
               <div className="flex items-center gap-3">
                 <Link
-                  to="/auth"
+                  to="/login"
                   className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
                 >
-                  <User className="h-4 w-4" /> Sign In
+                  <User className="h-4 w-4" /> Login
                 </Link>
                 <Link
                   to="/membership"
-                  className="px-5 py-2 text-sm font-semibold rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                  className="px-5 py-2 text-sm font-semibold rounded-full bg-[hsl(50,90%,50%)] text-[hsl(220,20%,7%)] hover:bg-[hsl(50,90%,45%)] transition-colors"
                 >
                   Join
                 </Link>
@@ -163,19 +163,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </div>
               {!user && (
                 <Link
-                  to="/auth"
+                  to="/login"
                   onClick={() => setMenuOpen(false)}
                   className="mt-2 px-5 py-2.5 text-center text-sm font-semibold rounded-full border border-primary/30 text-foreground"
                 >
-                  Sign In
+                  Login
                 </Link>
               )}
               <Link
                 to="/membership"
                 onClick={() => setMenuOpen(false)}
-                className="mt-1 px-5 py-2.5 text-center text-sm font-semibold rounded-full bg-primary text-primary-foreground"
+                className="mt-1 px-5 py-2.5 text-center text-sm font-semibold rounded-full bg-[hsl(50,90%,50%)] text-[hsl(220,20%,7%)]"
               >
-                Join the Community
+                Join
               </Link>
               {user && (
                 <button
