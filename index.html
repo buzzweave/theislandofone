@@ -63,5 +63,19 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <!-- Failsafe: if the app doesn't render within 8s, show recovery UI -->
+    <script>
+      setTimeout(function () {
+        var root = document.getElementById("root");
+        if (root && root.children.length === 0) {
+          root.innerHTML =
+            '<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#1a1d26;color:#e2e8f0;font-family:Inter,system-ui,sans-serif;padding:2rem;text-align:center">' +
+            '<h1 style="font-size:1.5rem;font-weight:700;margin-bottom:0.75rem">Loading issue detected</h1>' +
+            '<p style="color:#94a3b8;margin-bottom:1.5rem;max-width:28rem">The page is taking longer than expected. Try clearing your cache.</p>' +
+            '<button onclick="if(\'caches\' in window){caches.keys().then(function(n){n.forEach(function(k){caches.delete(k)})})};if(\'serviceWorker\' in navigator){navigator.serviceWorker.getRegistrations().then(function(r){r.forEach(function(s){s.unregister()})})};setTimeout(function(){location.reload()},500)" style="padding:0.75rem 2rem;border-radius:9999px;background:#c8a84e;color:#1a1d26;font-weight:600;font-size:0.875rem;border:none;cursor:pointer">Clear Cache &amp; Reload</button>' +
+            "</div>";
+        }
+      }, 8000);
+    </script>
   </body>
 </html>
