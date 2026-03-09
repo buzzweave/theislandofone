@@ -2,7 +2,9 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { useHeroBanners } from "@/hooks/useHeroBanners";
-import heroBgFallback from "@/assets/hero-bg.jpg";
+
+// Stable public URL — matches the preload link in index.html so the browser reuses the same request
+const heroBgFallback = "/hero-bg.jpg";
 
 export default function HeroCarousel() {
   const { banners } = useHeroBanners();
