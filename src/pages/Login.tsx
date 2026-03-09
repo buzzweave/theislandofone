@@ -125,19 +125,14 @@ export default function Login() {
                   {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Mail className="h-4 w-4 mr-2" />}
                   Send Login Code
                 </Button>
-                <div className="text-center space-y-2">
+                <div className="text-center">
                   <button
                     type="button"
                     onClick={() => { setStep("code"); setError(""); }}
                     className="text-sm text-muted-foreground hover:text-primary transition-colors"
                   >
-                    Sign in with code
+                    Already have a code? Enter it here
                   </button>
-                  <div>
-                    <Link to="/auth" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                      Sign in with password
-                    </Link>
-                  </div>
                 </div>
               </form>
             )}
