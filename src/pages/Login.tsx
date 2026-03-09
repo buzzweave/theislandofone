@@ -102,7 +102,7 @@ export default function Login() {
             {step === "email" && (
               <form onSubmit={handleRequestCode} className="space-y-5">
                 <CardDescription className="text-center">
-                  Enter your email to receive a login code.
+                  Enter your email to receive a login code, or enter your lifetime access code below.
                 </CardDescription>
                 <div className="space-y-2">
                   <Label htmlFor="login-email">Email Address</Label>
@@ -128,7 +128,14 @@ export default function Login() {
                 <div className="text-center">
                   <button
                     type="button"
-                    onClick={() => { setStep("code"); setError(""); }}
+                    onClick={() => {
+                      if (!email.trim()) {
+                        setError("Please enter your email first.");
+                        return;
+                      }
+                      setError("");
+                      setStep("code");
+                    }}
                     className="text-sm text-muted-foreground hover:text-primary transition-colors"
                   >
                     Already have a code? Enter it here
@@ -144,7 +151,7 @@ export default function Login() {
                     <KeyRound className="h-6 w-6 text-primary" />
                   </div>
                   <CardDescription>
-                    We sent a 6-digit code to <strong>{email}</strong>
+                    Enter your 6-digit login code or lifetime access code for <strong>{email}</strong>
                   </CardDescription>
                 </div>
                 <div className="flex justify-center">

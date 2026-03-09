@@ -96,6 +96,17 @@ serve(async (req) => {
       }
     }
 
+    // 4. Check if there are any unredeemed access codes available
+    // (user might have a code but hasn't entered it yet — let them through
+    //  so they can enter the code on the next screen)
+    if (!hasAccess) {
+      // We allow sending a login code even without access,
+      // because the user might have a lifetime code to enter.
+      // The verify step will handle access validation.
+      hasAccess = true;
+      planType = "pending";
+    }
+
     if (!hasAccess) {
       return new Response(JSON.stringify({
         error: "no_access",
