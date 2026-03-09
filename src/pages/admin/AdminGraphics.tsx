@@ -238,6 +238,11 @@ export default function AdminGraphics() {
           </div>
         </TabsContent>
 
+        {/* AI Generate tab */}
+        <TabsContent value="ai-generate" className="mt-4">
+          <AIGraphicGenerator />
+        </TabsContent>
+
         {/* Folders tab */}
         <TabsContent value="folders">
           <AdminGraphicsFoldersTab />
