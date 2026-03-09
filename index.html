@@ -61,45 +61,7 @@
   </head>
 
   <body>
-    <div id="root">
-      <!-- Static fallback rendered immediately — replaced by React when app boots -->
-      <div id="static-fallback" style="min-height:100vh;background:#1a1d26;color:#e2e8f0;font-family:Inter,system-ui,sans-serif">
-        <header style="position:fixed;top:0;left:0;right:0;z-index:50;border-bottom:1px solid rgba(255,255,255,0.08);background:rgba(26,29,38,0.8);backdrop-filter:blur(12px)">
-          <nav style="max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:56px;padding:0 1rem">
-            <span style="font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:600">The Island of One</span>
-            <div style="display:flex;gap:1.5rem;font-size:0.875rem;color:#94a3b8">
-              <a href="/books" style="color:inherit;text-decoration:none">Books</a>
-              <a href="/sermons" style="color:inherit;text-decoration:none">Sermons</a>
-              <a href="/videos" style="color:inherit;text-decoration:none">Videos</a>
-              <a href="/about" style="color:inherit;text-decoration:none">About</a>
-            </div>
-          </nav>
-        </header>
-        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:70vh;padding:6rem 2rem 2rem;text-align:center">
-          <p style="color:#c8a84e;font-size:0.75rem;letter-spacing:0.2em;text-transform:uppercase;margin-bottom:1rem">Author · Speaker · Pastor</p>
-          <h1 style="font-family:'Playfair Display',serif;font-size:clamp(2rem,6vw,4.5rem);font-weight:700;line-height:1.1;margin-bottom:1rem">The Island<br><span style="background:linear-gradient(135deg,#c8a84e,#e8d48b);-webkit-background-clip:text;-webkit-text-fill-color:transparent">of One</span></h1>
-          <p style="color:#94a3b8;font-size:1rem;max-width:32rem;line-height:1.6;margin-bottom:2rem">Empowering believers to stand firm in faith, discover purpose in solitude, and lead with unshakeable conviction.</p>
-          <div style="display:flex;gap:0.75rem;flex-wrap:wrap;justify-content:center">
-            <a href="/books" style="display:inline-flex;align-items:center;padding:0.75rem 2rem;border-radius:9999px;background:#c8a84e;color:#1a1d26;font-weight:600;font-size:0.875rem;text-decoration:none">Explore Books</a>
-            <a href="/sermons" style="display:inline-flex;align-items:center;padding:0.75rem 2rem;border-radius:9999px;border:1px solid rgba(200,168,78,0.3);color:#e2e8f0;font-weight:600;font-size:0.875rem;text-decoration:none">Browse Sermons</a>
-          </div>
-        </div>
-      </div>
-    </div>
+    <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <script>
-      // Remove static fallback once React renders (React replaces root contents)
-      // If React never boots, the fallback stays visible — users can navigate.
-      // After 12s, if root still shows the fallback, add a subtle recovery note.
-      setTimeout(function () {
-        var fb = document.getElementById("static-fallback");
-        if (fb) {
-          var note = document.createElement("p");
-          note.style.cssText = "text-align:center;color:#64748b;font-size:0.75rem;padding:1rem;";
-          note.innerHTML = 'Interactive features loading… <button onclick="if(\'serviceWorker\' in navigator){navigator.serviceWorker.getRegistrations().then(function(r){r.forEach(function(s){s.unregister()})})};if(\'caches\' in window){caches.keys().then(function(n){n.forEach(function(k){caches.delete(k)})})};setTimeout(function(){location.reload()},500)" style="color:#c8a84e;background:none;border:none;text-decoration:underline;cursor:pointer;font-size:0.75rem">Retry</button>';
-          fb.appendChild(note);
-        }
-      }, 12000);
-    </script>
   </body>
 </html>
