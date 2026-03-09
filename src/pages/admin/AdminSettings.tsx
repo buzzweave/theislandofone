@@ -49,7 +49,7 @@ export default function AdminSettings() {
   const notifyBookPurchases = useSiteSettings("notify_book_purchases", "false");
   const maintenanceMode = useSiteSettings("maintenance_mode", "false");
   const allowRegistration = useSiteSettings("allow_registration", "true");
-  const studioLanding = useSiteSettings("studio_landing_enabled", "false");
+  
 
   const chatgptApiKey = useSiteSettings("chatgpt_api_key", "");
   const elevenlabsApiKey = useSiteSettings("elevenlabs_api_key", "");
