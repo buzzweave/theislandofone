@@ -20,7 +20,8 @@ function useStudioLandingEnabled() {
         .maybeSingle();
       return data?.value === "true";
     },
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
   });
 }
 
@@ -33,6 +34,8 @@ function getYouTubeId(url: string) {
 function useHomepageBooks() {
   return useQuery({
     queryKey: ["books_homepage"],
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("books")
@@ -48,6 +51,8 @@ function useHomepageBooks() {
 function useHomepageSermons() {
   return useQuery({
     queryKey: ["sermons_homepage"],
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sermons")
@@ -64,6 +69,8 @@ function useHomepageSermons() {
 function useHomepageVideos() {
   return useQuery({
     queryKey: ["videos_homepage"],
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("videos")
@@ -79,6 +86,8 @@ function useHomepageVideos() {
 function useHomepageGraphics() {
   return useQuery({
     queryKey: ["graphics_homepage"],
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("graphics")
@@ -95,6 +104,8 @@ function useHomepageGraphics() {
 function useHomepageBlog() {
   return useQuery({
     queryKey: ["blog_posts_homepage"],
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("blog_posts")
@@ -154,14 +165,7 @@ export default function Index() {
   const featuredVideos = videos.filter((v: any) => v.featured);
   const [playingId, setPlayingId] = useState<string | null>(null);
 
-  if (studioLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground text-sm">Loading…</div>
-      </div>
-    );
-  }
-
+  // Don't block render for studio check — show homepage immediately
   if (studioEnabled) {
     return (
       <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-pulse text-muted-foreground text-sm">Loading…</div></div>}>
