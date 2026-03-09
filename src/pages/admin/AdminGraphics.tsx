@@ -121,8 +121,6 @@ export default function AdminGraphics() {
         <TabsList>
           <TabsTrigger value="store">Store Graphics</TabsTrigger>
           <TabsTrigger value="folders">Folders</TabsTrigger>
-          <TabsTrigger value="images">Image Library</TabsTrigger>
-          <TabsTrigger value="videos">Video Uploads</TabsTrigger>
         </TabsList>
 
         {/* Existing store graphics tab */}
