@@ -305,8 +305,22 @@ serve(async (req) => {
         const sermonTitle = extractTitle(userPrompt);
         const sermonManuscript = renderSermonManuscript();
         const sermonScripture = extractScriptureRef(pick("scripture", "scripture_reference", "verse", "reference"));
-        const sermonExcerpt = safeStr(pick("excerpt", "summary", "description"));
+        let sermonExcerpt = safeStr(pick("excerpt", "summary", "description"));
         const sermonCategory = safeStr(pick("category"), "Faith");
+
+        // Auto-generate excerpt from manuscript if AI didn't provide one
+        if (!sermonExcerpt || sermonExcerpt.length < 10) {
+          // Extract first meaningful paragraph (skip headings/bullets)
+          const lines = sermonManuscript.split("\n").filter((l: string) => {
+            const t = l.trim();
+            return t.length > 30 && !t.startsWith("•") && !t.startsWith("-") && !t.startsWith("*") && t !== t.toUpperCase();
+          });
+          if (lines.length > 0) {
+            // Take first 2 sentences or 250 chars
+            const raw = lines.slice(0, 2).join(" ");
+            sermonExcerpt = raw.length > 250 ? raw.substring(0, 247) + "..." : raw;
+          }
+        }
 
         console.log("[generate_draft] Rendered manuscript length:", sermonManuscript.length);
         console.log("[generate_draft] Title:", sermonTitle);
