@@ -13,6 +13,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
+import { SermonManuscriptRenderer } from "@/components/SermonManuscriptRenderer";
 import {
   ArrowLeft,
   Lock,
