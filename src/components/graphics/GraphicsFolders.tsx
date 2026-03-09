@@ -176,8 +176,10 @@ function FolderDetail({
             >
               <div className="aspect-square bg-muted overflow-hidden">
                 <img
-                  src={(img as any).url}
+                  src={`${(img as any).url}?width=600&quality=70`}
                   alt={img.file_name}
+                  width={600}
+                  height={600}
                   loading="lazy"
                   decoding="async"
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
