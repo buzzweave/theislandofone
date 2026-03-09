@@ -13,6 +13,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import MediaImagesTab from "@/components/admin/media/MediaImagesTab";
 import MediaVideosTab from "@/components/admin/media/MediaVideosTab";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import AdminGraphicsFoldersTab from "@/components/admin/graphics/AdminGraphicsFoldersTab";
 /** Compress an image file to a smaller preview (max 800px, 70% quality JPEG) */
 async function createCompressedPreview(file: File): Promise<File> {
   return new Promise((resolve) => {
@@ -121,6 +122,7 @@ export default function AdminGraphics() {
       <Tabs defaultValue="store" className="w-full">
         <TabsList>
           <TabsTrigger value="store">Store Graphics</TabsTrigger>
+          <TabsTrigger value="folders">Folders</TabsTrigger>
           <TabsTrigger value="images">Image Library</TabsTrigger>
           <TabsTrigger value="videos">Video Uploads</TabsTrigger>
         </TabsList>
@@ -236,6 +238,11 @@ export default function AdminGraphics() {
               </div>
             )}
           </div>
+        </TabsContent>
+
+        {/* Folders tab */}
+        <TabsContent value="folders">
+          <AdminGraphicsFoldersTab />
         </TabsContent>
 
         {/* Media Library - Images */}
