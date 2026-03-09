@@ -44,7 +44,7 @@ function SiteLogo({ sizeOverride }: { sizeOverride?: number }) {
     >
       {logoUrl ? (
         <img
-          src={supabaseImageUrl(logoUrl, { width: size * 2, quality: 80 })}
+          src={logoUrl}
           alt="Site Logo"
           width={size}
           height={size}
