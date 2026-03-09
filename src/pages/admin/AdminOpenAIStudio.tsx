@@ -16,12 +16,17 @@ const DEFAULT_BOOK_PROMPT = `You are a Christian book author assistant. Generate
 const DEFAULT_SERMON_PROMPT = `You are a sermon writing assistant for a Christian ministry. Generate a complete sermon manuscript. Return a JSON object with: title, scripture, excerpt (2-3 sentence summary), manuscript (full sermon text with rich formatting), category (one of: Faith, Worship, Calling, Leadership, Deliverance, Prayer, Family). Write with passion and biblical depth.`;
 
 export default function AdminOpenAIStudio() {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [bookPrompt, setBookPrompt] = useState(DEFAULT_BOOK_PROMPT);
   const [sermonPrompt, setSermonPrompt] = useState(DEFAULT_SERMON_PROMPT);
   const [bookTopic, setBookTopic] = useState("");
   const [sermonTopic, setSermonTopic] = useState("");
   const [generating, setGenerating] = useState<"book" | "sermon" | null>(null);
   const [savedPrompts, setSavedPrompts] = useState(false);
+  const [lastGeneratedSermonId, setLastGeneratedSermonId] = useState<string | null>(null);
+  const [lastGeneratedBookId, setLastGeneratedBookId] = useState<string | null>(null);
+  const [generationFailed, setGenerationFailed] = useState<{ type: string; topic: string } | null>(null);
 
   // Load saved prompts from site_settings
   useEffect(() => {
