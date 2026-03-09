@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import { supabaseImageUrl } from "@/lib/supabaseImage";
 import { useState, lazy, Suspense, memo } from "react";
 import { ArrowRight, BookOpen, Mic, Play, PenLine, X } from "lucide-react";
 import HeroCarousel from "@/components/HeroCarousel";
@@ -119,7 +118,7 @@ function useHomepageMembershipPlans() {
   });
 }
 
-const BookCard = memo(({ book }: { book: any }) => (
+const BookCard = memo(({ book, priority = false }: { book: any; priority?: boolean }) => (
   <Link
     to="/books"
     className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300 hover:shadow-gold"
@@ -127,13 +126,15 @@ const BookCard = memo(({ book }: { book: any }) => (
     <div className="aspect-[2/3] overflow-hidden">
       {book.cover_image ? (
          <img
-           src={supabaseImageUrl(book.cover_image, { width: 700, quality: 75 })}
+           src={book.cover_image}
            alt={book.title}
            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-           loading="lazy"
-           decoding="async"
+           loading={priority ? "eager" : "lazy"}
+           decoding={priority ? "sync" : "async"}
+           fetchPriority={priority ? "high" : "auto"}
            width={400}
            height={600}
+           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
          />
       ) : (
         <div className="w-full h-full bg-muted flex items-center justify-center">
@@ -166,8 +167,8 @@ function FeaturedBooksSection() {
           <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold">Featured Books</h2>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 max-w-5xl mx-auto">
-          {featuredBooks.map((book: any) => (
-            <BookCard key={book.id} book={book} />
+          {featuredBooks.map((book: any, i: number) => (
+            <BookCard key={book.id} book={book} priority={i < 3} />
           ))}
         </div>
         <div className="text-center mt-10 sm:mt-12">
@@ -413,7 +414,7 @@ function GraphicsSection() {
               className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300"
             >
               <div className="aspect-video overflow-hidden bg-muted">
-                <img src={graphic.preview_url} alt={graphic.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" decoding="async" />
+                <img src={graphic.preview_url} alt={graphic.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" decoding="async" width={600} height={338} sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" />
               </div>
               <div className="p-4">
                 <p className="text-xs text-primary uppercase tracking-wider mb-1">{graphic.category}</p>
