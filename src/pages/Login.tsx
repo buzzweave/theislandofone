@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+
 import { Crown, Mail, Loader2, ArrowLeft, KeyRound, ShieldCheck } from "lucide-react";
 
 type Step = "email" | "code" | "paywall";
@@ -48,7 +48,7 @@ export default function Login() {
 
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (code.length !== 6) { setError("Please enter the full 6-digit code."); return; }
+    if (code.trim().length < 6) { setError("Please enter your code."); return; }
     setError("");
     setLoading(true);
 
@@ -151,7 +151,7 @@ export default function Login() {
                     <KeyRound className="h-6 w-6 text-primary" />
                   </div>
                   <CardDescription>
-                    Enter your email and code to sign in.
+                    Enter your 6-digit login code or lifetime access code.
                   </CardDescription>
                 </div>
                 <div className="space-y-2">
@@ -170,22 +170,23 @@ export default function Login() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>6-Digit Code</Label>
-                  <div className="flex justify-center">
-                    <InputOTP maxLength={6} value={code} onChange={setCode}>
-                      <InputOTPGroup>
-                        <InputOTPSlot index={0} />
-                        <InputOTPSlot index={1} />
-                        <InputOTPSlot index={2} />
-                        <InputOTPSlot index={3} />
-                        <InputOTPSlot index={4} />
-                        <InputOTPSlot index={5} />
-                      </InputOTPGroup>
-                    </InputOTP>
+                  <Label htmlFor="login-code">Login Code or Lifetime Access Code</Label>
+                  <div className="relative">
+                    <KeyRound className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="login-code"
+                      type="text"
+                      placeholder="Enter your code"
+                      className="pl-10 tracking-widest font-mono"
+                      value={code}
+                      onChange={(e) => setCode(e.target.value)}
+                      required
+                      autoFocus
+                    />
                   </div>
                 </div>
                 {error && <p className="text-sm text-destructive text-center">{error}</p>}
-                <Button type="submit" className="w-full" size="lg" disabled={loading || code.length !== 6 || !email.trim()}>
+                <Button type="submit" className="w-full" size="lg" disabled={loading || code.trim().length < 6 || !email.trim()}>
                   {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
                   Verify & Sign In
                 </Button>
