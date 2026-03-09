@@ -7,7 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout";
 import { AdminAuthProvider } from "./contexts/AdminAuthContext";
 import { AuthProvider } from "./contexts/AuthContext";
-import { WorkspaceProvider } from "./contexts/WorkspaceContext";
+
 
 // Critical path — loaded eagerly
 import Index from "./pages/Index";
