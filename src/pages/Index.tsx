@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import { supabaseImageUrl } from "@/lib/supabaseImage";
 import { useState, lazy, Suspense, memo } from "react";
 import { ArrowRight, BookOpen, Mic, Play, PenLine, X } from "lucide-react";
 import HeroCarousel from "@/components/HeroCarousel";
