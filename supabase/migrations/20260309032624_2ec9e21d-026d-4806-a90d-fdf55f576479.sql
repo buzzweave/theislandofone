@@ -1,0 +1,1 @@
+ALTER TABLE public.access_codes ALTER COLUMN code SET DEFAULT encode(extensions.gen_random_bytes(3), 'hex');
