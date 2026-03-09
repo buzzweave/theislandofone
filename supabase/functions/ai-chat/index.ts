@@ -6,16 +6,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
-
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY not configured");
 
-    const model = "google/gemini-2.5-flash";
+    const model = "gpt-4o-mini";
     const systemPrompt = "You are a helpful AI assistant for The Island of One ministry. Be warm, encouraging, and faith-driven. Keep answers clear and concise.";
 
     const body = await req.json();
@@ -59,9 +57,11 @@ serve(async (req) => {
         ? "You are a Christian book author. Return valid JSON with: title, subtitle, author, description, chapters (array of {title, content}). Each chapter should have at least 300 words."
         : "You are a sermon writer. Return valid JSON with: title, scripture, excerpt, manuscript, category.");
 
-      const response = await fetch(AI_GATEWAY, {
+      console.log("Calling OpenAI for draft generation, model:", model);
+
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model,
           messages: [
@@ -75,18 +75,8 @@ serve(async (req) => {
 
       if (!response.ok) {
         const errText = await response.text();
-        console.error("AI gateway error:", response.status, errText);
-        if (response.status === 429) {
-          return new Response(JSON.stringify({ error: "Rate limit exceeded, please try again later." }), {
-            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        if (response.status === 402) {
-          return new Response(JSON.stringify({ error: "AI credits exhausted. Please add funds in Settings." }), {
-            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        return new Response(JSON.stringify({ error: "AI service error" }), {
+        console.error("OpenAI error:", response.status, errText);
+        return new Response(JSON.stringify({ error: `OpenAI error (${response.status}): ${errText.substring(0, 200)}` }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -101,6 +91,7 @@ serve(async (req) => {
       try {
         parsed = JSON.parse(content);
       } catch {
+        console.error("Failed to parse AI JSON:", content.substring(0, 500));
         return new Response(JSON.stringify({ error: "Failed to parse AI response as JSON", raw: content.substring(0, 500) }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -203,9 +194,9 @@ serve(async (req) => {
       });
     }
 
-    const response = await fetch(AI_GATEWAY, {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model,
         messages: [{ role: "system", content: systemPrompt }, ...messages],
@@ -215,18 +206,8 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error("AI gateway error:", response.status, errText);
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded, please try again later." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add funds in Settings." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      return new Response(JSON.stringify({ error: "AI service error" }), {
+      console.error("OpenAI error:", response.status, errText);
+      return new Response(JSON.stringify({ error: `OpenAI error (${response.status})` }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
