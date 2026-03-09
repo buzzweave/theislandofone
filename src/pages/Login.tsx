@@ -151,23 +151,41 @@ export default function Login() {
                     <KeyRound className="h-6 w-6 text-primary" />
                   </div>
                   <CardDescription>
-                    Enter your 6-digit login code or lifetime access code for <strong>{email}</strong>
+                    Enter your email and code to sign in.
                   </CardDescription>
                 </div>
-                <div className="flex justify-center">
-                  <InputOTP maxLength={6} value={code} onChange={setCode}>
-                    <InputOTPGroup>
-                      <InputOTPSlot index={0} />
-                      <InputOTPSlot index={1} />
-                      <InputOTPSlot index={2} />
-                      <InputOTPSlot index={3} />
-                      <InputOTPSlot index={4} />
-                      <InputOTPSlot index={5} />
-                    </InputOTPGroup>
-                  </InputOTP>
+                <div className="space-y-2">
+                  <Label htmlFor="code-email">Email Address</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="code-email"
+                      type="email"
+                      placeholder="you@example.com"
+                      className="pl-10"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>6-Digit Code</Label>
+                  <div className="flex justify-center">
+                    <InputOTP maxLength={6} value={code} onChange={setCode}>
+                      <InputOTPGroup>
+                        <InputOTPSlot index={0} />
+                        <InputOTPSlot index={1} />
+                        <InputOTPSlot index={2} />
+                        <InputOTPSlot index={3} />
+                        <InputOTPSlot index={4} />
+                        <InputOTPSlot index={5} />
+                      </InputOTPGroup>
+                    </InputOTP>
+                  </div>
                 </div>
                 {error && <p className="text-sm text-destructive text-center">{error}</p>}
-                <Button type="submit" className="w-full" size="lg" disabled={loading || code.length !== 6}>
+                <Button type="submit" className="w-full" size="lg" disabled={loading || code.length !== 6 || !email.trim()}>
                   {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
                   Verify & Sign In
                 </Button>
@@ -177,15 +195,15 @@ export default function Login() {
                     onClick={() => { setStep("email"); setCode(""); setError(""); }}
                     className="text-sm text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
                   >
-                    <ArrowLeft className="h-3 w-3" /> Change email
+                    <ArrowLeft className="h-3 w-3" /> Back
                   </button>
                   <button
                     type="button"
                     onClick={handleRequestCode}
                     className="text-sm text-muted-foreground hover:text-primary transition-colors"
-                    disabled={loading}
+                    disabled={loading || !email.trim()}
                   >
-                    Resend code
+                    Send me a code
                   </button>
                 </div>
               </form>
