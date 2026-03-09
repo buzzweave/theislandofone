@@ -470,10 +470,12 @@ export default function SermonDetail() {
 .sermon-content .title-page .subtitle{ font-size:20px; opacity:0.85; }
             `}</style>
 
-            <div className="prose prose-invert max-w-none">
-              <article className="sermon-content" ref={sermonRef}>
-                <div dangerouslySetInnerHTML={{ __html: pagedHtml }} />
-              </article>
+            <div ref={sermonRef}>
+              <SermonManuscriptRenderer
+                content={manuscriptRaw}
+                title={title}
+                scripture={scripture}
+              />
             </div>
           </>
         )}
