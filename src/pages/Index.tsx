@@ -119,7 +119,7 @@ function useHomepageMembershipPlans() {
   });
 }
 
-const BookCard = memo(({ book }: { book: any }) => (
+const BookCard = memo(({ book, priority = false }: { book: any; priority?: boolean }) => (
   <Link
     to="/books"
     className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300 hover:shadow-gold"
@@ -127,13 +127,15 @@ const BookCard = memo(({ book }: { book: any }) => (
     <div className="aspect-[2/3] overflow-hidden">
       {book.cover_image ? (
          <img
-           src={supabaseImageUrl(book.cover_image, { width: 700, quality: 75 })}
+           src={book.cover_image}
            alt={book.title}
            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-           loading="lazy"
-           decoding="async"
+           loading={priority ? "eager" : "lazy"}
+           decoding={priority ? "sync" : "async"}
+           fetchPriority={priority ? "high" : "auto"}
            width={400}
            height={600}
+           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
          />
       ) : (
         <div className="w-full h-full bg-muted flex items-center justify-center">
