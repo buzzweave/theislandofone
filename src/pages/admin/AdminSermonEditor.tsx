@@ -137,6 +137,7 @@ export default function AdminSermonEditor() {
         category: draft.category,
         price: draft.price,
         is_free: draft.is_free ? 1 : 0,
+        is_published: !!draft.is_published,
         preview_cutoff: draft.preview_cutoff,
         featured: draft.featured ? 1 : 0,
         audio_url: draft.audio_url || "",
