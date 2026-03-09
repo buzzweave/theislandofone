@@ -174,7 +174,7 @@ serve(async (req) => {
         // SERMON DRAFT CREATION
         const sermonPayload = {
           title: safeStr(parsed.title, "Untitled Sermon"),
-          scripture: safeStr(parsed.scripture),
+          scripture: extractScriptureRef(parsed.scripture),
           excerpt: safeStr(parsed.excerpt),
           manuscript: safeStr(parsed.manuscript),
           category: safeStr(parsed.category, "Faith"),
@@ -193,7 +193,7 @@ serve(async (req) => {
           title: sermonPayload.title,
           category: sermonPayload.category,
           is_published: sermonPayload.is_published,
-          scripture: sermonPayload.scripture.substring(0, 50),
+          scripture: sermonPayload.scripture,
           manuscript_length: sermonPayload.manuscript.length,
         }));
 
