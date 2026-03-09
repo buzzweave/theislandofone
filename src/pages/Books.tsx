@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { supabaseImageUrl } from "@/lib/supabaseImage";
 import { Link } from "react-router-dom";
 import { BookOpen, Lock } from "lucide-react";
 import { useBooks } from "@/hooks/useBooks";
@@ -57,13 +58,13 @@ export default function Books() {
             >
               <div className="aspect-[2/3] overflow-hidden">
                 {book.cover_image ? (
-                  <img
-                    src={book.cover_image}
-                    alt={book.title}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    loading="lazy"
-                    decoding="async"
-                  />
+                   <img
+                     src={supabaseImageUrl(book.cover_image, { width: 700, quality: 75 })}
+                     alt={book.title}
+                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                     loading="lazy"
+                     decoding="async"
+                   />
                 ) : (
                   <div className="w-full h-full bg-muted flex items-center justify-center">
                     <BookOpen className="h-12 w-12 text-muted-foreground" />

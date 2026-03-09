@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { supabaseImageUrl } from "@/lib/supabaseImage";
 import { useState, lazy, Suspense, memo } from "react";
 import { ArrowRight, BookOpen, Mic, Play, PenLine, X } from "lucide-react";
 import { useMembershipPlans } from "@/hooks/useMembershipPlans";
@@ -109,15 +110,15 @@ const BookCard = memo(({ book }: { book: any }) => (
   >
     <div className="aspect-[2/3] overflow-hidden">
       {book.cover_image ? (
-        <img
-          src={book.cover_image}
-          alt={book.title}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          loading="lazy"
-          decoding="async"
-          width={400}
-          height={600}
-        />
+         <img
+           src={supabaseImageUrl(book.cover_image, { width: 700, quality: 75 })}
+           alt={book.title}
+           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+           loading="lazy"
+           decoding="async"
+           width={400}
+           height={600}
+         />
       ) : (
         <div className="w-full h-full bg-muted flex items-center justify-center">
           <BookOpen className="h-12 w-12 text-muted-foreground" />
