@@ -59,3 +59,12 @@ verify_jwt = false
 
 [functions.share-invite]
 verify_jwt = false
+
+[functions.request-login-code]
+verify_jwt = false
+
+[functions.verify-login-code]
+verify_jwt = false
+
+[functions.redeem-access-code]
+verify_jwt = false

@@ -77,7 +77,31 @@ serve(async (req) => {
         return new Response(JSON.stringify({
           subscribed: true,
           product_id: productId,
-          subscription_end: null, // no expiry for admin-assigned members
+          subscription_end: null,
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // --- 3. Check redeemed lifetime access codes ---
+    const { data: accessCode } = await supabaseClient
+      .from("access_codes")
+      .select("plan_type")
+      .eq("redeemed_by_user_id", user.id)
+      .limit(1)
+      .maybeSingle();
+
+    if (accessCode) {
+      const planName = accessCode.plan_type === "pastor" ? "Pastor" :
+                       accessCode.plan_type === "inner-circle" ? "Inner Circle" :
+                       accessCode.plan_type === "full" ? "Inner Circle" : "Reader";
+      const productId = PLAN_TO_PRODUCT[planName] || null;
+      if (productId) {
+        return new Response(JSON.stringify({
+          subscribed: true,
+          product_id: productId,
+          subscription_end: null,
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });

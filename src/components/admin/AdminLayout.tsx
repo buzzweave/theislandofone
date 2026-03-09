@@ -35,6 +35,7 @@ import {
   Palette,
   UserCheck,
   CreditCard,
+  KeyRound,
 } from "lucide-react";
 import AISidebar from "./AISidebar";
 import NotificationBell from "./NotificationBell";
@@ -62,6 +63,8 @@ const navItems = [
   { to: "/admin/crm", label: "Email CRM", icon: Mail },
   { to: "/admin/video-studio", label: "Video Studio", icon: Video },
   { to: "/admin/notifications", label: "Notifications", icon: BellIcon },
+  { to: "/admin/access-codes", label: "Access Codes", icon: KeyRound },
+  { to: "/admin/user-access", label: "User Access", icon: UserCheck },
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
 

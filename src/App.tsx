@@ -35,6 +35,8 @@ const Community = lazy(() => import("./pages/Community"));
 const ForumCategory = lazy(() => import("./pages/ForumCategory"));
 const ForumThread = lazy(() => import("./pages/ForumThread"));
 const InviteRedirect = lazy(() => import("./pages/InviteRedirect"));
+const Login = lazy(() => import("./pages/Login"));
+const RedeemCode = lazy(() => import("./pages/RedeemCode"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Studio (SaaS) pages
@@ -66,6 +68,8 @@ const AdminBlogManager = lazy(() => import("./pages/admin/AdminBlogManager"));
 const AdminPublisher = lazy(() => import("./pages/admin/AdminPublisher"));
 const AdminNotifications = lazy(() => import("./pages/admin/AdminNotifications"));
 const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
+const AdminAccessCodes = lazy(() => import("./pages/admin/AdminAccessCodes"));
+const AdminUserAccess = lazy(() => import("./pages/admin/AdminUserAccess"));
 const AdminCRM = lazy(() => import("./pages/admin/AdminCRM"));
 const AdminPlaceholder = lazy(() => import("./pages/admin/AdminPlaceholder"));
 const AdminStudioManager = lazy(() => import("./pages/admin/AdminStudioManager"));
@@ -195,6 +199,8 @@ const App = () => (
                   <Route path="/community/:slug" element={<LazyLayout><ForumCategory /></LazyLayout>} />
                   <Route path="/community/:slug/:postId" element={<LazyLayout><ForumThread /></LazyLayout>} />
                   <Route path="/i/:code" element={<LazyLayout><InviteRedirect /></LazyLayout>} />
+                  <Route path="/login" element={<LazyLayout><Login /></LazyLayout>} />
+                  <Route path="/redeem" element={<LazyLayout><RedeemCode /></LazyLayout>} />
 
                   {/* Studio (SaaS) routes */}
                   <Route path="/studio" element={<Suspense fallback={<PageFallback />}><Studio /></Suspense>} />
@@ -233,6 +239,8 @@ const App = () => (
                     <Route path="publisher" element={<AdminPublisher />} />
                     <Route path="notifications" element={<AdminNotifications />} />
                     <Route path="settings" element={<AdminSettings />} />
+                    <Route path="access-codes" element={<AdminAccessCodes />} />
+                    <Route path="user-access" element={<AdminUserAccess />} />
                     <Route path="studio" element={<AdminStudioManager />} />
                     <Route path="studio/chapters" element={<AdminPlaceholder title="Chapter Outlines" />} />
                     <Route path="studio/workspace" element={<AdminPlaceholder title="Writing Workspace" />} />
