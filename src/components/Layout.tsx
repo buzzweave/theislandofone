@@ -163,19 +163,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </div>
               {!user && (
                 <Link
-                  to="/auth"
+                  to="/login"
                   onClick={() => setMenuOpen(false)}
                   className="mt-2 px-5 py-2.5 text-center text-sm font-semibold rounded-full border border-primary/30 text-foreground"
                 >
-                  Sign In
+                  Login
                 </Link>
               )}
               <Link
                 to="/membership"
                 onClick={() => setMenuOpen(false)}
-                className="mt-1 px-5 py-2.5 text-center text-sm font-semibold rounded-full bg-primary text-primary-foreground"
+                className="mt-1 px-5 py-2.5 text-center text-sm font-semibold rounded-full bg-[hsl(50,90%,50%)] text-[hsl(220,20%,7%)]"
               >
-                Join the Community
+                Join
               </Link>
               {user && (
                 <button
