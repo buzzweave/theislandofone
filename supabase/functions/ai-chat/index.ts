@@ -303,19 +303,22 @@ serve(async (req) => {
       } else {
         // SERMON DRAFT
         const sermonTitle = extractTitle(userPrompt);
-        const sermonManuscript = extractManuscript();
+        const sermonManuscript = renderSermonManuscript();
         const sermonScripture = extractScriptureRef(pick("scripture", "scripture_reference", "verse", "reference"));
         const sermonExcerpt = safeStr(pick("excerpt", "summary", "description"));
         const sermonCategory = safeStr(pick("category"), "Faith");
 
+        console.log("[generate_draft] Rendered manuscript length:", sermonManuscript.length);
+        console.log("[generate_draft] Title:", sermonTitle);
+
         // Validate: do not save empty sermons
         if (!sermonManuscript || sermonManuscript.length < 50) {
           console.error("[generate_draft] Sermon manuscript too short! Length:", sermonManuscript.length);
-          console.error("[generate_draft] Parsed keys:", Object.keys(parsed).join(", "));
+          console.error("[generate_draft] Root keys:", Object.keys(root).join(", "));
           console.error("[generate_draft] Raw preview:", content.substring(0, 1000));
           return new Response(JSON.stringify({ 
             error: "Generated sermon content was empty or too short. The AI may have used unexpected field names. Please try again.", 
-            raw_keys: Object.keys(parsed),
+            raw_keys: Object.keys(root),
           }), {
             status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
