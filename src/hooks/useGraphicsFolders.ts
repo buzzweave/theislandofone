@@ -25,19 +25,22 @@ export interface GraphicsFolderImage {
 export function useGraphicsFolders() {
   return useQuery({
     queryKey: ["graphics-folders"],
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     queryFn: async () => {
+      // Use count aggregation to avoid fetching all image rows
       const { data: folders, error } = await supabase
         .from("graphics_folders")
-        .select("*")
+        .select("id,name,cover_image,description,is_active,sort_order,created_at")
         .eq("is_active", true)
         .order("sort_order", { ascending: true });
 
       if (error) throw error;
 
-      // Get image counts for each folder
       const folderIds = (folders || []).map((f) => f.id);
       if (folderIds.length === 0) return [];
 
+      // Get counts efficiently - only select folder_id
       const { data: counts } = await supabase
         .from("graphics_folder_images")
         .select("folder_id")
@@ -60,10 +63,12 @@ export function useGraphicsFolderImages(folderId: string | null) {
   return useQuery({
     queryKey: ["graphics-folder-images", folderId],
     enabled: !!folderId,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("graphics_folder_images")
-        .select("*")
+        .select("id,folder_id,file_name,file_url,file_size,sort_order")
         .eq("folder_id", folderId!)
         .order("sort_order", { ascending: true });
 

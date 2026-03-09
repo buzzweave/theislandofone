@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef, memo } from "react";
 import { useGraphics } from "@/hooks/useGraphics";
 import { useAuth } from "@/contexts/AuthContext";
 import { getTierByProductId, tierHasAccess, MEMBERSHIP_TIERS } from "@/lib/stripe";
@@ -7,6 +7,85 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import PublicGraphicsFolders from "@/components/graphics/PublicGraphicsFolders";
+
+const PAGE_SIZE = 12;
+
+const GraphicCard = memo(function GraphicCard({
+  graphic,
+  canDownload,
+  isFree,
+  tierLabel,
+  buyingId,
+  onBuy,
+}: {
+  graphic: any;
+  canDownload: boolean;
+  isFree: boolean;
+  tierLabel: string | null;
+  buyingId: string | null;
+  onBuy: (g: any) => void;
+}) {
+  return (
+    <div className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300">
+      <div className="relative aspect-video overflow-hidden bg-muted">
+        <img
+          src={graphic.preview_url}
+          alt={graphic.title}
+          loading="lazy"
+          decoding="async"
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+          <span className="text-white/20 font-display text-lg sm:text-xl font-bold rotate-[-25deg] whitespace-nowrap">
+            The Island of One
+          </span>
+        </div>
+      </div>
+      <div className="p-4 space-y-3">
+        <div>
+          <p className="text-xs text-primary uppercase tracking-wider mb-1">{graphic.category}</p>
+          <h3 className="font-display text-sm font-semibold group-hover:text-primary transition-colors">
+            {graphic.title}
+          </h3>
+          {graphic.description && (
+            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{graphic.description}</p>
+          )}
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-bold text-primary">
+              {isFree ? "Free" : `$${Number(graphic.price).toFixed(2)}`}
+            </span>
+            {tierLabel && (
+              <Badge variant="secondary" className="text-[10px]">
+                Included with {tierLabel}
+              </Badge>
+            )}
+          </div>
+          {canDownload ? (
+            <a
+              href={graphic.file_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" /> Download
+            </a>
+          ) : (
+            <button
+              onClick={() => onBuy(graphic)}
+              disabled={buyingId === graphic.id}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              <ShoppingCart className="h-3.5 w-3.5" />
+              {buyingId === graphic.id ? "Processing…" : "Buy Now"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+});
 
 export default function Graphics() {
   const { graphics, isLoading } = useGraphics();
@@ -42,13 +121,33 @@ export default function Graphics() {
     return matchesCategory && matchesSearch;
   });
 
-  // Pagination for performance
-  const PAGE_SIZE = 12;
+  // Infinite scroll pagination
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const visibleGraphics = filtered.slice(0, visibleCount);
   const hasMore = visibleCount < filtered.length;
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
-  const handleBuy = async (graphic: typeof graphics[0]) => {
+  // Reset visible count when filters change
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [activeCategory, searchQuery]);
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    if (!hasMore || !sentinelRef.current) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisibleCount((prev) => prev + PAGE_SIZE);
+        }
+      },
+      { rootMargin: "400px" }
+    );
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, visibleCount]);
+
+  const handleBuy = useCallback(async (graphic: typeof graphics[0]) => {
     setBuyingId(graphic.id);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -66,9 +165,8 @@ export default function Graphics() {
       toast({ title: "Checkout failed", description: err.message, variant: "destructive" });
     }
     setBuyingId(null);
-  };
+  }, [toast]);
 
-  // Helper to get the minimum tier label for a graphic
   const getTierLabel = (accessTiers: string[]) => {
     if (!accessTiers || accessTiers.length === 0) return null;
     const tierRank: Record<string, number> = { reader: 1, pastor: 2, "inner-circle": 3 };
@@ -122,7 +220,6 @@ export default function Graphics() {
           </div>
         </div>
 
-        {/* Folders view */}
         {isFoldersView ? (
           <PublicGraphicsFolders />
         ) : isLoading ? (
@@ -133,79 +230,34 @@ export default function Graphics() {
             <p className="text-muted-foreground">No graphics found. Check back soon!</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto pb-24">
-            {filtered.map((graphic) => {
-              const isFree = !graphic.price || graphic.price === 0;
-              const hasTierAccess = tierHasAccess(userTier, graphic.access_tiers);
-              const hasPurchased = purchasedIds.has(graphic.id);
-              const canDownload = isFree || hasTierAccess || hasPurchased;
-              const tierLabel = !isFree && hasTierAccess ? getTierLabel(graphic.access_tiers) : null;
+          <div className="max-w-5xl mx-auto pb-24">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {visibleGraphics.map((graphic) => {
+                const isFree = !graphic.price || graphic.price === 0;
+                const hasTierAccess = tierHasAccess(userTier, graphic.access_tiers);
+                const hasPurchased = purchasedIds.has(graphic.id);
+                const canDownload = isFree || hasTierAccess || hasPurchased;
+                const tierLabel = !isFree && hasTierAccess ? getTierLabel(graphic.access_tiers) : null;
 
-              return (
-                <div
-                  key={graphic.id}
-                  className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300"
-                >
-                  <div className="relative aspect-video overflow-hidden bg-muted">
-                    <img
-                      src={graphic.preview_url}
-                      alt={graphic.title}
-                      loading="lazy"
-                      decoding="async"
-                      fetchPriority={filtered.indexOf(graphic) < 3 ? "high" : "low"}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
-                      <span className="text-white/20 font-display text-lg sm:text-xl font-bold rotate-[-25deg] whitespace-nowrap">
-                        The Island of One
-                      </span>
-                    </div>
-                  </div>
-                  <div className="p-4 space-y-3">
-                    <div>
-                      <p className="text-xs text-primary uppercase tracking-wider mb-1">{graphic.category}</p>
-                      <h3 className="font-display text-sm font-semibold group-hover:text-primary transition-colors">
-                        {graphic.title}
-                      </h3>
-                      {graphic.description && (
-                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{graphic.description}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg font-bold text-primary">
-                          {isFree ? "Free" : `$${Number(graphic.price).toFixed(2)}`}
-                        </span>
-                        {tierLabel && (
-                          <Badge variant="secondary" className="text-[10px]">
-                            Included with {tierLabel}
-                          </Badge>
-                        )}
-                      </div>
-                      {canDownload ? (
-                        <a
-                          href={graphic.file_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors"
-                        >
-                          <Download className="h-3.5 w-3.5" /> Download
-                        </a>
-                      ) : (
-                        <button
-                          onClick={() => handleBuy(graphic)}
-                          disabled={buyingId === graphic.id}
-                          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
-                        >
-                          <ShoppingCart className="h-3.5 w-3.5" />
-                          {buyingId === graphic.id ? "Processing…" : "Buy Now"}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+                return (
+                  <GraphicCard
+                    key={graphic.id}
+                    graphic={graphic}
+                    canDownload={canDownload}
+                    isFree={isFree}
+                    tierLabel={tierLabel}
+                    buyingId={buyingId}
+                    onBuy={handleBuy}
+                  />
+                );
+              })}
+            </div>
+            {/* Infinite scroll sentinel */}
+            {hasMore && (
+              <div ref={sentinelRef} className="flex justify-center py-8">
+                <div className="animate-pulse text-muted-foreground text-sm">Loading more…</div>
+              </div>
+            )}
           </div>
         )}
       </div>

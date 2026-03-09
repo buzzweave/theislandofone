@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { useGraphicsFolders, useGraphicsFolderImages, type GraphicsFolder } from "@/hooks/useGraphicsFolders";
 import { useToast } from "@/hooks/use-toast";
 import { Download, FolderOpen, ArrowLeft, Image } from "lucide-react";
@@ -9,6 +9,35 @@ function formatSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+const FolderImageCard = memo(function FolderImageCard({ img }: { img: any }) {
+  return (
+    <div className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300">
+      <div className="aspect-square bg-muted overflow-hidden">
+        <img
+          src={img.file_url}
+          alt={img.file_name}
+          loading="lazy"
+          decoding="async"
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+      </div>
+      <div className="p-3 flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-xs font-medium truncate">{img.file_name}</p>
+          <p className="text-[10px] text-muted-foreground">{formatSize(img.file_size)}</p>
+        </div>
+        <a
+          href={img.file_url}
+          download={img.file_name}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors shrink-0"
+        >
+          <Download className="h-3.5 w-3.5" /> Download
+        </a>
+      </div>
+    </div>
+  );
+});
 
 export default function PublicGraphicsFolders() {
   const { toast } = useToast();
@@ -23,7 +52,7 @@ export default function PublicGraphicsFolders() {
     toast({ title: "Preparing ZIP…" });
     try {
       const { data: folderImages } = await import("@/integrations/supabase/client").then(
-        ({ supabase }) => supabase.from("graphics_folder_images").select("*").eq("folder_id", folder.id)
+        ({ supabase }) => supabase.from("graphics_folder_images").select("id,file_url,file_name").eq("folder_id", folder.id)
       );
       if (!folderImages || folderImages.length === 0) {
         toast({ title: "Folder is empty", variant: "destructive" });
@@ -32,13 +61,19 @@ export default function PublicGraphicsFolders() {
       }
       const { default: JSZip } = await import("jszip");
       const zip = new JSZip();
-      for (const img of folderImages) {
+      
+      // Parallel fetch all images for ZIP (much faster)
+      const fetchPromises = folderImages.map(async (img) => {
         try {
           const resp = await fetch(img.file_url);
           const blob = await resp.blob();
-          zip.file(img.file_name || `image-${img.id}.jpg`, blob);
-        } catch { /* skip */ }
-      }
+          return { name: img.file_name || `image-${img.id}.jpg`, blob };
+        } catch { return null; }
+      });
+
+      const results = await Promise.all(fetchPromises);
+      results.forEach((r) => { if (r) zip.file(r.name, r.blob); });
+
       const content = await zip.generateAsync({ type: "blob" });
       const url = URL.createObjectURL(content);
       const a = document.createElement("a");
@@ -90,6 +125,7 @@ export default function PublicGraphicsFolders() {
                 src={folder.cover_image}
                 alt={folder.name}
                 loading="lazy"
+                decoding="async"
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
             </div>
@@ -172,33 +208,7 @@ function FolderDetail({
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {images.map((img) => (
-            <div
-              key={img.id}
-              className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300"
-            >
-              <div className="aspect-square bg-muted overflow-hidden">
-                <img
-                  src={img.file_url}
-                  alt={img.file_name}
-                  loading="lazy"
-                  decoding="async"
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                />
-              </div>
-              <div className="p-3 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-xs font-medium truncate">{img.file_name}</p>
-                  <p className="text-[10px] text-muted-foreground">{formatSize(img.file_size)}</p>
-                </div>
-                <a
-                  href={img.file_url}
-                  download={img.file_name}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors shrink-0"
-                >
-                  <Download className="h-3.5 w-3.5" /> Download
-                </a>
-              </div>
-            </div>
+            <FolderImageCard key={img.id} img={img} />
           ))}
         </div>
       )}

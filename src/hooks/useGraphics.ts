@@ -16,14 +16,16 @@ export interface Graphic {
   updated_at: string;
 }
 
-/** Public hook – returns active graphics only */
+/** Public hook – returns active graphics only with aggressive caching */
 export function useGraphics() {
   const { data: graphics = [], isLoading } = useQuery({
     queryKey: ["graphics"],
+    staleTime: 10 * 60 * 1000, // 10 min cache
+    gcTime: 30 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("graphics")
-        .select("*")
+        .select("id,title,description,category,price,preview_url,file_url,access_tiers,sort_order")
         .eq("is_active", true)
         .order("sort_order", { ascending: true });
       if (error) throw new Error(error.message);
