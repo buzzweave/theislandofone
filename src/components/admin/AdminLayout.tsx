@@ -35,6 +35,7 @@ import {
   Palette,
   UserCheck,
   CreditCard,
+  KeyRound,
 } from "lucide-react";
 import AISidebar from "./AISidebar";
 import NotificationBell from "./NotificationBell";
