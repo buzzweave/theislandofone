@@ -156,6 +156,7 @@ function LazyLayout({ children }: { children: React.ReactNode }) {
 }
 
 const App = () => (
+  <AppErrorBoundary>
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
