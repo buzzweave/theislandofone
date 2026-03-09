@@ -170,19 +170,18 @@ export default function Login() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="login-code">Login Code or Lifetime Access Code</Label>
-                  <div className="relative">
-                    <KeyRound className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="login-code"
-                      type="text"
-                      placeholder="Enter your code"
-                      className="pl-10 tracking-widest font-mono"
-                      value={code}
-                      onChange={(e) => setCode(e.target.value)}
-                      required
-                      autoFocus
-                    />
+                  <Label>6-Character Code</Label>
+                  <div className="flex justify-center">
+                    <InputOTP maxLength={6} value={code} onChange={setCode} pattern="[a-zA-Z0-9]*">
+                      <InputOTPGroup>
+                        <InputOTPSlot index={0} />
+                        <InputOTPSlot index={1} />
+                        <InputOTPSlot index={2} />
+                        <InputOTPSlot index={3} />
+                        <InputOTPSlot index={4} />
+                        <InputOTPSlot index={5} />
+                      </InputOTPGroup>
+                    </InputOTP>
                   </div>
                 </div>
                 {error && <p className="text-sm text-destructive text-center">{error}</p>}
