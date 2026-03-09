@@ -66,13 +66,25 @@ export default defineConfig(({ mode }) => ({
     cssCodeSplit: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-select', '@radix-ui/react-tabs', '@radix-ui/react-tooltip', '@radix-ui/react-popover'],
-          query: ['@tanstack/react-query'],
-          charts: ['recharts'],
-          editor: ['@tiptap/react', '@tiptap/starter-kit'],
-          supabase: ['@supabase/supabase-js'],
+        manualChunks(id) {
+          // Core framework — always needed
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/') || id.includes('node_modules/react-router-dom/')) {
+            return 'vendor';
+          }
+          // Query client — used on most pages
+          if (id.includes('@tanstack/react-query')) {
+            return 'query';
+          }
+          // Charts — heavy, rarely needed on initial load
+          if (id.includes('recharts')) {
+            return 'charts';
+          }
+          // Editor — admin only
+          if (id.includes('@tiptap')) {
+            return 'editor';
+          }
+          // Let Vite naturally split supabase and radix-ui
+          // into shared chunks loaded only when needed
         },
       },
     },
