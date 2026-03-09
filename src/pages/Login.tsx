@@ -185,7 +185,7 @@ export default function Login() {
                   </div>
                 </div>
                 {error && <p className="text-sm text-destructive text-center">{error}</p>}
-                <Button type="submit" className="w-full" size="lg" disabled={loading || code.trim().length < 6 || !email.trim()}>
+                <Button type="submit" className="w-full" size="lg" disabled={loading || code.length !== 6 || !email.trim()}>
                   {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
                   Verify & Sign In
                 </Button>
