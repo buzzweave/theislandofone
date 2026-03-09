@@ -35,6 +35,8 @@ const Community = lazy(() => import("./pages/Community"));
 const ForumCategory = lazy(() => import("./pages/ForumCategory"));
 const ForumThread = lazy(() => import("./pages/ForumThread"));
 const InviteRedirect = lazy(() => import("./pages/InviteRedirect"));
+const Login = lazy(() => import("./pages/Login"));
+const RedeemCode = lazy(() => import("./pages/RedeemCode"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Studio (SaaS) pages
