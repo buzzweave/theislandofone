@@ -36,27 +36,36 @@ export default function HeroCarousel() {
   }, [slides.length]);
 
   const slide = slides[current];
-  const bgImage = slide.image_url || heroBgFallback;
 
   const prev = () => setCurrent((c) => (c - 1 + slides.length) % slides.length);
   const next = () => setCurrent((c) => (c + 1) % slides.length);
 
+  // Only render current + adjacent slides to reduce DOM and network load
+  const visibleIndices = new Set<number>();
+  visibleIndices.add(current);
+  if (slides.length > 1) {
+    visibleIndices.add((current + 1) % slides.length);
+    visibleIndices.add((current - 1 + slides.length) % slides.length);
+  }
+
   return (
     <section className="relative min-h-[55vh] sm:min-h-[70vh] md:min-h-[80vh] lg:min-h-[90vh] flex items-center justify-center overflow-hidden">
-      {/* Background with crossfade */}
-      {slides.map((s, i) => (
-        <img
-          key={s.id}
-          src={s.image_url || heroBgFallback}
-          alt=""
-          fetchPriority={i === 0 ? "high" : "auto"}
-          loading={i === 0 ? "eager" : "lazy"}
-          decoding={i === 0 ? "sync" : "async"}
-          className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-1000 ${
-            i === current ? "opacity-100" : "opacity-0"
-          }`}
-        />
-      ))}
+      {/* Background — only render current + adjacent slides */}
+      {slides.map((s, i) =>
+        visibleIndices.has(i) ? (
+          <img
+            key={s.id}
+            src={s.image_url || heroBgFallback}
+            alt=""
+            fetchPriority={i === current ? "high" : "auto"}
+            loading={i === current ? "eager" : "lazy"}
+            decoding={i === current ? "sync" : "async"}
+            className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-1000 ${
+              i === current ? "opacity-100" : "opacity-0"
+            }`}
+          />
+        ) : null
+      )}
       <div className="absolute inset-0 bg-gradient-hero" />
 
       <div className="relative z-10 container mx-auto px-4 sm:px-6 text-center animate-fade-up">
