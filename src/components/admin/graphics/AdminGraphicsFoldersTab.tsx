@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { uploadToStorage } from "@/lib/supabaseUpload";
+import { optimizeImage, parallelUpload } from "@/lib/imageOptimizer";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Plus, Trash2, FolderOpen, Image, Upload } from "lucide-react";
@@ -8,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Progress } from "@/components/ui/progress";
 
 interface AdminFolder {
   id: string;
@@ -25,6 +27,7 @@ function useAdminGraphicsFolders() {
 
   const { data: folders = [], isLoading, refetch } = useQuery({
     queryKey: ["admin-graphics-folders"],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { data: rawFolders, error } = await supabase
         .from("graphics_folders")
@@ -66,6 +69,7 @@ export default function AdminGraphicsFoldersTab() {
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [uploadingFolderId, setUploadingFolderId] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
 
   const updateFolder = async (id: string, updates: Partial<AdminFolder>) => {
     const { error } = await supabase.from("graphics_folders").update(updates).eq("id", id);
@@ -113,7 +117,9 @@ export default function AdminGraphicsFoldersTab() {
       if (!file) return;
       setUploadingFolderId(folderId);
       try {
-        const url = await uploadToStorage("graphics", file, "folder-covers");
+        // Compress cover image
+        const optimized = await optimizeImage(file, { maxWidth: 1200, quality: 0.8 });
+        const url = await uploadToStorage("graphics", optimized, "folder-covers");
         await updateFolder(folderId, { cover_image: url });
         toast({ title: "Cover image updated" });
       } catch (err: any) {
@@ -133,23 +139,34 @@ export default function AdminGraphicsFoldersTab() {
       const files = Array.from((e.target as HTMLInputElement).files || []);
       if (files.length === 0) return;
       setUploadingFolderId(folderId);
-      let successCount = 0;
-      for (let i = 0; i < files.length; i++) {
-        try {
-          const url = await uploadToStorage("graphics", files[i], `folder-images/${folderId}`);
-          const { error } = await supabase.from("graphics_folder_images").insert({
+      setUploadProgress({ current: 0, total: files.length });
+
+      const result = await parallelUpload(
+        files,
+        async (file, i) => {
+          // Compress before upload
+          const optimized = await optimizeImage(file, { maxWidth: 2400, quality: 0.82 });
+          const url = await uploadToStorage("graphics", optimized, `folder-images/${folderId}`);
+          await supabase.from("graphics_folder_images").insert({
             folder_id: folderId,
             file_url: url,
-            file_name: files[i].name,
-            file_size: files[i].size,
+            file_name: file.name,
+            file_size: optimized.size,
             sort_order: i,
           });
-          if (!error) successCount++;
-        } catch { /* skip */ }
-      }
-      toast({ title: `${successCount} image(s) uploaded` });
+        },
+        {
+          concurrency: 3,
+          onProgress: (completed, total) => {
+            setUploadProgress({ current: completed, total });
+          },
+        }
+      );
+
+      toast({ title: `${result.successes} image(s) uploaded${result.failures > 0 ? `, ${result.failures} failed` : ""}` });
       invalidate();
       setUploadingFolderId(null);
+      setUploadProgress(null);
     };
     input.click();
   };
@@ -158,7 +175,6 @@ export default function AdminGraphicsFoldersTab() {
 
   return (
     <div className="space-y-4 pt-2">
-      {/* Create new folder */}
       <div className="flex items-center gap-2">
         <Input
           placeholder="New folder name…"
@@ -172,6 +188,14 @@ export default function AdminGraphicsFoldersTab() {
         </Button>
       </div>
 
+      {/* Upload progress bar */}
+      {uploadProgress && (
+        <div className="space-y-1">
+          <p className="text-xs text-muted-foreground">Uploading {uploadProgress.current}/{uploadProgress.total}…</p>
+          <Progress value={(uploadProgress.current / uploadProgress.total) * 100} className="h-2" />
+        </div>
+      )}
+
       {folders.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border p-12 text-center text-muted-foreground">
           <FolderOpen className="h-10 w-10 mx-auto mb-3 opacity-50" />
@@ -181,20 +205,18 @@ export default function AdminGraphicsFoldersTab() {
         <div className="space-y-3">
           {folders.map((folder) => (
             <div key={folder.id} className="rounded-lg border border-border bg-card overflow-hidden">
-              {/* Status bar */}
               <div className={`px-4 py-1.5 text-xs font-semibold uppercase tracking-wider flex items-center justify-between ${folder.is_active ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>
                 <span>{folder.is_active ? "Published — Visible on site" : "Draft — Hidden from public"}</span>
               </div>
 
               <div className="flex flex-col md:flex-row">
-                {/* Cover image */}
                 <div
                   className="relative w-full md:w-44 aspect-video md:aspect-auto md:h-40 shrink-0 bg-muted overflow-hidden cursor-pointer group"
                   onClick={() => handleCoverUpload(folder.id)}
                   title="Click to change cover image"
                 >
                   {folder.cover_image ? (
-                    <img src={folder.cover_image} alt={folder.name} className="w-full h-full object-cover" />
+                    <img src={folder.cover_image} alt={folder.name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-muted-foreground">
                       <Image className="h-8 w-8 opacity-40" />
@@ -206,7 +228,6 @@ export default function AdminGraphicsFoldersTab() {
                   </div>
                 </div>
 
-                {/* Details */}
                 <div className="flex-1 p-4 space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-start gap-3">
                     <div className="flex-1 space-y-2">
@@ -228,8 +249,6 @@ export default function AdminGraphicsFoldersTab() {
                         />
                       </div>
                     </div>
-
-                    {/* Publish toggle */}
                     <div className="flex items-center gap-2 shrink-0 pt-1">
                       <Switch
                         checked={folder.is_active}
