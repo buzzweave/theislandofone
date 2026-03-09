@@ -152,8 +152,8 @@ export default function Index() {
       {/* HERO */}
       <HeroCarousel />
 
-      {/* FEATURED BOOKS */}
-      <section className="bg-gradient-section py-16 sm:py-24">
+      {/* FEATURED BOOKS - min-height prevents CLS */}
+      <section className="bg-gradient-section py-16 sm:py-24 min-h-[600px] sm:min-h-[800px]">
         <div className="container mx-auto px-4">
           <div className="text-center mb-10 sm:mb-16">
             <p className="text-primary text-sm tracking-[0.2em] uppercase mb-3">Library</p>
