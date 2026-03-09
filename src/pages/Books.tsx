@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { supabaseImageUrl } from "@/lib/supabaseImage";
+
 import { Link } from "react-router-dom";
 import { BookOpen, Lock } from "lucide-react";
 import { useBooks } from "@/hooks/useBooks";
@@ -50,7 +50,7 @@ export default function Books() {
 
         {/* Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto pb-24">
-          {filtered.map((book) => (
+          {filtered.map((book, i) => (
             <Link
               key={book.id}
               to={`/books/${book.id}`}
@@ -59,11 +59,13 @@ export default function Books() {
               <div className="aspect-[2/3] overflow-hidden">
                 {book.cover_image ? (
                    <img
-                     src={supabaseImageUrl(book.cover_image, { width: 700, quality: 75 })}
+                     src={book.cover_image}
                      alt={book.title}
                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                     loading="lazy"
-                     decoding="async"
+                     loading={i < 3 ? "eager" : "lazy"}
+                     decoding={i < 3 ? "sync" : "async"}
+                     width={400}
+                     height={600}
                    />
                 ) : (
                   <div className="w-full h-full bg-muted flex items-center justify-center">
