@@ -12,7 +12,6 @@ import ImageResizeDialog from "@/components/admin/ImageResizeDialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 import AdminGraphicsFoldersTab from "@/components/admin/graphics/AdminGraphicsFoldersTab";
-import AIGraphicGenerator from "@/components/admin/graphics/AIGraphicGenerator";
 /** Compress an image file to a smaller preview (max 800px, 70% quality JPEG) */
 async function createCompressedPreview(file: File): Promise<File> {
   return new Promise((resolve) => {
@@ -121,7 +120,6 @@ export default function AdminGraphics() {
       <Tabs defaultValue="store" className="w-full">
         <TabsList>
           <TabsTrigger value="store">Store Graphics</TabsTrigger>
-          <TabsTrigger value="ai-generate">AI Generate</TabsTrigger>
           <TabsTrigger value="folders">Folders</TabsTrigger>
         </TabsList>
 
@@ -236,11 +234,6 @@ export default function AdminGraphics() {
               </div>
             )}
           </div>
-        </TabsContent>
-
-        {/* AI Generate tab */}
-        <TabsContent value="ai-generate" className="mt-4">
-          <AIGraphicGenerator />
         </TabsContent>
 
         {/* Folders tab */}
