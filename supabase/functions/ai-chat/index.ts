@@ -116,13 +116,50 @@ serve(async (req) => {
       content = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
       
       let parsed: Record<string, any>;
+      let isPlainText = false;
       try {
         parsed = JSON.parse(content);
       } catch (parseErr) {
-        console.error("[generate_draft] JSON parse failed:", content.substring(0, 500));
-        return new Response(JSON.stringify({ error: "Failed to parse AI response as JSON", raw: content.substring(0, 500) }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        console.log("[generate_draft] JSON parse failed, treating as plain text manuscript");
+        isPlainText = true;
+        // Extract title from first line if it looks like a heading
+        const lines = content.split("\n").map((l: string) => l.trim()).filter(Boolean);
+        let extractedTitle = userPrompt;
+        let manuscriptBody = content;
+        if (lines.length > 0) {
+          const firstLine = lines[0].replace(/^#+\s*/, "").replace(/^\*\*(.+)\*\*$/, "$1").trim();
+          // Use first line as title if it's short enough and looks like a title
+          if (firstLine.length > 3 && firstLine.length < 150) {
+            extractedTitle = firstLine;
+            // Remove the title line from the manuscript body
+            const idx = content.indexOf(lines[0]);
+            if (idx >= 0) {
+              manuscriptBody = content.substring(idx + lines[0].length).trim();
+            }
+          }
+        }
+        // Extract scripture reference if present (e.g. "Scripture: Romans 8:28" or "Text: John 3:16")
+        let extractedScripture = "";
+        const scriptureMatch = content.match(/(?:scripture|text|passage|reference)\s*[:—–-]\s*(.+)/i);
+        if (scriptureMatch) {
+          extractedScripture = scriptureMatch[1].trim().replace(/\*+/g, "");
+        }
+        // Extract category
+        let extractedCategory = "Faith";
+        const categoryMatch = content.match(/(?:category|theme)\s*[:—–-]\s*(.+)/i);
+        if (categoryMatch) {
+          const cat = categoryMatch[1].trim();
+          const validCats = ["Faith", "Worship", "Calling", "Leadership", "Deliverance", "Prayer", "Family"];
+          const found = validCats.find(c => cat.toLowerCase().includes(c.toLowerCase()));
+          if (found) extractedCategory = found;
+        }
+        parsed = {
+          title: extractedTitle,
+          scripture: extractedScripture,
+          manuscript: manuscriptBody || content,
+          category: extractedCategory,
+          excerpt: "",
+        };
       }
 
       // Log actual keys for debugging
