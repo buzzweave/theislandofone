@@ -184,12 +184,41 @@ serve(async (req) => {
         return fallback;
       };
 
+      // Strip prompt artifacts and ensure proper line breaks in manuscript text
+      const normalizeManuscriptText = (text: string): string => {
+        let t = text;
+        // Strip markdown bold wrappers from headings
+        t = t.replace(/\*\*([A-Z][A-Z .:'!?0-9\-—–]+)\*\*/g, "$1");
+        // Strip prompt artifact prefixes like "BOLD SECTION TITLE:"
+        t = t.replace(/(?:BOLD\s+SECTION\s+TITLE|MAIN\s+POINT\s+TITLE(?:\s+IN\s+ALL\s+CAPS)?|SECTION\s+HEADING|SECTION\s+TITLE)\s*[:—–-]\s*/gi, "");
+        // Ensure line breaks before Roman numeral headings
+        t = t.replace(/([.!?…"')\s])\s*([IVXLCDM]+\.\s+[A-Z])/g, "$1\n\n$2");
+        // Ensure line breaks before known section labels when inline
+        const labels = [
+          "TRUE OPENING ILLUSTRATION", "OPENING ILLUSTRATION", "MID-SERMON ILLUSTRATION",
+          "ILLUSTRATION CALLBACK", "ILLUSTRATION", "INTRODUCTION", "CLOSING BUILD",
+          "CLOSING DECLARATION", "ALTAR CALL", "APPLICATION", "POWER DECLARATIONS",
+          "SCRIPTURE", "CONTINUED MAIN POINTS",
+        ];
+        for (const label of labels) {
+          const re = new RegExp("([.!?…\"')\\s])\\s*(" + label + ")", "gi");
+          t = t.replace(re, "$1\n\n$2");
+        }
+        // Ensure line breaks before KEY POINT
+        t = t.replace(/([.!?…"')\s])\s*(KEY\s+POINT\s*[:—–-])/gi, "$1\n\n$2");
+        // Ensure line breaks before bullet characters
+        t = t.replace(/([.!?…"')\s])\s*([•●]\s)/g, "$1\n$2");
+        // Normalize excessive blank lines
+        t = t.replace(/\n{3,}/g, "\n\n");
+        return t.trim();
+      };
+
       // Render structured AI response into a full manuscript string
       const renderSermonManuscript = (): string => {
         // 1. Check for a direct flat manuscript/content string first
         for (const k of ["manuscript", "content", "body", "sermon_body", "sermonBody", "sermon_content", "text", "full_text"]) {
           const v = root[k];
-          if (typeof v === "string" && v.length > 50) return v;
+          if (typeof v === "string" && v.length > 50) return normalizeManuscriptText(v);
         }
 
         // 2. Build manuscript from structured fields
@@ -237,7 +266,12 @@ serve(async (req) => {
             if (teaching) section += `\n\n${teaching}`;
             const bullets = p.bullet_points || p.bullets || p.key_points || [];
             if (Array.isArray(bullets)) {
-              section += "\n" + bullets.map((b: any) => `• ${safeStr(b)}`).join("\n");
+              section += "\n\n" + bullets.map((b: any) => `• ${safeStr(b)}`).join("\n");
+            }
+            // Key point for this section
+            const kp = p.key_point || p.keyPoint || p.summary;
+            if (kp) {
+              section += `\n\nKEY POINT: ${safeStr(kp)}`;
             }
             parts.push(section);
           });
@@ -293,7 +327,7 @@ serve(async (req) => {
           if (closeText) parts.push(`CLOSING DECLARATION\n\n${closeText}`);
         }
 
-        return parts.join("\n\n");
+        return normalizeManuscriptText(parts.join("\n\n"));
       };
 
       // Save draft to DB
