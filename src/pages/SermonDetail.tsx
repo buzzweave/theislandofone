@@ -151,7 +151,6 @@ export default function SermonDetail() {
         } catch {
           result = await (checkPurchase as any)(id);
         }
-
         if (alive) setPurchased(Boolean(result));
       } catch {
         if (alive) setPurchased(false);
@@ -573,67 +572,7 @@ export default function SermonDetail() {
       </div>
     </div>
   );
-}}
-
-function escapeHtml(s: string) {
-  return String(s ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-function buildLockedPages(args: {
-  title: string;
-  scriptureRef: string;
-  rawText: string;
-  sanitizedHtml: string | null;
-}) {
-  const { title, scriptureRef, rawText, sanitizedHtml } = args;
-
-  const alreadyWrapped =
-    typeof sanitizedHtml === "string" &&
-    sanitizedHtml.includes('class="pdf-page"');
-
-  if (alreadyWrapped) return sanitizedHtml as string;
-
-  const page1 = `
-<section class="pdf-page title-page">
-  <div class="title-wrap">
-    <h1>${escapeHtml(title)}</h1>
-    ${scriptureRef ? `<p class="subtitle">${escapeHtml(scriptureRef)}</p>` : ""}
-  </div>
-</section>`.trim();
-
-  const bodyHtml = sanitizedHtml
-    ? sanitizedHtml
-    : `<p>${escapeHtml(rawText)
-        .replace(/\n{2,}/g, "\n\n")
-        .replace(/\n/g, "<br/>")}</p>`;
-
-  const page2 = `
-<section class="pdf-page scripture-illustration-page">
-  ${bodyHtml}
-</section>`.trim();
-
-  return `${page1}\n${page2}`;
-}
-
-export default function SermonDetail() {
-  const params = useParams<{ id: string }>();
-  const id = params.id ?? "";
-  const navigate = useNavigate();
-
-  const { data: sermon, isLoading } = useSermon(id);
-
-  const auth: any = useAuth();
-  const user = auth?.user ?? null;
-  const isSubscribed = Boolean(auth?.isSubscribed);
-  const checkPurchase = auth?.checkPurchase;
-
-  const [purchased, setPurchased] = useState(false);
-  const [checkingPurchase, setCheckingPurchase] = useState(false);
+}  const [checkingPurchase, setCheckingPurchase] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   const sermonRef = useRef<any>(null);
