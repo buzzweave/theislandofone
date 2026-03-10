@@ -13,7 +13,6 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
-import { SermonManuscriptRenderer } from "@/components/SermonManuscriptRenderer";
 import {
   ArrowLeft,
   Lock,
@@ -45,7 +44,151 @@ function escapeHtml(s: string) {
     .replace(/'/g, "&#039;");
 }
 
-function buildLockedPages(args: {
+function normalizeLine(line: string) {
+  return line.replace(/\s+/g, " ").trim();
+}
+
+function isAllCapsLike(line: string) {
+  const cleaned = line.replace(/[^A-Za-z]/g, "");
+  if (!cleaned) return false;
+  return cleaned === cleaned.toUpperCase() && cleaned.length > 3;
+}
+
+function isMainPointHeading(line: string) {
+  const trimmed = normalizeLine(line);
+
+  if (
+    /^(MAIN POINT|POINT|KEY POINT|TEACHING INSIGHT|SCRIPTURE REFERENCE|ILLUSTRATION|INTRODUCTION|CLOSING THOUGHTS?|ALTAR CALL|APPLICATION)\b/i.test(
+      trimmed,
+    )
+  ) {
+    return true;
+  }
+
+  if (/^(I|II|III|IV|V|VI|VII|VIII|IX|X)\.\s+/i.test(trimmed) || /^(I|II|III|IV|V|VI|VII|VIII|IX|X)\b/i.test(trimmed)) {
+    return true;
+  }
+
+  if (isAllCapsLike(trimmed) && trimmed.length <= 90) {
+    return true;
+  }
+
+  return false;
+}
+
+function isBulletLine(line: string) {
+  const trimmed = line.trim();
+  return /^([-•*])\s+/.test(trimmed) || /^\d+\.\s+/.test(trimmed);
+}
+
+function lineToBullet(line: string) {
+  return escapeHtml(line.trim().replace(/^([-•*]|\d+\.)\s+/, ""));
+}
+
+function formatPlainTextToHtml(rawText: string, title: string, scriptureRef: string) {
+  const lines = String(rawText ?? "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n");
+
+  const html: string[] = [];
+
+  html.push(`
+    <section class="pdf-page title-page">
+      <div class="title-wrap">
+        <h1>${escapeHtml(title || "Sermon")}</h1>
+        ${scriptureRef ? `<p class="subtitle">${escapeHtml(scriptureRef)}</p>` : ""}
+      </div>
+    </section>
+  `);
+
+  html.push(`<section class="pdf-page manuscript-page">`);
+
+  let paragraphBuffer: string[] = [];
+  let bulletBuffer: string[] = [];
+  let firstRealHeadingRendered = false;
+
+  const flushParagraph = () => {
+    if (!paragraphBuffer.length) return;
+    const text = paragraphBuffer.join(" ").replace(/\s+/g, " ").trim();
+    if (text) {
+      html.push(`<p>${escapeHtml(text)}</p>`);
+    }
+    paragraphBuffer = [];
+  };
+
+  const flushBullets = () => {
+    if (!bulletBuffer.length) return;
+    html.push("<ul>");
+    bulletBuffer.forEach((b) => {
+      html.push(`<li>${b}</li>`);
+    });
+    html.push("</ul>");
+    bulletBuffer = [];
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i] ?? "";
+    const line = normalizeLine(rawLine);
+
+    if (!line) {
+      flushParagraph();
+      flushBullets();
+      continue;
+    }
+
+    if (isBulletLine(line)) {
+      flushParagraph();
+      bulletBuffer.push(lineToBullet(line));
+      continue;
+    }
+
+    if (isMainPointHeading(line)) {
+      flushParagraph();
+      flushBullets();
+
+      const cleanHeading = line
+        .replace(/^MAIN POINT\s*[:\-]?\s*/i, "")
+        .replace(/^POINT\s*[:\-]?\s*/i, "")
+        .trim();
+
+      if (!firstRealHeadingRendered) {
+        html.push(`<h2>${escapeHtml(cleanHeading)}</h2>`);
+        firstRealHeadingRendered = true;
+      } else {
+        html.push(`<h2>${escapeHtml(cleanHeading)}</h2>`);
+      }
+      continue;
+    }
+
+    const next = normalizeLine(lines[i + 1] ?? "");
+    const looksLikeStandaloneShortHeading =
+      line.length <= 65 &&
+      !/[.!?]$/.test(line) &&
+      !next.startsWith("-") &&
+      !next.startsWith("•") &&
+      !/^\d+\.\s+/.test(next) &&
+      next.length > 0;
+
+    if (looksLikeStandaloneShortHeading) {
+      flushParagraph();
+      flushBullets();
+      html.push(`<h3>${escapeHtml(line)}</h3>`);
+      continue;
+    }
+
+    paragraphBuffer.push(line);
+  }
+
+  flushParagraph();
+  flushBullets();
+
+  html.push(`</section>`);
+
+  return html.join("\n");
+}
+
+function buildFormattedPages(args: {
   title: string;
   scriptureRef: string;
   rawText: string;
@@ -53,30 +196,25 @@ function buildLockedPages(args: {
 }) {
   const { title, scriptureRef, rawText, sanitizedHtml } = args;
 
-  const alreadyWrapped = typeof sanitizedHtml === "string" && sanitizedHtml.includes('class="pdf-page"');
+  if (sanitizedHtml && sanitizedHtml.includes('class="pdf-page"')) {
+    return sanitizedHtml;
+  }
 
-  if (alreadyWrapped) return sanitizedHtml as string;
+  if (sanitizedHtml) {
+    return `
+      <section class="pdf-page title-page">
+        <div class="title-wrap">
+          <h1>${escapeHtml(title)}</h1>
+          ${scriptureRef ? `<p class="subtitle">${escapeHtml(scriptureRef)}</p>` : ""}
+        </div>
+      </section>
+      <section class="pdf-page manuscript-page">
+        ${sanitizedHtml}
+      </section>
+    `;
+  }
 
-  const page1 = `
-<section class="pdf-page title-page">
-  <div class="title-wrap">
-    <h1>${escapeHtml(title)}</h1>
-    ${scriptureRef ? `<p class="subtitle">${escapeHtml(scriptureRef)}</p>` : ""}
-  </div>
-</section>`.trim();
-
-  const bodyHtml = sanitizedHtml
-    ? sanitizedHtml
-    : `<p>${escapeHtml(rawText)
-        .replace(/\n{2,}/g, "\n\n")
-        .replace(/\n/g, "<br/>")}</p>`;
-
-  const page2 = `
-<section class="pdf-page scripture-illustration-page">
-  ${bodyHtml}
-</section>`.trim();
-
-  return `${page1}\n${page2}`;
+  return formatPlainTextToHtml(rawText, title, scriptureRef);
 }
 
 export default function SermonDetail() {
@@ -127,10 +265,12 @@ export default function SermonDetail() {
         if (alive) setPurchased(false);
         return;
       }
+
       if (!user || !id) {
         if (alive) setPurchased(false);
         return;
       }
+
       if (typeof checkPurchase !== "function") {
         if (alive) setPurchased(false);
         return;
@@ -154,6 +294,7 @@ export default function SermonDetail() {
     }
 
     run();
+
     return () => {
       alive = false;
     };
@@ -170,15 +311,22 @@ export default function SermonDetail() {
   const sanitizedHtml = useMemo(() => {
     const looksHtml = manuscriptRaw.includes("<") && manuscriptRaw.includes(">");
     if (!looksHtml) return null;
-    return DOMPurify.sanitize(manuscriptRaw);
+
+    return DOMPurify.sanitize(manuscriptRaw, {
+      USE_PROFILES: { html: true },
+    });
   }, [manuscriptRaw]);
 
-  const pagedHtml = useMemo(() => {
-    return buildLockedPages({
+  const formattedHtml = useMemo(() => {
+    const built = buildFormattedPages({
       title,
       scriptureRef: scripture,
       rawText: manuscriptRaw,
       sanitizedHtml,
+    });
+
+    return DOMPurify.sanitize(built, {
+      USE_PROFILES: { html: true },
     });
   }, [title, scripture, manuscriptRaw, sanitizedHtml]);
 
@@ -264,7 +412,6 @@ export default function SermonDetail() {
 
   return (
     <div className="min-h-screen bg-[#050816] text-white">
-      {/* Load Playfair Display */}
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       <link
@@ -415,13 +562,25 @@ export default function SermonDetail() {
           <>
             <style>{`
               @media print {
-                @page { size: A4 portrait; margin: 0.75in; }
+                @page {
+                  size: A4 portrait;
+                  margin: 0.7in;
+                }
+
+                html, body {
+                  background: #050816 !important;
+                  -webkit-print-color-adjust: exact;
+                  print-color-adjust: exact;
+                }
 
                 .sermon-content .pdf-page {
                   page-break-after: always;
                   break-after: page;
-                  page-break-inside: avoid;
-                  break-inside: avoid-page;
+                }
+
+                .sermon-content .pdf-page:last-child {
+                  page-break-after: auto;
+                  break-after: auto;
                 }
 
                 .sermon-content h1,
@@ -433,126 +592,148 @@ export default function SermonDetail() {
                   page-break-inside: avoid;
                   break-inside: avoid;
                 }
-
-                .sermon-content h1,
-                .sermon-content h2,
-                .sermon-content h3 {
-                  page-break-after: avoid;
-                }
               }
             `}</style>
 
             <style>{`
-              .sermon-content .pdf-page{
+              .sermon-content {
+                max-width: 760px;
+              }
+
+              .sermon-content .pdf-page {
                 page-break-after: always;
                 break-after: page;
-                page-break-inside: avoid;
-                break-inside: avoid-page;
               }
 
-              @media screen{
-                .sermon-content .pdf-page{
-                  padding: 0;
-                  margin: 0;
-                  border: 0;
-                  border-radius: 0;
-                  background: transparent;
-                }
+              .sermon-content .pdf-page:last-child {
+                page-break-after: auto;
+                break-after: auto;
               }
 
-              .sermon-content{
-                max-width: 760px;
+              .sermon-content .title-page {
+                padding: 0 0 1.5rem 0;
+              }
+
+              .sermon-content .title-wrap {
+                text-align: left;
+              }
+
+              .sermon-content .manuscript-page {
+                padding-top: 0.25rem;
               }
 
               .sermon-content h1,
               .sermon-content h2,
-              .sermon-content h3{
+              .sermon-content h3 {
                 font-family: "Playfair Display", serif;
-                font-weight: 700;
-                letter-spacing: -0.02em;
                 color: #ffffff;
+                letter-spacing: -0.03em;
               }
 
-              .sermon-content h1{
-                font-size: 4.25rem;
-                line-height: 0.95;
-                margin: 0 0 2rem 0;
-                font-weight: 800;
+              .sermon-content h1 {
+                font-size: 4.2rem;
+                line-height: 0.92;
+                margin: 0 0 2.25rem 0;
+                font-weight: 900;
+                max-width: 720px;
               }
 
-              .sermon-content h2{
+              .sermon-content .subtitle {
+                margin: 0 0 2.25rem 0;
+                font-size: 0.92rem;
+                line-height: 1.4;
+                color: rgba(255,255,255,0.65);
+                text-transform: uppercase;
+                letter-spacing: 0.18em;
+                font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+              }
+
+              .sermon-content h2 {
                 font-size: 2.1rem;
-                line-height: 1.05;
-                margin: 3rem 0 1.25rem 0;
+                line-height: 1.02;
+                margin: 3.2rem 0 1.35rem 0;
+                font-weight: 800;
+                text-transform: uppercase;
+              }
+
+              .sermon-content h3 {
+                font-size: 1.4rem;
+                line-height: 1.08;
+                margin: 2rem 0 0.85rem 0;
                 font-weight: 700;
                 text-transform: uppercase;
               }
 
-              .sermon-content h3{
-                font-size: 1.55rem;
-                line-height: 1.1;
-                margin: 2.25rem 0 1rem 0;
-                font-weight: 700;
-                text-transform: uppercase;
+              .sermon-content p {
+                font-size: 1.18rem;
+                line-height: 1.88;
+                margin: 0 0 1.55rem 0;
+                color: rgba(255,255,255,0.94);
+                font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+                white-space: normal;
               }
 
-              .sermon-content p{
-                font-size: 1.28rem;
-                line-height: 1.72;
-                margin: 0 0 1.35rem 0;
-                color: rgba(255,255,255,0.92);
-              }
-
-              .sermon-content ul{
-                margin: 0 0 1.5rem 0;
+              .sermon-content ul {
+                margin: 0.25rem 0 1.8rem 0;
                 padding-left: 1.5rem;
               }
 
-              .sermon-content li{
-                font-size: 1.25rem;
-                line-height: 1.7;
-                margin: 0 0 0.75rem 0;
-                color: rgba(255,255,255,0.92);
+              .sermon-content li {
+                font-size: 1.14rem;
+                line-height: 1.85;
+                margin: 0 0 0.9rem 0;
+                color: rgba(255,255,255,0.94);
+                font-family: Inter, ui-sans-serif, system-ui, sans-serif;
               }
 
-              .sermon-content .title-page .title-wrap{
-                text-align: left;
-                padding-top: 0;
+              .sermon-content strong {
+                color: #ffffff;
+                font-weight: 700;
               }
 
-              .sermon-content .title-page .subtitle{
-                margin-top: 1rem;
-                font-size: 0.9rem;
-                opacity: 0.7;
-                text-transform: uppercase;
-                letter-spacing: 0.18em;
+              .sermon-content em {
+                font-style: italic;
               }
 
-              @media (max-width: 640px){
-                .sermon-content h1{
-                  font-size: 2.85rem;
+              @media screen {
+                .sermon-content .pdf-page {
+                  background: transparent;
+                  border: 0;
+                  border-radius: 0;
+                  margin: 0;
+                  padding: 0;
+                }
+              }
+
+              @media (max-width: 640px) {
+                .sermon-content h1 {
+                  font-size: 3rem;
+                  line-height: 0.95;
+                  margin-bottom: 1.8rem;
                 }
 
-                .sermon-content h2{
-                  font-size: 1.85rem;
-                  margin-top: 2.4rem;
+                .sermon-content h2 {
+                  font-size: 1.8rem;
+                  margin-top: 2.5rem;
                 }
 
-                .sermon-content h3{
-                  font-size: 1.3rem;
+                .sermon-content h3 {
+                  font-size: 1.2rem;
                 }
 
                 .sermon-content p,
-                .sermon-content li{
-                  font-size: 1.18rem;
-                  line-height: 1.65;
+                .sermon-content li {
+                  font-size: 1.06rem;
+                  line-height: 1.75;
+                }
+
+                .sermon-content .subtitle {
+                  font-size: 0.78rem;
                 }
               }
             `}</style>
 
-            <div ref={sermonRef} className="sermon-content">
-              <SermonManuscriptRenderer content={manuscriptRaw} title={title} scripture={scripture} />
-            </div>
+            <div ref={sermonRef} className="sermon-content" dangerouslySetInnerHTML={{ __html: formattedHtml }} />
           </>
         )}
       </div>
