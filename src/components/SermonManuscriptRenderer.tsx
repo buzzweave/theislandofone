@@ -4,14 +4,51 @@ import React from "react";
  * Parses raw sermon text (plain text or HTML) and renders it
  * with proper heading, bullet, and paragraph styling matching
  * the Island of One sermon manuscript look (Power of Transparency reference).
+ *
+ * Includes a pre-normalization pass that ensures proper line breaks
+ * exist before section markers, so AI-generated content never renders
+ * as one jumbled paragraph.
  */
 
-// Detect Roman numeral main-point headings (I. II. III. etc)
-const ROMAN_POINT_RE = /^(?:#{1,3}\s+)?[IVXLCDM]+\.\s+/;
+// ── Detection helpers ──────────────────────────────────────────────
 
-// Detect other section labels
-const SECTION_LABEL_RE =
-  /^(?:#{1,3}\s+)?(?:MAIN\s+POINT\s+[IVXLCDM0-9]+|CLOSING\s+BUILD|ALTAR\s+CALL|(?:TRUE\s+)?(?:OPENING\s+)?ILLUSTRATION|MID[- ]SERMON\s+ILLUSTRATION|INTRODUCTION|KEY\s+POINT|APPLICATION|POWER\s+DECLARATIONS?|CLOSING\s+DECLARATION|SCRIPTURE|OPENING\s+ILLUSTRATION)/i;
+// Roman numeral main-point headings (I. II. III. IV. V. etc.)
+const ROMAN_POINT_RE = /^(?:#{1,3}\s+)?(?:\*\*)?[IVXLCDM]+\.\s+/;
+
+// Known section labels
+const SECTION_LABELS = [
+  "TRUE OPENING ILLUSTRATION",
+  "OPENING ILLUSTRATION",
+  "MID-SERMON ILLUSTRATION",
+  "ILLUSTRATION CALLBACK",
+  "ILLUSTRATION",
+  "INTRODUCTION",
+  "CLOSING BUILD",
+  "CLOSING DECLARATION",
+  "ALTAR CALL",
+  "APPLICATION",
+  "POWER DECLARATIONS",
+  "POWER DECLARATION",
+  "SCRIPTURE",
+  "CONTINUED MAIN POINTS",
+];
+
+// Build a regex that matches any of those labels at start of line,
+// optionally preceded by markdown heading markers or bold markers,
+// and optionally followed by a colon
+const SECTION_LABEL_RE = new RegExp(
+  "^(?:#{1,3}\\s+)?(?:\\*\\*)?(?:" +
+    SECTION_LABELS.map((l) => l.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") +
+    ")(?:\\*\\*)?\\s*:?\\s*$",
+  "i"
+);
+
+// Matches "MAIN POINT 1", "MAIN POINT II" etc.
+const MAIN_POINT_NUM_RE = /^(?:#{1,3}\s+)?(?:\*\*)?MAIN\s+POINT\s+[IVXLCDM0-9]+(?:\*\*)?/i;
+
+// Prompt artifact prefixes to strip (e.g. "BOLD SECTION TITLE: TRUE OPENING ILLUSTRATION")
+const ARTIFACT_PREFIX_RE =
+  /^(?:BOLD\s+SECTION\s+TITLE|MAIN\s+POINT\s+TITLE(?:\s+IN\s+ALL\s+CAPS)?|SECTION\s+HEADING|SECTION\s+TITLE)\s*[:—–-]\s*/i;
 
 function isRomanPointHeading(line: string): boolean {
   return ROMAN_POINT_RE.test(line.trim());
@@ -21,15 +58,15 @@ function isSectionLabel(line: string): boolean {
   const trimmed = line.trim();
   if (!trimmed) return false;
   if (SECTION_LABEL_RE.test(trimmed)) return true;
-  // All-caps lines longer than 4 chars that aren't bullets or KEY POINT
+  if (MAIN_POINT_NUM_RE.test(trimmed)) return true;
+  // All-caps lines > 4 chars that aren't bullets
   if (
     trimmed.length > 4 &&
+    trimmed.length < 80 &&
     trimmed === trimmed.toUpperCase() &&
     /[A-Z]/.test(trimmed) &&
-    !trimmed.startsWith("•") &&
-    !trimmed.startsWith("-") &&
-    !trimmed.startsWith("*") &&
-    !trimmed.startsWith("KEY POINT")
+    !/^[•\-*●]/.test(trimmed) &&
+    !/^KEY\s+POINT/i.test(trimmed)
   ) {
     return true;
   }
@@ -37,12 +74,12 @@ function isSectionLabel(line: string): boolean {
 }
 
 function isKeyPointLine(line: string): boolean {
-  return /^KEY\s+POINT\s*[:—–-]/i.test(line.trim());
+  return /^(?:\*\*)?KEY\s+POINT\s*[:—–-]/i.test(line.trim());
 }
 
 function isBulletLine(line: string): boolean {
   const t = line.trim();
-  return t.startsWith("• ") || t.startsWith("- ") || t.startsWith("* ") || t.startsWith("● ");
+  return /^[•●]\s/.test(t) || /^[-*]\s/.test(t);
 }
 
 function stripBulletPrefix(line: string): string {
@@ -68,6 +105,59 @@ function stripHtml(html: string): string {
   return text;
 }
 
+// ── Pre-normalization ──────────────────────────────────────────────
+// Ensures proper line breaks exist before section markers so
+// the line-by-line parser can detect them. Also strips prompt artifacts.
+
+// Regex that matches inline section markers (headings jammed inside text)
+const INLINE_SECTION_RE = new RegExp(
+  "(?<=\\S[ \\t])(" +
+    // Roman numeral headings
+    "(?:[IVXLCDM]+\\.\\s+[A-Z][A-Z ]{3,})" +
+    "|" +
+    // Known labels
+    SECTION_LABELS.map((l) => l.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") +
+    "|" +
+    // MAIN POINT N
+    "MAIN\\s+POINT\\s+[IVXLCDM0-9]+" +
+    "|" +
+    // KEY POINT:
+    "KEY\\s+POINT\\s*[:—–-]" +
+    ")",
+  "gi"
+);
+
+function preNormalize(raw: string): string {
+  let text = raw;
+
+  // 1. Strip markdown bold wrappers from headings: **HEADING** → HEADING
+  text = text.replace(/\*\*([A-Z][A-Z .:'!?0-9\-—–]+)\*\*/g, "$1");
+
+  // 2. Strip prompt artifact prefixes
+  text = text.replace(new RegExp(ARTIFACT_PREFIX_RE.source, "gim"), "");
+
+  // 3. Insert line breaks before inline section markers
+  // This is the KEY fix: if "...some text TRUE OPENING ILLUSTRATION ..."
+  // we split it so the heading is on its own line.
+  text = text.replace(INLINE_SECTION_RE, "\n\n$1");
+
+  // 4. Also insert line breaks before Roman numeral headings that are inline
+  text = text.replace(/([.!?…"')\s])(\s*)([IVXLCDM]+\.\s+[A-Z])/g, "$1\n\n$3");
+
+  // 5. Insert line break before KEY POINT when inline
+  text = text.replace(/([.!?…"')\s])\s*(KEY\s+POINT\s*[:—–-])/gi, "$1\n\n$2");
+
+  // 6. Insert line break before bullet characters that are inline
+  text = text.replace(/([.!?…"')\s])\s*([•●]\s)/g, "$1\n$2");
+
+  // 7. Normalize multiple blank lines to max 2
+  text = text.replace(/\n{3,}/g, "\n\n");
+
+  return text.trim();
+}
+
+// ── Component ──────────────────────────────────────────────────────
+
 interface SermonManuscriptRendererProps {
   content: string;
   title?: string;
@@ -81,7 +171,8 @@ export const SermonManuscriptRenderer: React.FC<SermonManuscriptRendererProps> =
 }) => {
   const isHtml = content.includes("<") && content.includes(">");
   const plainText = isHtml ? stripHtml(content) : content;
-  const rawLines = plainText.split("\n");
+  const normalized = preNormalize(plainText);
+  const rawLines = normalized.split("\n");
 
   const elements: React.ReactNode[] = [];
   let bulletBuffer: string[] = [];
@@ -108,24 +199,28 @@ export const SermonManuscriptRenderer: React.FC<SermonManuscriptRendererProps> =
       continue;
     }
 
-    if (isBulletLine(trimmed)) {
-      bulletBuffer.push(stripBulletPrefix(trimmed));
+    // Strip any remaining prompt artifact prefix on this line
+    const cleaned = trimmed.replace(ARTIFACT_PREFIX_RE, "").trim();
+    if (!cleaned) continue;
+
+    if (isBulletLine(cleaned)) {
+      bulletBuffer.push(stripBulletPrefix(cleaned));
       continue;
     }
 
     flushBullets();
 
     // Roman numeral main-point headings — dramatic large serif
-    if (isRomanPointHeading(trimmed)) {
+    if (isRomanPointHeading(cleaned)) {
       elements.push(
         <h2 key={key++} className="sms-main-point">
-          {trimmed}
+          {cleaned}
         </h2>
       );
     }
     // KEY POINT label
-    else if (isKeyPointLine(trimmed)) {
-      const parts = trimmed.split(/[:—–-]\s*/);
+    else if (isKeyPointLine(cleaned)) {
+      const parts = cleaned.split(/[:—–-]\s*/);
       const label = parts[0]?.trim() || "KEY POINT";
       const rest = parts.slice(1).join(" ").trim();
       elements.push(
@@ -136,10 +231,10 @@ export const SermonManuscriptRenderer: React.FC<SermonManuscriptRendererProps> =
       );
     }
     // Section labels (ILLUSTRATION, ALTAR CALL, etc.)
-    else if (isSectionLabel(trimmed)) {
+    else if (isSectionLabel(cleaned)) {
       elements.push(
         <h3 key={key++} className="sms-section-label">
-          {trimmed}
+          {cleaned}
         </h3>
       );
     }
@@ -147,7 +242,7 @@ export const SermonManuscriptRenderer: React.FC<SermonManuscriptRendererProps> =
     else {
       elements.push(
         <p key={key++} className="sms-paragraph">
-          {trimmed}
+          {cleaned}
         </p>
       );
     }
