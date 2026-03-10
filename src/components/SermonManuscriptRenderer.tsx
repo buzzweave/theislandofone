@@ -3,31 +3,41 @@ import React from "react";
 /**
  * Parses raw sermon text (plain text or HTML) and renders it
  * with proper heading, bullet, and paragraph styling matching
- * the Island of One sermon manuscript look.
+ * the Island of One sermon manuscript look (Power of Transparency reference).
  */
 
-// Detect lines that are sermon section headings
-const HEADING_RE =
-  /^(?:#{1,3}\s+)?(?:[IVXLCDM]+\.\s+|MAIN\s+POINT\s+[IVXLCDM0-9]+|CLOSING\s+BUILD|ALTAR\s+CALL|ILLUSTRATION|INTRODUCTION|KEY\s+POINT|APPLICATION|POWER\s+DECLARATIONS?|CLOSING\s+DECLARATION|SCRIPTURE|OPENING\s+ILLUSTRATION)/i;
+// Detect Roman numeral main-point headings (I. II. III. etc)
+const ROMAN_POINT_RE = /^(?:#{1,3}\s+)?[IVXLCDM]+\.\s+/;
 
-const ROMAN_HEADING_RE = /^[IVXLCDM]+\.\s+/;
+// Detect other section labels
+const SECTION_LABEL_RE =
+  /^(?:#{1,3}\s+)?(?:MAIN\s+POINT\s+[IVXLCDM0-9]+|CLOSING\s+BUILD|ALTAR\s+CALL|(?:TRUE\s+)?(?:OPENING\s+)?ILLUSTRATION|MID[- ]SERMON\s+ILLUSTRATION|INTRODUCTION|KEY\s+POINT|APPLICATION|POWER\s+DECLARATIONS?|CLOSING\s+DECLARATION|SCRIPTURE|OPENING\s+ILLUSTRATION)/i;
 
-function isHeadingLine(line: string): boolean {
+function isRomanPointHeading(line: string): boolean {
+  return ROMAN_POINT_RE.test(line.trim());
+}
+
+function isSectionLabel(line: string): boolean {
   const trimmed = line.trim();
   if (!trimmed) return false;
-  if (HEADING_RE.test(trimmed)) return true;
-  // All-caps lines longer than 4 chars that aren't bullets
+  if (SECTION_LABEL_RE.test(trimmed)) return true;
+  // All-caps lines longer than 4 chars that aren't bullets or KEY POINT
   if (
     trimmed.length > 4 &&
     trimmed === trimmed.toUpperCase() &&
     /[A-Z]/.test(trimmed) &&
     !trimmed.startsWith("•") &&
     !trimmed.startsWith("-") &&
-    !trimmed.startsWith("*")
+    !trimmed.startsWith("*") &&
+    !trimmed.startsWith("KEY POINT")
   ) {
     return true;
   }
   return false;
+}
+
+function isKeyPointLine(line: string): boolean {
+  return /^KEY\s+POINT\s*[:—–-]/i.test(line.trim());
 }
 
 function isBulletLine(line: string): boolean {
@@ -40,7 +50,6 @@ function stripBulletPrefix(line: string): string {
 }
 
 function stripHtml(html: string): string {
-  // Convert <br> variants to newlines, strip tags, decode entities
   let text = html
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/p>/gi, "\n\n")
@@ -49,7 +58,6 @@ function stripHtml(html: string): string {
     .replace(/<\/li>/gi, "\n")
     .replace(/<li[^>]*>/gi, "• ")
     .replace(/<[^>]+>/g, "");
-  // Decode common entities
   text = text
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
@@ -71,14 +79,10 @@ export const SermonManuscriptRenderer: React.FC<SermonManuscriptRendererProps> =
   title,
   scripture,
 }) => {
-  // Convert HTML to plain text if needed
   const isHtml = content.includes("<") && content.includes(">");
   const plainText = isHtml ? stripHtml(content) : content;
-
-  // Split into lines
   const rawLines = plainText.split("\n");
 
-  // Build elements
   const elements: React.ReactNode[] = [];
   let bulletBuffer: string[] = [];
   let key = 0;
@@ -86,7 +90,7 @@ export const SermonManuscriptRenderer: React.FC<SermonManuscriptRendererProps> =
   const flushBullets = () => {
     if (bulletBuffer.length === 0) return;
     elements.push(
-      <ul key={key++} className="sermon-ms-bullets">
+      <ul key={key++} className="sms-bullets">
         {bulletBuffer.map((b, i) => (
           <li key={i}>{b}</li>
         ))}
@@ -99,7 +103,6 @@ export const SermonManuscriptRenderer: React.FC<SermonManuscriptRendererProps> =
     const line = rawLines[i];
     const trimmed = line.trim();
 
-    // Skip empty lines (spacing handled by CSS)
     if (!trimmed) {
       flushBullets();
       continue;
@@ -112,15 +115,38 @@ export const SermonManuscriptRenderer: React.FC<SermonManuscriptRendererProps> =
 
     flushBullets();
 
-    if (isHeadingLine(trimmed)) {
+    // Roman numeral main-point headings — dramatic large serif
+    if (isRomanPointHeading(trimmed)) {
       elements.push(
-        <h2 key={key++} className="sermon-ms-heading">
+        <h2 key={key++} className="sms-main-point">
           {trimmed}
         </h2>
       );
-    } else {
+    }
+    // KEY POINT label
+    else if (isKeyPointLine(trimmed)) {
+      const parts = trimmed.split(/[:—–-]\s*/);
+      const label = parts[0]?.trim() || "KEY POINT";
+      const rest = parts.slice(1).join(" ").trim();
       elements.push(
-        <p key={key++} className="sermon-ms-paragraph">
+        <p key={key++} className="sms-key-point">
+          <span className="sms-key-point-label">{label}:</span>{" "}
+          {rest}
+        </p>
+      );
+    }
+    // Section labels (ILLUSTRATION, ALTAR CALL, etc.)
+    else if (isSectionLabel(trimmed)) {
+      elements.push(
+        <h3 key={key++} className="sms-section-label">
+          {trimmed}
+        </h3>
+      );
+    }
+    // Normal paragraph
+    else {
+      elements.push(
+        <p key={key++} className="sms-paragraph">
           {trimmed}
         </p>
       );
@@ -130,89 +156,126 @@ export const SermonManuscriptRenderer: React.FC<SermonManuscriptRendererProps> =
 
   return (
     <>
-      <style>{sermonManuscriptStyles}</style>
+      <style>{manuscriptCSS}</style>
       <article className="sermon-manuscript">
         {title && (
-          <header className="sermon-ms-title-block">
-            <h1 className="sermon-ms-title">{title}</h1>
-            {scripture && <p className="sermon-ms-scripture">{scripture}</p>}
+          <header className="sms-title-block">
+            <h1 className="sms-title">{title}</h1>
+            {scripture && <p className="sms-scripture">{scripture}</p>}
           </header>
         )}
-        <div className="sermon-ms-body">{elements}</div>
+        <div className="sms-body">{elements}</div>
       </article>
     </>
   );
 };
 
-const sermonManuscriptStyles = `
+/* ------------------------------------------------------------------ */
+/*  CSS — locked to Power of Transparency reference                    */
+/* ------------------------------------------------------------------ */
+const manuscriptCSS = `
 .sermon-manuscript {
   max-width: 720px;
   margin: 0 auto;
-  padding: 0 1.5rem;
+  padding: 0 1.25rem;
 }
 
-.sermon-ms-title-block {
+/* ---- Title block ---- */
+.sms-title-block {
   text-align: center;
   margin-bottom: 2.5rem;
   padding-top: 0.5rem;
 }
-
-.sermon-ms-title {
+.sms-title {
   font-family: 'Playfair Display', Georgia, serif;
-  font-size: 2.25rem;
-  line-height: 1.1;
-  font-weight: 700;
-  color: hsl(0 0% 100%);
+  font-size: 2.5rem;
+  line-height: 1.08;
+  font-weight: 800;
+  color: hsl(var(--foreground));
   margin: 0 0 0.5rem 0;
 }
-
-.sermon-ms-scripture {
+.sms-scripture {
   font-family: 'Inter', system-ui, sans-serif;
   font-size: 1rem;
-  opacity: 0.75;
-  color: hsl(0 0% 100%);
+  opacity: 0.7;
+  color: hsl(var(--foreground));
   margin: 0;
 }
 
-.sermon-ms-heading {
+/* ---- MAIN POINT headings (Roman numeral) — dramatic large serif ---- */
+.sms-main-point {
   font-family: 'Playfair Display', Georgia, serif;
-  font-size: 1.55rem;
-  line-height: 1.2;
-  font-weight: 700;
-  color: hsl(0 0% 100%);
-  margin: 2.25rem 0 1rem 0;
+  font-size: 1.75rem;
+  line-height: 1.18;
+  font-weight: 800;
+  color: hsl(var(--foreground));
+  margin: 2.75rem 0 1.25rem 0;
   text-transform: uppercase;
   letter-spacing: 0.01em;
 }
 
-.sermon-ms-paragraph {
-  font-family: 'Inter', system-ui, sans-serif;
-  font-size: 1.125rem;
-  line-height: 1.7;
-  color: hsl(0 0% 100%);
-  margin: 0 0 1rem 0;
+/* ---- Section labels (ILLUSTRATION, ALTAR CALL, etc.) ---- */
+.sms-section-label {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 1.35rem;
+  line-height: 1.2;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+  margin: 2rem 0 0.85rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  opacity: 0.92;
 }
 
-.sermon-ms-bullets {
+/* ---- Body paragraphs ---- */
+.sms-paragraph {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 1.125rem;
+  line-height: 1.75;
+  color: hsl(var(--foreground));
+  margin: 0 0 1.1rem 0;
+}
+
+/* ---- Bullet lists ---- */
+.sms-bullets {
   list-style: disc;
   padding-left: 1.75rem;
-  margin: 0.75rem 0 1.25rem 0;
+  margin: 0.75rem 0 1.5rem 0;
 }
-
-.sermon-ms-bullets li {
+.sms-bullets li {
   font-family: 'Inter', system-ui, sans-serif;
   font-size: 1.125rem;
-  line-height: 1.6;
-  color: hsl(0 0% 100%);
-  margin: 0 0 0.75rem 0;
+  line-height: 1.65;
+  color: hsl(var(--foreground));
+  margin: 0 0 0.85rem 0;
 }
 
+/* ---- KEY POINT ---- */
+.sms-key-point {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 1.125rem;
+  line-height: 1.65;
+  color: hsl(var(--foreground));
+  margin: 1.5rem 0 1.75rem 0;
+  padding-left: 0.25rem;
+}
+.sms-key-point-label {
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: hsl(var(--primary));
+}
+
+/* ---- Mobile refinements ---- */
 @media (max-width: 640px) {
-  .sermon-ms-title {
-    font-size: 1.75rem;
+  .sms-title {
+    font-size: 1.85rem;
   }
-  .sermon-ms-heading {
-    font-size: 1.35rem;
+  .sms-main-point {
+    font-size: 1.45rem;
+  }
+  .sms-section-label {
+    font-size: 1.15rem;
   }
 }
 `;
