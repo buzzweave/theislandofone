@@ -110,8 +110,9 @@ function stripHtml(html: string): string {
 // the line-by-line parser can detect them. Also strips prompt artifacts.
 
 // Regex that matches inline section markers (headings jammed inside text)
+// Uses a capture-group approach instead of lookbehind for broader browser support
 const INLINE_SECTION_RE = new RegExp(
-  "(?<=\\S[ \\t])(" +
+  "([.!?…\"')\\w])[ \\t]+(" +
     // Roman numeral headings
     "(?:[IVXLCDM]+\\.\\s+[A-Z][A-Z ]{3,})" +
     "|" +
