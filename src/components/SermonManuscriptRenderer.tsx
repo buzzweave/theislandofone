@@ -140,7 +140,7 @@ function preNormalize(raw: string): string {
   // 3. Insert line breaks before inline section markers
   // This is the KEY fix: if "...some text TRUE OPENING ILLUSTRATION ..."
   // we split it so the heading is on its own line.
-  text = text.replace(INLINE_SECTION_RE, "\n\n$1");
+  text = text.replace(INLINE_SECTION_RE, "$1\n\n$2");
 
   // 4. Also insert line breaks before Roman numeral headings that are inline
   text = text.replace(/([.!?…"')\s])(\s*)([IVXLCDM]+\.\s+[A-Z])/g, "$1\n\n$3");
