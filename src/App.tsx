@@ -195,6 +195,7 @@ const App = () => (
                   <Route path="/i/:code" element={<LazyLayout><InviteRedirect /></LazyLayout>} />
                   <Route path="/login" element={<LazyLayout><Login /></LazyLayout>} />
                   <Route path="/redeem" element={<LazyLayout><RedeemCode /></LazyLayout>} />
+                  <Route path="/donate" element={<LazyLayout><Donate /></LazyLayout>} />
 
                   {/* Admin */}
                   <Route path="/admin/login" element={<Suspense fallback={<PageFallback />}><AdminLogin /></Suspense>} />

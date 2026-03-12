@@ -200,7 +200,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* Main content */}
-      <main className="flex-1 pt-14 sm:pt-16">{children}</main>
+      <main className="flex-1 pt-14 sm:pt-16 pb-16 lg:pb-0">{children}</main>
+
+      {/* Mobile bottom nav */}
+      <BottomNav />
 
       {/* Footer */}
       <footer className="border-t border-border bg-card">
