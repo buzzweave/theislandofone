@@ -6,6 +6,7 @@ import { useSiteLogo } from "@/hooks/useSiteLogo";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import InstallPrompt from "@/components/InstallPrompt";
 import { useAuth } from "@/contexts/AuthContext";
+import BottomNav from "@/components/BottomNav";
 
 function useOgShareImage() {
   const { value: ogImage } = useSiteSettings("og_share_image");
@@ -199,7 +200,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* Main content */}
-      <main className="flex-1 pt-14 sm:pt-16">{children}</main>
+      <main className="flex-1 pt-14 sm:pt-16 pb-16 lg:pb-0">{children}</main>
+
+      {/* Mobile bottom nav */}
+      <BottomNav />
 
       {/* Footer */}
       <footer className="border-t border-border bg-card">

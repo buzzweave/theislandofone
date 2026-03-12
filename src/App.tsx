@@ -37,6 +37,7 @@ const ForumThread = lazy(() => import("./pages/ForumThread"));
 const InviteRedirect = lazy(() => import("./pages/InviteRedirect"));
 const Login = lazy(() => import("./pages/Login"));
 const RedeemCode = lazy(() => import("./pages/RedeemCode"));
+const Donate = lazy(() => import("./pages/Donate"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Lazy-loaded admin pages
@@ -194,6 +195,7 @@ const App = () => (
                   <Route path="/i/:code" element={<LazyLayout><InviteRedirect /></LazyLayout>} />
                   <Route path="/login" element={<LazyLayout><Login /></LazyLayout>} />
                   <Route path="/redeem" element={<LazyLayout><RedeemCode /></LazyLayout>} />
+                  <Route path="/donate" element={<LazyLayout><Donate /></LazyLayout>} />
 
                   {/* Admin */}
                   <Route path="/admin/login" element={<Suspense fallback={<PageFallback />}><AdminLogin /></Suspense>} />
