@@ -37,6 +37,7 @@ const ForumThread = lazy(() => import("./pages/ForumThread"));
 const InviteRedirect = lazy(() => import("./pages/InviteRedirect"));
 const Login = lazy(() => import("./pages/Login"));
 const RedeemCode = lazy(() => import("./pages/RedeemCode"));
+const Donate = lazy(() => import("./pages/Donate"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Lazy-loaded admin pages
