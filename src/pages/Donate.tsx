@@ -30,8 +30,6 @@ interface DonationRow {
 let rowId = 1;
 
 export default function Donate() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
   const [frequency, setFrequency] = useState("one-time");
   const [rows, setRows] = useState<DonationRow[]>([{ id: rowId++, fund: FUNDS[0], amount: "" }]);
   const [loading, setLoading] = useState(false);
