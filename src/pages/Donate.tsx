@@ -65,12 +65,6 @@ export default function Donate() {
       return;
     }
 
-    if (!user) {
-      toast.error("Please log in to donate.");
-      navigate("/login");
-      return;
-    }
-
     setLoading(true);
     try {
       const designations = rows
