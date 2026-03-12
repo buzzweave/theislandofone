@@ -139,14 +139,33 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             )}
           </div>
 
-          {/* Mobile toggle */}
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="lg:hidden text-foreground p-1"
-            aria-label="Toggle menu"
-          >
-            {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-          </button>
+          {/* Mobile actions */}
+          <div className="flex items-center gap-2 lg:hidden">
+            {!user && (
+              <Link
+                to="/login"
+                className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors px-2 py-1.5 rounded-full border border-border"
+              >
+                <User className="h-3.5 w-3.5" /> Login
+              </Link>
+            )}
+            {user && (
+              <button
+                onClick={() => signOut()}
+                className="text-muted-foreground hover:text-foreground p-1.5"
+                title="Sign out"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            )}
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="text-foreground p-1"
+              aria-label="Toggle menu"
+            >
+              {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
+          </div>
         </nav>
 
         {/* Mobile menu */}

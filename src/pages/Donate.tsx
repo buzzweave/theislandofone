@@ -4,9 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/components/ui/sonner";
-import { useNavigate } from "react-router-dom";
 
 const FREQUENCIES = [
   { value: "one-time", label: "One-Time" },
@@ -32,8 +30,6 @@ interface DonationRow {
 let rowId = 1;
 
 export default function Donate() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
   const [frequency, setFrequency] = useState("one-time");
   const [rows, setRows] = useState<DonationRow[]>([{ id: rowId++, fund: FUNDS[0], amount: "" }]);
   const [loading, setLoading] = useState(false);
@@ -62,12 +58,6 @@ export default function Donate() {
   const handleSubmit = async () => {
     if (totalAmount <= 0) {
       toast.error("Please enter a donation amount.");
-      return;
-    }
-
-    if (!user) {
-      toast.error("Please log in to donate.");
-      navigate("/login");
       return;
     }
 
