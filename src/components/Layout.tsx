@@ -6,6 +6,7 @@ import { useSiteLogo } from "@/hooks/useSiteLogo";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import InstallPrompt from "@/components/InstallPrompt";
 import { useAuth } from "@/contexts/AuthContext";
+import BottomNav from "@/components/BottomNav";
 
 function useOgShareImage() {
   const { value: ogImage } = useSiteSettings("og_share_image");
