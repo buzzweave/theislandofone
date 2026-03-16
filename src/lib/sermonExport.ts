@@ -2,11 +2,12 @@ import { jsPDF } from "jspdf";
 import { buildEpubZip } from "@/lib/bookExport";
 import { triggerDownload } from "@/lib/downloadHelper";
 import { COPYRIGHT } from "@/lib/pulpitFormat";
+import { parseExportStructure, type ExportStructure } from "@/lib/sermonExportFormatter";
 import type { Sermon } from "@/hooks/useSermons";
 
 const safeTitle = (title: string) => title.replace(/[^a-zA-Z0-9]/g, "_");
 
-// ── Shared helpers ──────────────────────────────────────────────────────
+// ── Shared helpers ──────────────────────────────────────────────────
 
 function normalizeParagraphs(html: string): string {
   return html
@@ -24,246 +25,169 @@ function normalizeParagraphs(html: string): string {
     .trim();
 }
 
-/** Parse HTML into styled segments for jsPDF rendering */
-interface TextSegment {
-  text: string;
-  bold: boolean;
-  italic: boolean;
-  heading: number; // 0 = body, 1-6 = heading level
+function escapeXml(s: string): string {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
-function parseHtmlToSegments(html: string): TextSegment[][] {
-  // Split by block-level elements into paragraphs
-  const blocks: string[] = [];
-  
-  // Normalize: replace block-level closing tags with markers
-  let processed = html
-    .replace(/<\/h([1-6])>/gi, (_, n) => `\n__BLOCK_END_H${n}__\n`)
-    .replace(/<h([1-6])[^>]*>/gi, (_, n) => `\n__BLOCK_START_H${n}__\n`)
-    .replace(/<\/p>/gi, "\n__BLOCK_END__\n")
-    .replace(/<p[^>]*>/gi, "\n__BLOCK_START__\n")
-    .replace(/<br\s*\/?>/gi, "\n__LINEBREAK__\n")
-    .replace(/<\/li>/gi, "\n__BLOCK_END__\n")
-    .replace(/<li[^>]*>/gi, "\n__BULLET__\n")
-    .replace(/<\/?(?:ul|ol)[^>]*>/gi, "");
+// ─── A4 constants ──────────────────────────────────────────────────
 
-  // Now parse segments within each block
-  const lines = processed.split("\n").filter(l => l.trim());
-  const paragraphs: TextSegment[][] = [];
-  let currentHeading = 0;
-  let isBullet = false;
+const A4W = 595;
+const A4H = 842;
+const MARGIN = 56;
+const CONTENT_W = A4W - MARGIN * 2;
 
-  for (const line of lines) {
-    const trimmed = line.trim();
-    
-    if (trimmed.match(/^__BLOCK_START_H(\d)__$/)) {
-      currentHeading = parseInt(trimmed.match(/(\d)/)?.[1] || "0");
-      continue;
-    }
-    if (trimmed.match(/^__BLOCK_END_H\d__$/)) {
-      currentHeading = 0;
-      continue;
-    }
-    if (trimmed === "__BLOCK_START__") continue;
-    if (trimmed === "__BLOCK_END__") continue;
-    if (trimmed === "__LINEBREAK__") {
-      paragraphs.push([{ text: "", bold: false, italic: false, heading: 0 }]);
-      continue;
-    }
-    if (trimmed === "__BULLET__") {
-      isBullet = true;
-      continue;
-    }
-
-    // Parse inline formatting (bold/italic)
-    const segments: TextSegment[] = [];
-    let remaining = trimmed;
-    
-    // Add bullet prefix if needed
-    if (isBullet) {
-      remaining = "• " + remaining;
-      isBullet = false;
-    }
-
-    // Simple regex-based inline parsing
-    const inlineRegex = /<(strong|b|em|i)(?:\s[^>]*)?>|<\/(strong|b|em|i)>/gi;
-    let bold = false;
-    let italic = false;
-    let lastIndex = 0;
-    let match: RegExpExecArray | null;
-
-    while ((match = inlineRegex.exec(remaining)) !== null) {
-      // Text before this tag
-      if (match.index > lastIndex) {
-        const text = stripInlineTags(remaining.slice(lastIndex, match.index));
-        if (text) segments.push({ text, bold, italic, heading: currentHeading });
-      }
-      
-      const tag = (match[1] || match[2]).toLowerCase();
-      if (match[1]) {
-        // Opening tag
-        if (tag === "strong" || tag === "b") bold = true;
-        if (tag === "em" || tag === "i") italic = true;
-      } else {
-        // Closing tag
-        if (tag === "strong" || tag === "b") bold = false;
-        if (tag === "em" || tag === "i") italic = false;
-      }
-      lastIndex = match.index + match[0].length;
-    }
-
-    // Remaining text after last tag
-    if (lastIndex < remaining.length) {
-      const text = stripInlineTags(remaining.slice(lastIndex));
-      if (text) segments.push({ text, bold, italic, heading: currentHeading });
-    }
-
-    if (segments.length === 0 && remaining.trim()) {
-      const text = stripInlineTags(remaining);
-      if (text) segments.push({ text, bold: false, italic: false, heading: currentHeading });
-    }
-
-    if (segments.length > 0) {
-      paragraphs.push(segments);
-    }
-  }
-
-  return paragraphs;
-}
-
-function stripInlineTags(text: string): string {
-  return text
-    .replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, " ");
-}
-
-// ─── PDF — Portrait A4 Preach Ready Layout ─────────────────────────────
+// ─── PDF Export — Preach-Ready Pulpit Format ────────────────────────
 
 export function exportSermonToPdf(sermon: Sermon) {
-  const A4W = 595;
-  const A4H = 842;
   const doc = new jsPDF({ unit: "pt", format: [A4W, A4H], orientation: "portrait" });
-  const margin = 56;
-  const contentW = A4W - margin * 2;
 
-  const title = sermon.title || "";
-  const scripture = sermon.scripture || "";
-  const manuscript = sermon.manuscript || "";
+  const structure = parseExportStructure(
+    sermon.manuscript || "",
+    sermon.title || "",
+    sermon.scripture || "",
+  );
 
-  // Parse structure
-  const boldSegments = manuscript.includes("<") ? extractBoldSegmentsFromHtml(manuscript) : new Set<string>();
-  const raw = normalizeParagraphs(manuscript);
-  const lines = raw.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+  renderPdfFromStructure(doc, structure);
 
-  const titleNorm = title.trim().toLowerCase();
-  const scriptureNorm = scripture.trim().toLowerCase();
+  const pdfBlob = doc.output("blob");
+  triggerDownload(pdfBlob, `${safeTitle(sermon.title)}.pdf`);
+}
 
-  interface MainPoint { heading: string; bullets: string[]; }
-  const mainPoints: MainPoint[] = [];
-  const illustrations: string[] = [];
-  let current: MainPoint | null = null;
-
-  for (const line of lines) {
-    const lineNorm = line.toLowerCase();
-    if (lineNorm === titleNorm || (scriptureNorm && lineNorm === scriptureNorm)) continue;
-
-    const isBoldHeading = [...boldSegments].some(
-      b => b.toLowerCase() === lineNorm || lineNorm.startsWith(b.toLowerCase())
-    );
-
-    if (isBoldHeading) {
-      current = { heading: line, bullets: [] };
-      mainPoints.push(current);
-    } else if (current) {
-      current.bullets.push(line);
-    } else {
-      illustrations.push(line);
-    }
-  }
-
-  /* ─── PAGE 1: Title + Scripture ─────────────────────────────────── */
+function renderPdfFromStructure(doc: jsPDF, s: ExportStructure) {
+  // ─── PAGE 1: Title Only ──────────────────────────────────────
   doc.setFont("times", "bold");
-  doc.setFontSize(36);
-  const titleLines: string[] = doc.splitTextToSize(title, contentW);
-  const titleBlockH = titleLines.length * 44;
-  let titleY = (A4H / 2) - (titleBlockH / 2) - 30;
-  if (titleY < margin) titleY = margin;
-
-  for (const tl of titleLines) {
-    doc.text(tl, A4W / 2, titleY, { align: "center" });
-    titleY += 44;
+  doc.setFontSize(42);
+  const titleLines: string[] = doc.splitTextToSize(s.title, CONTENT_W);
+  const titleBlockH = titleLines.length * 50;
+  let y = (A4H / 2) - (titleBlockH / 2);
+  if (y < MARGIN) y = MARGIN;
+  for (const line of titleLines) {
+    doc.text(line, A4W / 2, y, { align: "center" });
+    y += 50;
   }
 
-  if (scripture) {
-    doc.setFont("times", "italic");
-    doc.setFontSize(20);
-    const scriptureLines: string[] = doc.splitTextToSize(scripture, contentW);
-    let sY = titleY + 30;
-    for (const sl of scriptureLines) {
-      doc.text(sl, A4W / 2, sY, { align: "center" });
-      sY += 26;
-    }
-  }
-
-  /* ─── PAGE 2: Illustrations & Notes ────────────────────────────── */
-  if (illustrations.length > 0) {
+  // ─── PAGE 2: Scripture ───────────────────────────────────────
+  if (s.scriptureReference || s.scriptureText) {
     doc.addPage([A4W, A4H]);
-    let y = margin;
+    y = MARGIN;
 
     doc.setFont("times", "bold");
-    doc.setFontSize(14);
-    doc.text("ILLUSTRATIONS & NOTES", A4W / 2, y, { align: "center" });
-    y += 36;
+    doc.setFontSize(28);
+    doc.text("SCRIPTURE", A4W / 2, y, { align: "center" });
+    y += 44;
+
+    if (s.scriptureReference) {
+      doc.setFont("times", "italic");
+      doc.setFontSize(18);
+      const refLines: string[] = doc.splitTextToSize(s.scriptureReference, CONTENT_W);
+      for (const line of refLines) {
+        doc.text(line, A4W / 2, y, { align: "center" });
+        y += 24;
+      }
+      y += 16;
+    }
+
+    if (s.scriptureText) {
+      doc.setFont("times", "normal");
+      doc.setFontSize(16);
+      const textLines: string[] = doc.splitTextToSize(s.scriptureText, CONTENT_W);
+      for (const line of textLines) {
+        if (y + 22 > A4H - MARGIN) { doc.addPage([A4W, A4H]); y = MARGIN; }
+        doc.text(line, MARGIN, y);
+        y += 22;
+      }
+    }
+  }
+
+  // ─── PAGE 3: Illustration ────────────────────────────────────
+  if (s.illustration.length > 0) {
+    doc.addPage([A4W, A4H]);
+    y = MARGIN;
+
+    doc.setFont("times", "bold");
+    doc.setFontSize(28);
+    doc.text("ILLUSTRATION", A4W / 2, y, { align: "center" });
+    y += 44;
 
     doc.setFont("times", "normal");
-    doc.setFontSize(13);
-    const lineHeight = 20;
-
-    for (const para of illustrations) {
-      const wrapped: string[] = doc.splitTextToSize(para, contentW);
-      for (const wl of wrapped) {
-        if (y + lineHeight > A4H - margin) { doc.addPage([A4W, A4H]); y = margin; }
-        doc.text(wl, margin, y);
-        y += lineHeight;
+    doc.setFontSize(14);
+    for (const para of s.illustration) {
+      const wrapped: string[] = doc.splitTextToSize(para, CONTENT_W);
+      for (const line of wrapped) {
+        if (y + 22 > A4H - MARGIN) { doc.addPage([A4W, A4H]); y = MARGIN; }
+        doc.text(line, MARGIN, y);
+        y += 22;
       }
-      y += 8;
+      y += 12; // generous spacing
     }
   }
 
-  /* ─── Each Main Point on its own page ──────────────────────────── */
-  for (let i = 0; i < mainPoints.length; i++) {
-    const mp = mainPoints[i];
+  // ─── MAIN POINTS — each on its own page ──────────────────────
+  for (const mp of s.mainPoints) {
     doc.addPage([A4W, A4H]);
-    let y = margin;
+    y = MARGIN;
 
-    // Numbered heading in bold
+    // Heading
     doc.setFont("times", "bold");
-    doc.setFontSize(22);
-    const headingText = `${i + 1}. ${mp.heading}`;
-    const headingLines: string[] = doc.splitTextToSize(headingText, contentW - 20);
+    doc.setFontSize(26);
+    const headingLines: string[] = doc.splitTextToSize(mp.heading, CONTENT_W);
     for (const hl of headingLines) {
-      doc.text(hl, margin + 10, y);
-      y += 28;
+      doc.text(hl, MARGIN, y);
+      y += 34;
     }
-    y += 12;
+    y += 8;
 
-    // Bullets in regular font
+    // Summary paragraph
+    if (mp.summary) {
+      doc.setFont("times", "normal");
+      doc.setFontSize(15);
+      const summaryLines: string[] = doc.splitTextToSize(mp.summary, CONTENT_W);
+      for (const sl of summaryLines) {
+        doc.text(sl, MARGIN, y);
+        y += 22;
+      }
+      y += 14;
+    }
+
+    // 6 bullet points with generous spacing
     doc.setFont("times", "normal");
     doc.setFontSize(14);
     for (const bullet of mp.bullets) {
-      const bulletText = `• ${bullet}`;
-      const bulletLines: string[] = doc.splitTextToSize(bulletText, contentW - 40);
+      if (!bullet) continue;
+      const bulletText = `•  ${bullet}`;
+      const bulletLines: string[] = doc.splitTextToSize(bulletText, CONTENT_W - 30);
       for (const bl of bulletLines) {
-        if (y + 20 > A4H - margin) { doc.addPage([A4W, A4H]); y = margin; }
-        doc.text(bl, margin + 30, y);
-        y += 20;
+        doc.text(bl, MARGIN + 20, y);
+        y += 22;
       }
-      y += 6;
+      y += 10; // even spacing between bullets
+    }
+  }
+
+  // ─── CLOSING PAGE ───────────────────────────────────────────
+  if (s.closing.length > 0) {
+    doc.addPage([A4W, A4H]);
+    y = MARGIN;
+
+    doc.setFont("times", "bold");
+    doc.setFontSize(28);
+    doc.text("CLOSING", A4W / 2, y, { align: "center" });
+    y += 44;
+
+    doc.setFont("times", "normal");
+    doc.setFontSize(14);
+    for (const para of s.closing) {
+      const wrapped: string[] = doc.splitTextToSize(para, CONTENT_W);
+      for (const line of wrapped) {
+        if (y + 22 > A4H - MARGIN) { doc.addPage([A4W, A4H]); y = MARGIN; }
+        doc.text(line, MARGIN, y);
+        y += 22;
+      }
+      y += 12;
     }
   }
 
@@ -271,35 +195,9 @@ export function exportSermonToPdf(sermon: Sermon) {
   doc.setFont("helvetica", "italic");
   doc.setFontSize(9);
   doc.text(COPYRIGHT(), A4W / 2, A4H - 30, { align: "center" });
-
-  const pdfBlob = doc.output("blob");
-  triggerDownload(pdfBlob, `${safeTitle(sermon.title)}.pdf`);
 }
 
-/** Extract bold text segments from HTML for main point detection */
-function extractBoldSegmentsFromHtml(html: string): Set<string> {
-  const bolds = new Set<string>();
-  const re = /<(?:strong|b)(?:\s[^>]*)?>(.+?)<\/(?:strong|b)>/gi;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(html)) !== null) {
-    const text = m[1].replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").trim();
-    if (text.length > 0) bolds.add(text);
-  }
-  return bolds;
-}
-
-function findOverlap(line: string, segText: string): string {
-  // Find the longest prefix of segText that matches the start of line
-  const maxLen = Math.min(line.length, segText.length);
-  for (let i = maxLen; i > 0; i--) {
-    if (line.substring(0, i) === segText.substring(0, i)) {
-      return line.substring(0, i);
-    }
-  }
-  return "";
-}
-
-// ─── EPUB (unchanged — e-reader format) ─────────────────────────────────
+// ─── EPUB (unchanged — e-reader format) ─────────────────────────────
 
 export function exportSermonToEpub(sermon: Sermon) {
   const sanitize = (t: string) =>
@@ -388,7 +286,7 @@ ${bodyHtml}
   triggerDownload(blob, `${safeTitle(sermon.title)}.epub`);
 }
 
-// ─── GoodNotes PDF (server-side, iPad-safe) ─────────────────────────────
+// ─── GoodNotes PDF (server-side, iPad-safe) ─────────────────────────
 
 export async function exportSermonToGoodNotesPdf(sermon: Sermon) {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -444,29 +342,89 @@ export async function exportSermonToGoodNotesPdf(sermon: Sermon) {
   }
 }
 
-// ─── Word (.doc) — WYSIWYG from Rich Editor ────────────────────────────
+// ─── Word (.doc) — Preach-Ready Pulpit Format with Playfair Display ─
 
 export function exportSermonToWord(sermon: Sermon) {
-  // Pass the manuscript HTML directly — preserves all formatting from the editor
+  const structure = parseExportStructure(
+    sermon.manuscript || "",
+    sermon.title || "",
+    sermon.scripture || "",
+  );
+
+  const sections: string[] = [];
+
+  // Title page
+  sections.push(`
+    <div style="page-break-after: always; display: flex; align-items: center; justify-content: center; min-height: 90vh; text-align: center;">
+      <h1 style="font-family: 'Playfair Display', Georgia, serif; font-size: 38pt; font-weight: 800; text-align: center; margin: 0;">${escapeXml(structure.title)}</h1>
+    </div>
+  `);
+
+  // Scripture page
+  if (structure.scriptureReference || structure.scriptureText) {
+    let scriptureHtml = `<div style="page-break-before: always; page-break-after: always;">`;
+    scriptureHtml += `<h2 style="font-family: 'Playfair Display', Georgia, serif; font-size: 26pt; font-weight: 800; text-align: center; text-transform: uppercase; margin-bottom: 0.8em;">SCRIPTURE</h2>`;
+    if (structure.scriptureReference) {
+      scriptureHtml += `<p style="font-family: 'Playfair Display', Georgia, serif; font-size: 16pt; font-style: italic; text-align: center; margin-bottom: 1.2em;">${escapeXml(structure.scriptureReference)}</p>`;
+    }
+    if (structure.scriptureText) {
+      scriptureHtml += `<p style="font-family: Georgia, serif; font-size: 14pt; line-height: 1.8;">${escapeXml(structure.scriptureText)}</p>`;
+    }
+    scriptureHtml += `</div>`;
+    sections.push(scriptureHtml);
+  }
+
+  // Illustration page
+  if (structure.illustration.length > 0) {
+    let illHtml = `<div style="page-break-before: always; page-break-after: always;">`;
+    illHtml += `<h2 style="font-family: 'Playfair Display', Georgia, serif; font-size: 26pt; font-weight: 800; text-align: center; text-transform: uppercase; margin-bottom: 0.8em;">ILLUSTRATION</h2>`;
+    for (const para of structure.illustration) {
+      illHtml += `<p style="font-family: Georgia, serif; font-size: 14pt; line-height: 2; margin-bottom: 1.2em;">${escapeXml(para)}</p>`;
+    }
+    illHtml += `</div>`;
+    sections.push(illHtml);
+  }
+
+  // Main Points — each on its own page
+  for (const mp of structure.mainPoints) {
+    let mpHtml = `<div style="page-break-before: always; page-break-after: always; page-break-inside: avoid;">`;
+    mpHtml += `<h2 style="font-family: 'Playfair Display', Georgia, serif; font-size: 24pt; font-weight: 800; text-transform: uppercase; margin-bottom: 0.6em;">${escapeXml(mp.heading)}</h2>`;
+    if (mp.summary) {
+      mpHtml += `<p style="font-family: Georgia, serif; font-size: 14pt; line-height: 1.8; margin-bottom: 1em;">${escapeXml(mp.summary)}</p>`;
+    }
+    mpHtml += `<ul style="font-family: Georgia, serif; font-size: 13pt; line-height: 1.7; margin-left: 0.4in; margin-top: 0.8em;">`;
+    for (const bullet of mp.bullets) {
+      if (bullet) {
+        mpHtml += `<li style="margin-bottom: 0.7em;">${escapeXml(bullet)}</li>`;
+      }
+    }
+    mpHtml += `</ul></div>`;
+    sections.push(mpHtml);
+  }
+
+  // Closing page
+  if (structure.closing.length > 0) {
+    let closeHtml = `<div style="page-break-before: always;">`;
+    closeHtml += `<h2 style="font-family: 'Playfair Display', Georgia, serif; font-size: 26pt; font-weight: 800; text-align: center; text-transform: uppercase; margin-bottom: 0.8em;">CLOSING</h2>`;
+    for (const para of structure.closing) {
+      closeHtml += `<p style="font-family: Georgia, serif; font-size: 14pt; line-height: 2; margin-bottom: 1.2em;">${escapeXml(para)}</p>`;
+    }
+    closeHtml += `</div>`;
+    sections.push(closeHtml);
+  }
+
   const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
-<head><meta charset="utf-8"><title>${sermon.title}</title>
+<head><meta charset="utf-8"><title>${escapeXml(sermon.title)}</title>
 <!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800;900&display=swap');
   @page { size: A4 portrait; margin: 1in; }
   body { font-family: Georgia, "Times New Roman", serif; margin: 1in; color: #000; line-height: 1.7; font-size: 13pt; }
-  h1 { font-size: 28pt; font-weight: bold; text-align: center; margin-bottom: 1.5em; }
-  h2 { font-size: 16pt; font-weight: bold; margin-top: 2em; margin-bottom: 0.6em; }
-  h3 { font-size: 14pt; font-weight: bold; margin-top: 1.5em; margin-bottom: 0.5em; }
-  p { margin-bottom: 1.1em; }
-  ul, ol { font-size: 12pt; line-height: 1.6; margin-left: 0.3in; margin-top: 1em; margin-bottom: 1.5em; }
-  li { margin-bottom: 0.6em; }
-  strong, b { font-weight: bold; }
-  em, i { font-style: italic; }
   .copyright { font-size: 9pt; font-style: italic; color: #999; text-align: center; margin-top: 2in; border-top: 1px solid #ddd; padding-top: 0.5in; }
 </style></head>
 <body>
-${sermon.manuscript}
-  <p class="copyright">${COPYRIGHT()}</p>
+${sections.join("\n")}
+  <p class="copyright">${escapeXml(COPYRIGHT())}</p>
 </body></html>`;
 
   const blob = new Blob([html], { type: "application/msword" });

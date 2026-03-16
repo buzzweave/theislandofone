@@ -13,19 +13,40 @@ interface SermonPayload {
   manuscript?: string;
 }
 
-interface MainPoint {
+/* ── Types ────────────────────────────────────────────────────────── */
+
+interface ExportMainPoint {
   heading: string;
+  summary: string;
   bullets: string[];
 }
 
-/* ── Portrait A4 ─────────────────────────────────────────────────────── */
+interface ExportStructure {
+  title: string;
+  scriptureReference: string;
+  scriptureText: string;
+  illustration: string[];
+  mainPoints: ExportMainPoint[];
+  closing: string[];
+}
+
+/* ── Portrait A4 ─────────────────────────────────────────────────── */
 
 const A4_W = 595;
 const A4_H = 842;
 const MARGIN = 56;
 const CONTENT_W = A4_W - MARGIN * 2;
 
-/* ── HTML helpers ────────────────────────────────────────────────────── */
+/* ── Roman numerals ──────────────────────────────────────────────── */
+
+const ROMAN = ["I","II","III","IV","V","VI","VII","VIII","IX","X",
+  "XI","XII","XIII","XIV","XV","XVI","XVII","XVIII","XIX","XX"];
+
+function toRoman(n: number): string {
+  return ROMAN[n - 1] || String(n);
+}
+
+/* ── HTML helpers ────────────────────────────────────────────────── */
 
 function stripHtml(html: string): string {
   return html
@@ -48,143 +69,311 @@ function extractBoldSegments(html: string): Set<string> {
   const re = /<(?:strong|b)(?:\s[^>]*)?>(.+?)<\/(?:strong|b)>/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(html)) !== null) {
-    const text = m[1].replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").trim();
+    const text = m[1]
+      .replace(/<[^>]+>/g, "")
+      .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ")
+      .trim();
     if (text.length > 0) bolds.add(text);
   }
   return bolds;
 }
 
-/* ── Parse manuscript ────────────────────────────────────────────────── */
+/* ── Section label detection ─────────────────────────────────────── */
 
-function parseSermonStructure(manuscript: string, title: string, scripture: string): { mainPoints: MainPoint[]; illustrations: string[] } {
+const ILLUSTRATION_RE = /^(?:TRUE\s+)?(?:OPENING\s+)?ILLUSTRATION|^MID[- ]SERMON\s+ILLUSTRATION|^ILLUSTRATION\s*(?:CALLBACK)?/i;
+const CLOSING_RE = /^CLOSING(?:\s+(?:BUILD|DECLARATION|THOUGHTS?))?|^ALTAR\s+CALL/i;
+const SCRIPTURE_RE = /^SCRIPTURE\s*(?:REFERENCE)?/i;
+const INTRO_RE = /^INTRODUCTION/i;
+const MAIN_POINT_LABEL_RE = /^MAIN\s+POINT\s+([IVXLCDM0-9]+)/i;
+
+function detectSectionType(line: string): "illustration" | "closing" | "scripture" | "intro" | "mainpoint" | null {
+  const t = line.trim();
+  if (ILLUSTRATION_RE.test(t)) return "illustration";
+  if (CLOSING_RE.test(t)) return "closing";
+  if (SCRIPTURE_RE.test(t)) return "scripture";
+  if (INTRO_RE.test(t)) return "intro";
+  if (MAIN_POINT_LABEL_RE.test(t)) return "mainpoint";
+  return null;
+}
+
+/* ── Ensure exactly 6 bullets ────────────────────────────────────── */
+
+function ensureSixBullets(source: string[]): string[] {
+  const cleaned = source.map(l => l.replace(/^[•●\-*]\s+/, "").trim()).filter(l => l.length > 0);
+  if (cleaned.length >= 6) return cleaned.slice(0, 6);
+
+  const expanded: string[] = [];
+  for (const line of cleaned) {
+    if (expanded.length >= 6) break;
+    const sentences = line.match(/[^.!?]+[.!?]+/g);
+    if (sentences && sentences.length > 1 && expanded.length + sentences.length <= 8) {
+      for (const s of sentences) {
+        if (expanded.length >= 6) break;
+        expanded.push(s.trim());
+      }
+    } else {
+      expanded.push(line);
+    }
+  }
+  while (expanded.length < 6) expanded.push("");
+  return expanded.slice(0, 6);
+}
+
+/* ── Parse manuscript into export structure ───────────────────────── */
+
+function parseExportStructure(manuscript: string, title: string, scriptureReference: string): ExportStructure {
   const boldSegments = manuscript.includes("<") ? extractBoldSegments(manuscript) : new Set<string>();
   const raw = manuscript.includes("<") ? stripHtml(manuscript) : manuscript;
   const lines = raw.split("\n").map(l => l.trim()).filter(l => l.length > 0);
 
   const titleNorm = title.trim().toLowerCase();
-  const scriptureNorm = scripture?.trim().toLowerCase() || "";
+  const scriptureNorm = scriptureReference?.trim().toLowerCase() || "";
 
-  const mainPoints: MainPoint[] = [];
-  const illustrations: string[] = [];
-  let current: MainPoint | null = null;
+  interface RawSection {
+    type: "illustration" | "closing" | "scripture" | "intro" | "mainpoint" | "body";
+    heading: string;
+    lines: string[];
+  }
+
+  const rawSections: RawSection[] = [];
+  let current: RawSection | null = null;
 
   for (const line of lines) {
     const lineNorm = line.toLowerCase();
     if (lineNorm === titleNorm || (scriptureNorm && lineNorm === scriptureNorm)) continue;
 
+    const sectionType = detectSectionType(line);
+    if (sectionType) {
+      current = { type: sectionType, heading: line, lines: [] };
+      rawSections.push(current);
+      continue;
+    }
+
     const isBoldHeading = [...boldSegments].some(
       b => b.toLowerCase() === lineNorm || lineNorm.startsWith(b.toLowerCase())
     );
 
-    if (isBoldHeading) {
-      current = { heading: line, bullets: [] };
-      mainPoints.push(current);
-    } else if (current) {
-      current.bullets.push(line);
+    if (isBoldHeading && line.length < 120) {
+      current = { type: "mainpoint", heading: line, lines: [] };
+      rawSections.push(current);
+      continue;
+    }
+
+    if (current) {
+      current.lines.push(line);
     } else {
-      illustrations.push(line);
+      if (!rawSections.length || rawSections[rawSections.length - 1].type !== "body") {
+        current = { type: "body", heading: "", lines: [line] };
+        rawSections.push(current);
+      } else {
+        rawSections[rawSections.length - 1].lines.push(line);
+        current = rawSections[rawSections.length - 1];
+      }
     }
   }
 
-  return { mainPoints, illustrations };
+  const result: ExportStructure = {
+    title,
+    scriptureReference,
+    scriptureText: "",
+    illustration: [],
+    mainPoints: [],
+    closing: [],
+  };
+
+  const scriptureSections = rawSections.filter(s => s.type === "scripture");
+  if (scriptureSections.length > 0) {
+    result.scriptureText = scriptureSections.flatMap(s => s.lines).join("\n\n");
+  }
+
+  const illustrationSections = rawSections.filter(s => s.type === "illustration" || s.type === "intro" || s.type === "body");
+  result.illustration = illustrationSections.flatMap(s => s.lines).filter(l => l.length > 0);
+
+  const closingSections = rawSections.filter(s => s.type === "closing");
+  result.closing = closingSections.flatMap(s => s.lines).filter(l => l.length > 0);
+
+  const mainPointSections = rawSections.filter(s => s.type === "mainpoint");
+
+  if (mainPointSections.length > 0) {
+    result.mainPoints = mainPointSections.map((mp, idx) => {
+      const allLines = mp.lines;
+      const summary = allLines[0] || mp.heading;
+      const bulletSource = allLines.slice(summary === mp.heading ? 0 : 1);
+      return {
+        heading: `MAIN POINT ${toRoman(idx + 1)}`,
+        summary: summary === mp.heading ? "" : summary,
+        bullets: ensureSixBullets(bulletSource),
+      };
+    });
+  } else {
+    const bodyLines = rawSections.filter(s => s.type === "body").flatMap(s => s.lines).filter(l => l.length > 0);
+    if (bodyLines.length > 0) {
+      const numPoints = Math.min(4, Math.max(1, Math.ceil(bodyLines.length / 7)));
+      const chunkSize = Math.ceil(bodyLines.length / numPoints);
+      for (let i = 0; i < numPoints; i++) {
+        const chunk = bodyLines.slice(i * chunkSize, (i + 1) * chunkSize);
+        const summary = chunk[0] || "";
+        const bulletSource = chunk.slice(1);
+        result.mainPoints.push({
+          heading: `MAIN POINT ${toRoman(i + 1)}`,
+          summary,
+          bullets: ensureSixBullets(bulletSource),
+        });
+      }
+    }
+  }
+
+  return result;
 }
 
-/* ── PDF Generation — Portrait A4 Preach Ready ───────────────────────── */
+/* ── PDF Generation — Section-per-page Pulpit Format ─────────────── */
 
 function generatePdf(data: SermonPayload): ArrayBuffer {
   const doc = new jsPDF({ unit: "pt", format: [A4_W, A4_H], orientation: "portrait" });
 
-  const manuscript = data.manuscript || "";
-  const title = data.title || "";
-  const scripture = data.scriptureReference || data.scripture || "";
+  const s = parseExportStructure(
+    data.manuscript || "",
+    data.title || "",
+    data.scriptureReference || data.scripture || "",
+  );
 
-  const { mainPoints, illustrations } = parseSermonStructure(manuscript, title, scripture);
+  let y: number;
 
-  /* ─── PAGE 1: Title + Scripture ─────────────────────────────────── */
+  // ─── PAGE 1: Title Only ──────────────────────────────────────
   doc.setFont("times", "bold");
-  doc.setFontSize(36);
-  const titleLines: string[] = doc.splitTextToSize(title, CONTENT_W);
-  const titleBlockH = titleLines.length * 44;
-  let titleY = (A4_H / 2) - (titleBlockH / 2) - 30;
-  if (titleY < MARGIN) titleY = MARGIN;
-
+  doc.setFontSize(42);
+  const titleLines: string[] = doc.splitTextToSize(s.title, CONTENT_W);
+  const titleBlockH = titleLines.length * 50;
+  y = (A4_H / 2) - (titleBlockH / 2);
+  if (y < MARGIN) y = MARGIN;
   for (const line of titleLines) {
-    doc.text(line, A4_W / 2, titleY, { align: "center" });
-    titleY += 44;
+    doc.text(line, A4_W / 2, y, { align: "center" });
+    y += 50;
   }
 
-  if (scripture) {
-    doc.setFont("times", "italic");
-    doc.setFontSize(20);
-    const scriptureLines: string[] = doc.splitTextToSize(scripture, CONTENT_W);
-    let scriptureY = titleY + 30;
-    for (const line of scriptureLines) {
-      doc.text(line, A4_W / 2, scriptureY, { align: "center" });
-      scriptureY += 26;
+  // ─── PAGE 2: Scripture ───────────────────────────────────────
+  if (s.scriptureReference || s.scriptureText) {
+    doc.addPage([A4_W, A4_H]);
+    y = MARGIN;
+
+    doc.setFont("times", "bold");
+    doc.setFontSize(28);
+    doc.text("SCRIPTURE", A4_W / 2, y, { align: "center" });
+    y += 44;
+
+    if (s.scriptureReference) {
+      doc.setFont("times", "italic");
+      doc.setFontSize(18);
+      const refLines: string[] = doc.splitTextToSize(s.scriptureReference, CONTENT_W);
+      for (const line of refLines) {
+        doc.text(line, A4_W / 2, y, { align: "center" });
+        y += 24;
+      }
+      y += 16;
+    }
+
+    if (s.scriptureText) {
+      doc.setFont("times", "normal");
+      doc.setFontSize(16);
+      const textLines: string[] = doc.splitTextToSize(s.scriptureText, CONTENT_W);
+      for (const line of textLines) {
+        if (y + 22 > A4_H - MARGIN) { doc.addPage([A4_W, A4_H]); y = MARGIN; }
+        doc.text(line, MARGIN, y);
+        y += 22;
+      }
     }
   }
 
-  /* ─── PAGE 2: Illustrations & Notes ────────────────────────────── */
-  if (illustrations.length > 0) {
+  // ─── Illustration Page ───────────────────────────────────────
+  if (s.illustration.length > 0) {
     doc.addPage([A4_W, A4_H]);
-    let y = MARGIN;
+    y = MARGIN;
 
     doc.setFont("times", "bold");
-    doc.setFontSize(14);
-    doc.text("ILLUSTRATIONS & NOTES", A4_W / 2, y, { align: "center" });
-    y += 36;
+    doc.setFontSize(28);
+    doc.text("ILLUSTRATION", A4_W / 2, y, { align: "center" });
+    y += 44;
 
     doc.setFont("times", "normal");
-    doc.setFontSize(13);
-    const lineHeight = 20;
-
-    for (const para of illustrations) {
+    doc.setFontSize(14);
+    for (const para of s.illustration) {
       const wrapped: string[] = doc.splitTextToSize(para, CONTENT_W);
       for (const line of wrapped) {
-        if (y + lineHeight > A4_H - MARGIN) {
-          doc.addPage([A4_W, A4_H]);
-          y = MARGIN;
-        }
+        if (y + 22 > A4_H - MARGIN) { doc.addPage([A4_W, A4_H]); y = MARGIN; }
         doc.text(line, MARGIN, y);
-        y += lineHeight;
+        y += 22;
       }
-      y += 8;
+      y += 12;
     }
   }
 
-  /* ─── Each Main Point on its own page ──────────────────────────── */
-  for (let i = 0; i < mainPoints.length; i++) {
-    const mp = mainPoints[i];
+  // ─── MAIN POINTS — each on its own page ──────────────────────
+  for (const mp of s.mainPoints) {
     doc.addPage([A4_W, A4_H]);
-    let y = MARGIN;
+    y = MARGIN;
 
-    // Numbered heading in bold
+    // Heading
     doc.setFont("times", "bold");
-    doc.setFontSize(22);
-    const headingText = `${i + 1}. ${mp.heading}`;
-    const headingLines: string[] = doc.splitTextToSize(headingText, CONTENT_W - 20);
+    doc.setFontSize(26);
+    const headingLines: string[] = doc.splitTextToSize(mp.heading, CONTENT_W);
     for (const hl of headingLines) {
-      doc.text(hl, MARGIN + 10, y);
-      y += 28;
+      doc.text(hl, MARGIN, y);
+      y += 34;
     }
-    y += 12;
+    y += 8;
 
-    // Bullets in regular font
+    // Summary paragraph
+    if (mp.summary) {
+      doc.setFont("times", "normal");
+      doc.setFontSize(15);
+      const summaryLines: string[] = doc.splitTextToSize(mp.summary, CONTENT_W);
+      for (const sl of summaryLines) {
+        doc.text(sl, MARGIN, y);
+        y += 22;
+      }
+      y += 14;
+    }
+
+    // 6 bullet points
     doc.setFont("times", "normal");
     doc.setFontSize(14);
     for (const bullet of mp.bullets) {
-      const bulletText = `• ${bullet}`;
-      const bulletLines: string[] = doc.splitTextToSize(bulletText, CONTENT_W - 40);
+      if (!bullet) continue;
+      const bulletText = `•  ${bullet}`;
+      const bulletLines: string[] = doc.splitTextToSize(bulletText, CONTENT_W - 30);
       for (const bl of bulletLines) {
-        if (y + 20 > A4_H - MARGIN) { doc.addPage([A4_W, A4_H]); y = MARGIN; }
-        doc.text(bl, MARGIN + 30, y);
-        y += 20;
+        doc.text(bl, MARGIN + 20, y);
+        y += 22;
       }
-      y += 6;
+      y += 10;
     }
   }
 
-  // Copyright on last page
+  // ─── Closing Page ────────────────────────────────────────────
+  if (s.closing.length > 0) {
+    doc.addPage([A4_W, A4_H]);
+    y = MARGIN;
+
+    doc.setFont("times", "bold");
+    doc.setFontSize(28);
+    doc.text("CLOSING", A4_W / 2, y, { align: "center" });
+    y += 44;
+
+    doc.setFont("times", "normal");
+    doc.setFontSize(14);
+    for (const para of s.closing) {
+      const wrapped: string[] = doc.splitTextToSize(para, CONTENT_W);
+      for (const line of wrapped) {
+        if (y + 22 > A4_H - MARGIN) { doc.addPage([A4_W, A4_H]); y = MARGIN; }
+        doc.text(line, MARGIN, y);
+        y += 22;
+      }
+      y += 12;
+    }
+  }
+
+  // Copyright
   doc.setFont("helvetica", "italic");
   doc.setFontSize(9);
   doc.text(
@@ -197,7 +386,7 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
   return doc.output("arraybuffer");
 }
 
-/* ── Handler ─────────────────────────────────────────────────────────── */
+/* ── Handler ─────────────────────────────────────────────────────── */
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
