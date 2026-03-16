@@ -178,7 +178,53 @@ export function parseExportStructure(
 
   // Extract illustration text
   const illustrationSections = rawSections.filter(s => s.type === "illustration" || s.type === "intro" || s.type === "body");
-  result.illustration = illustrationSections.flatMap(s => s.lines).filter(l => l.length > 0);
+  const illustrationLines = illustrationSections.flatMap(s => s.lines).filter(l => l.length > 0);
+
+  // ── Pull scripture text OUT of illustration lines if parser missed it ──
+  // If scriptureText is still empty, scan illustration lines for the scripture
+  // reference followed by verse text and move that content to the scripture page.
+  if (!result.scriptureText && scriptureNorm) {
+    const refIdx = illustrationLines.findIndex(l =>
+      l.toLowerCase().includes(scriptureNorm) ||
+      l.toLowerCase().replace(/[–—-]/g, "-").includes(scriptureNorm.replace(/[–—-]/g, "-"))
+    );
+    if (refIdx !== -1) {
+      // Gather the reference line + consecutive verse-like lines that follow
+      const extracted: string[] = [];
+      extracted.push(illustrationLines[refIdx]);
+      let endIdx = refIdx + 1;
+      // Heuristic: verse text usually starts with a quote mark or continues
+      // the passage. Stop when we hit a short standalone sentence that looks
+      // like the start of the actual illustration narrative.
+      while (endIdx < illustrationLines.length) {
+        const nextLine = illustrationLines[endIdx];
+        // If it looks like quoted scripture or a continuation verse, keep it
+        const looksLikeVerse = /^[""\u201C]/.test(nextLine) ||
+          nextLine.toLowerCase().startsWith("but ") ||
+          nextLine.toLowerCase().startsWith("and ") ||
+          nextLine.toLowerCase().startsWith("for ") ||
+          nextLine.toLowerCase().startsWith("then ") ||
+          nextLine.endsWith('"') || nextLine.endsWith('\u201D') ||
+          nextLine.endsWith('.\"') || nextLine.endsWith('."');
+        // If the previous extracted line ends mid-sentence (no period) keep going
+        const prevEndsOpen = extracted.length > 0 &&
+          !extracted[extracted.length - 1].endsWith('.') &&
+          !extracted[extracted.length - 1].endsWith('"') &&
+          !extracted[extracted.length - 1].endsWith('\u201D');
+        if (looksLikeVerse || prevEndsOpen) {
+          extracted.push(nextLine);
+          endIdx++;
+        } else {
+          break;
+        }
+      }
+      result.scriptureText = extracted.join("\n\n");
+      // Remove those lines from illustration
+      illustrationLines.splice(refIdx, extracted.length);
+    }
+  }
+
+  result.illustration = illustrationLines;
 
   // Extract closing
   const closingSections = rawSections.filter(s => s.type === "closing");
@@ -188,16 +234,11 @@ export function parseExportStructure(
   const mainPointSections = rawSections.filter(s => s.type === "mainpoint");
 
   if (mainPointSections.length > 0) {
-    // Use detected main points
     result.mainPoints = mainPointSections.map((mp, idx) => {
       const allLines = mp.lines;
-      // First substantial line is summary, rest become bullets
       const summary = allLines[0] || mp.heading;
       const bulletSource = allLines.slice(summary === mp.heading ? 0 : 1);
-
-      // Ensure exactly 6 bullets
       const bullets = ensureSixBullets(bulletSource);
-
       return {
         heading: `MAIN POINT ${toRoman(idx + 1)}`,
         summary: summary === mp.heading ? "" : summary,
@@ -205,15 +246,12 @@ export function parseExportStructure(
       };
     });
   } else {
-    // No bold headings detected — auto-create from body content
-    // Group all non-illustration, non-closing, non-scripture lines
     const bodyLines = rawSections
       .filter(s => s.type === "body")
       .flatMap(s => s.lines)
       .filter(l => l.length > 0);
 
     if (bodyLines.length > 0) {
-      // Split into ~4 equal groups for main points
       const numPoints = Math.min(4, Math.max(1, Math.ceil(bodyLines.length / 7)));
       const chunkSize = Math.ceil(bodyLines.length / numPoints);
 
