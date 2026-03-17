@@ -291,7 +291,7 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
     y = MARGIN;
 
     doc.setFont("times", "bold");
-    doc.setFontSize(28);
+    doc.setFontSize(34);
     doc.text("ILLUSTRATION", A4_W / 2, y, { align: "center" });
     y += 44;
 
