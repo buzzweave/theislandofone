@@ -337,16 +337,16 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
 
     // 6 bullet points
     doc.setFont("times", "normal");
-    doc.setFontSize(14);
+    doc.setFontSize(18);
     for (const bullet of mp.bullets) {
       if (!bullet) continue;
       const bulletText = `•  ${bullet}`;
       const bulletLines: string[] = doc.splitTextToSize(bulletText, CONTENT_W - 30);
       for (const bl of bulletLines) {
         doc.text(bl, MARGIN + 20, y);
-        y += 22;
+        y += 28;
       }
-      y += 10;
+      y += 14;
     }
   }
 
