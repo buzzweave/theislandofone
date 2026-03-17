@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useAdminVideos, useAddVideo, useUpdateVideo, useDeleteVideo, type Video } from "@/hooks/useVideos";
-import { api } from "@/lib/api";
+import { uploadToStorage } from "@/lib/supabaseUpload";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,8 +22,8 @@ function ThumbnailUploader({ currentUrl, onUploaded }: { currentUrl: string; onU
     if (!file) return;
     setUploading(true);
     try {
-      const res = await api.upload<{ url: string }>("/api/upload", file);
-      onUploaded(res.url);
+      const url = await uploadToStorage("workspace-media", file, "video-thumbnails");
+      onUploaded(url);
     } catch (err: any) {
       toast({ title: "Upload failed", description: err.message, variant: "destructive" });
     }
