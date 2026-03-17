@@ -222,9 +222,6 @@ export default function Login() {
                   <Link to="/membership">View Membership Plans</Link>
                 </Button>
                 <div className="space-y-2">
-                  <Link to="/redeem" className="block text-sm text-primary hover:text-primary/80 transition-colors font-medium">
-                    Have a lifetime access code? Redeem it here
-                  </Link>
                   <button
                     type="button"
                     onClick={() => { setStep("email"); setError(""); }}
