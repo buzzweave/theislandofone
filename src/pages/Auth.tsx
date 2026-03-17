@@ -5,32 +5,27 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Crown, Mail, Lock, User, Gift } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
+import { Card, CardContent, CardDescription } from "@/components/ui/card";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { Crown, Mail, Loader2, ArrowLeft, KeyRound, ShieldCheck, Gift } from "lucide-react";
 import { toast } from "sonner";
-import { lovable } from "@/integrations/lovable/index";
+
+type Step = "email" | "code";
 
 export default function Auth() {
-  const { signIn, signUp, user, checkSubscription } = useAuth();
+  const { user, checkSubscription } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const from = (location.state as any)?.from || "/";
   const inviteCode = searchParams.get("invite");
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [step, setStep] = useState<Step>("email");
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [inviteRedeemed, setInviteRedeemed] = useState(false);
-
-  // Login form
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
-
-  // Signup form
-  const [signupEmail, setSignupEmail] = useState("");
-  const [signupPassword, setSignupPassword] = useState("");
-  const [signupName, setSignupName] = useState("");
 
   // Auto-redeem invite after login/signup
   useEffect(() => {
@@ -56,29 +51,66 @@ export default function Auth() {
     }
   }, [user, inviteCode, inviteRedeemed]);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleRequestCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    const { error } = await signIn(loginEmail, loginPassword);
-    setIsSubmitting(false);
-    if (error) {
-      toast.error(error);
-    } else {
-      toast.success("Welcome back!");
-      // navigate handled by useEffect above if invite present
-      if (!inviteCode) navigate(from, { replace: true });
+    if (!email.trim()) { setError("Please enter your email."); return; }
+    setError("");
+    setLoading(true);
+
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("request-login-code", {
+        body: { email: email.trim() },
+      });
+      if (fnError) throw fnError;
+
+      if (data?.success) {
+        setStep("code");
+      } else {
+        setError(data?.message || "Something went wrong.");
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to send code.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSignup = async (e: React.FormEvent) => {
+  const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    const { error } = await signUp(signupEmail, signupPassword, signupName);
-    setIsSubmitting(false);
-    if (error) {
-      toast.error(error);
-    } else {
-      toast.success("Check your email to confirm your account.");
+    if (code.length !== 6) { setError("Please enter the full 6-character code."); return; }
+    setError("");
+    setLoading(true);
+
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("verify-login-code", {
+        body: { email: email.trim(), code },
+      });
+      if (fnError) throw fnError;
+
+      if (data?.error) {
+        setError(data.message || "Invalid code.");
+        setLoading(false);
+        return;
+      }
+
+      if (data?.token_hash) {
+        const { error: verifyError } = await supabase.auth.verifyOtp({
+          type: "magiclink",
+          token_hash: data.token_hash,
+        });
+        if (verifyError) throw verifyError;
+      } else if (data?.action_link) {
+        window.location.href = data.action_link;
+        return;
+      }
+
+      await checkSubscription();
+      toast.success("Welcome!");
+      navigate(from, { replace: true });
+    } catch (err: any) {
+      setError(err.message || "Failed to verify code.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -91,190 +123,132 @@ export default function Auth() {
               <Gift className="h-10 w-10 text-primary mx-auto mb-3" />
               <h1 className="font-display text-3xl font-bold">You're Invited!</h1>
               <p className="text-muted-foreground text-sm mt-1">
-                Sign up or sign in to claim your <strong>free lifetime Inner Circle membership</strong>.
+                Enter your email to claim your <strong>free lifetime Inner Circle membership</strong>.
               </p>
             </>
           ) : (
             <>
               <Crown className="h-10 w-10 text-primary mx-auto mb-3" />
-              <h1 className="font-display text-3xl font-bold">Welcome</h1>
+              <h1 className="font-display text-3xl font-bold">Join Us</h1>
               <p className="text-muted-foreground text-sm mt-1">
-                Sign in to access your purchases and membership.
+                The Island of One Ministries
               </p>
             </>
           )}
         </div>
 
         <Card>
-          <Tabs defaultValue={inviteCode ? "signup" : "login"}>
-            <CardHeader className="pb-2">
-              <TabsList className="w-full">
-                <TabsTrigger value="login" className="flex-1">Sign In</TabsTrigger>
-                <TabsTrigger value="signup" className="flex-1">Create Account</TabsTrigger>
-              </TabsList>
-            </CardHeader>
-
-            <CardContent>
-              {/* Social sign-in buttons */}
-              <div className="space-y-3 mb-4">
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={async () => {
-                    const { error } = await lovable.auth.signInWithOAuth("google", {
-                      redirect_uri: window.location.origin,
-                    });
-                    if (error) toast.error("Google sign-in failed");
-                  }}
-                >
-                  <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                  </svg>
-                  Continue with Google
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={async () => {
-                    const { error } = await lovable.auth.signInWithOAuth("apple", {
-                      redirect_uri: window.location.origin,
-                    });
-                    if (error) toast.error("Apple sign-in failed");
-                  }}
-                >
-                  <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-                  </svg>
-                  Continue with Apple
-                </Button>
-              </div>
-
-              <div className="relative mb-4">
-                <Separator />
-                <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-3 text-xs text-muted-foreground">
-                  or
-                </span>
-              </div>
-
-              <TabsContent value="login" className="mt-0">
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-email">Email</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="login-email"
-                        type="email"
-                        placeholder="you@example.com"
-                        className="pl-10"
-                        value={loginEmail}
-                        onChange={(e) => setLoginEmail(e.target.value)}
-                        required
-                      />
-                    </div>
+          <CardContent className="pt-6">
+            {step === "email" && (
+              <form onSubmit={handleRequestCode} className="space-y-5">
+                <CardDescription className="text-center">
+                  Enter your email to receive a 6-digit code.
+                </CardDescription>
+                <div className="space-y-2">
+                  <Label htmlFor="auth-email">Email Address</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="auth-email"
+                      type="email"
+                      placeholder="you@example.com"
+                      className="pl-10"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      autoFocus
+                    />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password">Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="login-password"
-                        type="password"
-                        placeholder="••••••••"
-                        className="pl-10"
-                        value={loginPassword}
-                        onChange={(e) => setLoginPassword(e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-                  <Button type="submit" className="w-full" disabled={isSubmitting}>
-                    {isSubmitting ? "Signing in…" : "Sign In"}
-                  </Button>
-                  <Button
+                </div>
+                {error && <p className="text-sm text-destructive">{error}</p>}
+                <Button type="submit" className="w-full" size="lg" disabled={loading}>
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Mail className="h-4 w-4 mr-2" />}
+                  Send Code
+                </Button>
+                <div className="text-center">
+                  <button
                     type="button"
-                    variant="link"
-                    className="w-full text-sm text-muted-foreground"
-                    onClick={async () => {
-                      if (!loginEmail) {
-                        toast.error("Enter your email above first.");
+                    onClick={() => {
+                      if (!email.trim()) {
+                        setError("Please enter your email first.");
                         return;
                       }
-                      const { error } = await supabase.auth.resetPasswordForEmail(loginEmail, {
-                        redirectTo: window.location.origin + "/reset-password",
-                      });
-                      if (error) {
-                        toast.error(error.message);
-                      } else {
-                        toast.success("Check your email for a password reset link.");
-                      }
+                      setError("");
+                      setStep("code");
                     }}
+                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
                   >
-                    Forgot your password?
-                  </Button>
-                </form>
-              </TabsContent>
+                    Already have a code? Enter it here
+                  </button>
+                </div>
+              </form>
+            )}
 
-              <TabsContent value="signup" className="mt-0">
-                <form onSubmit={handleSignup} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-name">Full Name</Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signup-name"
-                        type="text"
-                        placeholder="Your name"
-                        className="pl-10"
-                        value={signupName}
-                        onChange={(e) => setSignupName(e.target.value)}
-                      />
-                    </div>
+            {step === "code" && (
+              <form onSubmit={handleVerifyCode} className="space-y-5">
+                <div className="text-center">
+                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                    <KeyRound className="h-6 w-6 text-primary" />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email">Email</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signup-email"
-                        type="email"
-                        placeholder="you@example.com"
-                        className="pl-10"
-                        value={signupEmail}
-                        onChange={(e) => setSignupEmail(e.target.value)}
-                        required
-                      />
-                    </div>
+                  <CardDescription>
+                    Enter the 6-digit code sent to your email.
+                  </CardDescription>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="code-email">Email Address</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="code-email"
+                      type="email"
+                      placeholder="you@example.com"
+                      className="pl-10"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password">Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="signup-password"
-                        type="password"
-                        placeholder="At least 6 characters"
-                        className="pl-10"
-                        value={signupPassword}
-                        onChange={(e) => setSignupPassword(e.target.value)}
-                        required
-                        minLength={6}
-                      />
-                    </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>6-Digit Code</Label>
+                  <div className="flex justify-center">
+                    <InputOTP maxLength={6} value={code} onChange={setCode} inputMode="text" pattern="^[a-zA-Z0-9]+$">
+                      <InputOTPGroup>
+                        <InputOTPSlot index={0} />
+                        <InputOTPSlot index={1} />
+                        <InputOTPSlot index={2} />
+                        <InputOTPSlot index={3} />
+                        <InputOTPSlot index={4} />
+                        <InputOTPSlot index={5} />
+                      </InputOTPGroup>
+                    </InputOTP>
                   </div>
-                  <Button type="submit" className="w-full" disabled={isSubmitting}>
-                    {isSubmitting ? "Creating account…" : "Create Account"}
-                  </Button>
-                  <p className="text-xs text-muted-foreground text-center">
-                    You'll receive an email to confirm your account.
-                  </p>
-                </form>
-              </TabsContent>
-            </CardContent>
-          </Tabs>
+                </div>
+                {error && <p className="text-sm text-destructive text-center">{error}</p>}
+                <Button type="submit" className="w-full" size="lg" disabled={loading || code.length !== 6 || !email.trim()}>
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
+                  Verify & Join
+                </Button>
+                <div className="flex justify-between">
+                  <button
+                    type="button"
+                    onClick={() => { setStep("email"); setCode(""); setError(""); }}
+                    className="text-sm text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
+                  >
+                    <ArrowLeft className="h-3 w-3" /> Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRequestCode}
+                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                    disabled={loading || !email.trim()}
+                  >
+                    Send me a code
+                  </button>
+                </div>
+              </form>
+            )}
+          </CardContent>
         </Card>
       </div>
     </div>
