@@ -242,14 +242,14 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
 
   // ─── PAGE 1: Title Only ──────────────────────────────────────
   doc.setFont("times", "bold");
-  doc.setFontSize(42);
+  doc.setFontSize(52);
   const titleLines: string[] = doc.splitTextToSize(s.title, CONTENT_W);
-  const titleBlockH = titleLines.length * 50;
+  const titleBlockH = titleLines.length * 62;
   y = (A4_H / 2) - (titleBlockH / 2);
   if (y < MARGIN) y = MARGIN;
   for (const line of titleLines) {
     doc.text(line, A4_W / 2, y, { align: "center" });
-    y += 50;
+    y += 62;
   }
 
   // ─── PAGE 2: Scripture ───────────────────────────────────────
