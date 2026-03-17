@@ -361,15 +361,15 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
     y += 44;
 
     doc.setFont("times", "normal");
-    doc.setFontSize(14);
+    doc.setFontSize(18);
     for (const para of s.closing) {
       const wrapped: string[] = doc.splitTextToSize(para, CONTENT_W);
       for (const line of wrapped) {
-        if (y + 22 > A4_H - MARGIN) { doc.addPage([A4_W, A4_H]); y = MARGIN; }
+        if (y + 28 > A4_H - MARGIN) { doc.addPage([A4_W, A4_H]); y = MARGIN; }
         doc.text(line, MARGIN, y);
-        y += 22;
+        y += 28;
       }
-      y += 12;
+      y += 16;
     }
   }
 
