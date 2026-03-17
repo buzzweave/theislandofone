@@ -315,11 +315,11 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
 
     // Heading
     doc.setFont("times", "bold");
-    doc.setFontSize(26);
+    doc.setFontSize(32);
     const headingLines: string[] = doc.splitTextToSize(mp.heading, CONTENT_W);
     for (const hl of headingLines) {
       doc.text(hl, MARGIN, y);
-      y += 34;
+      y += 40;
     }
     y += 8;
 
