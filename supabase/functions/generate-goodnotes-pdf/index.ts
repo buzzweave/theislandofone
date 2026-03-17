@@ -242,14 +242,14 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
 
   // ─── PAGE 1: Title Only ──────────────────────────────────────
   doc.setFont("times", "bold");
-  doc.setFontSize(42);
+  doc.setFontSize(52);
   const titleLines: string[] = doc.splitTextToSize(s.title, CONTENT_W);
-  const titleBlockH = titleLines.length * 50;
+  const titleBlockH = titleLines.length * 62;
   y = (A4_H / 2) - (titleBlockH / 2);
   if (y < MARGIN) y = MARGIN;
   for (const line of titleLines) {
     doc.text(line, A4_W / 2, y, { align: "center" });
-    y += 50;
+    y += 62;
   }
 
   // ─── PAGE 2: Scripture ───────────────────────────────────────
@@ -258,29 +258,29 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
     y = MARGIN;
 
     doc.setFont("times", "bold");
-    doc.setFontSize(28);
+    doc.setFontSize(34);
     doc.text("SCRIPTURE", A4_W / 2, y, { align: "center" });
     y += 44;
 
     if (s.scriptureReference) {
       doc.setFont("times", "italic");
-      doc.setFontSize(18);
+      doc.setFontSize(22);
       const refLines: string[] = doc.splitTextToSize(s.scriptureReference, CONTENT_W);
       for (const line of refLines) {
         doc.text(line, A4_W / 2, y, { align: "center" });
-        y += 24;
+        y += 30;
       }
       y += 16;
     }
 
     if (s.scriptureText) {
       doc.setFont("times", "normal");
-      doc.setFontSize(16);
+      doc.setFontSize(20);
       const textLines: string[] = doc.splitTextToSize(s.scriptureText, CONTENT_W);
       for (const line of textLines) {
-        if (y + 22 > A4_H - MARGIN) { doc.addPage([A4_W, A4_H]); y = MARGIN; }
+        if (y + 28 > A4_H - MARGIN) { doc.addPage([A4_W, A4_H]); y = MARGIN; }
         doc.text(line, MARGIN, y);
-        y += 22;
+        y += 28;
       }
     }
   }
@@ -291,20 +291,20 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
     y = MARGIN;
 
     doc.setFont("times", "bold");
-    doc.setFontSize(28);
+    doc.setFontSize(34);
     doc.text("ILLUSTRATION", A4_W / 2, y, { align: "center" });
     y += 44;
 
     doc.setFont("times", "normal");
-    doc.setFontSize(14);
+    doc.setFontSize(18);
     for (const para of s.illustration) {
       const wrapped: string[] = doc.splitTextToSize(para, CONTENT_W);
       for (const line of wrapped) {
-        if (y + 22 > A4_H - MARGIN) { doc.addPage([A4_W, A4_H]); y = MARGIN; }
+        if (y + 28 > A4_H - MARGIN) { doc.addPage([A4_W, A4_H]); y = MARGIN; }
         doc.text(line, MARGIN, y);
-        y += 22;
+        y += 28;
       }
-      y += 12;
+      y += 16;
     }
   }
 
@@ -315,38 +315,38 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
 
     // Heading
     doc.setFont("times", "bold");
-    doc.setFontSize(26);
+    doc.setFontSize(32);
     const headingLines: string[] = doc.splitTextToSize(mp.heading, CONTENT_W);
     for (const hl of headingLines) {
       doc.text(hl, MARGIN, y);
-      y += 34;
+      y += 40;
     }
     y += 8;
 
     // Summary paragraph
     if (mp.summary) {
       doc.setFont("times", "normal");
-      doc.setFontSize(15);
+      doc.setFontSize(19);
       const summaryLines: string[] = doc.splitTextToSize(mp.summary, CONTENT_W);
       for (const sl of summaryLines) {
         doc.text(sl, MARGIN, y);
-        y += 22;
+        y += 28;
       }
-      y += 14;
+      y += 16;
     }
 
     // 6 bullet points
     doc.setFont("times", "normal");
-    doc.setFontSize(14);
+    doc.setFontSize(18);
     for (const bullet of mp.bullets) {
       if (!bullet) continue;
       const bulletText = `•  ${bullet}`;
       const bulletLines: string[] = doc.splitTextToSize(bulletText, CONTENT_W - 30);
       for (const bl of bulletLines) {
         doc.text(bl, MARGIN + 20, y);
-        y += 22;
+        y += 28;
       }
-      y += 10;
+      y += 14;
     }
   }
 
@@ -356,20 +356,20 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
     y = MARGIN;
 
     doc.setFont("times", "bold");
-    doc.setFontSize(28);
+    doc.setFontSize(34);
     doc.text("CLOSING", A4_W / 2, y, { align: "center" });
     y += 44;
 
     doc.setFont("times", "normal");
-    doc.setFontSize(14);
+    doc.setFontSize(18);
     for (const para of s.closing) {
       const wrapped: string[] = doc.splitTextToSize(para, CONTENT_W);
       for (const line of wrapped) {
-        if (y + 22 > A4_H - MARGIN) { doc.addPage([A4_W, A4_H]); y = MARGIN; }
+        if (y + 28 > A4_H - MARGIN) { doc.addPage([A4_W, A4_H]); y = MARGIN; }
         doc.text(line, MARGIN, y);
-        y += 22;
+        y += 28;
       }
-      y += 12;
+      y += 16;
     }
   }
 
