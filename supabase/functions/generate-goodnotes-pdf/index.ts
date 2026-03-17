@@ -326,13 +326,13 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
     // Summary paragraph
     if (mp.summary) {
       doc.setFont("times", "normal");
-      doc.setFontSize(15);
+      doc.setFontSize(19);
       const summaryLines: string[] = doc.splitTextToSize(mp.summary, CONTENT_W);
       for (const sl of summaryLines) {
         doc.text(sl, MARGIN, y);
-        y += 22;
+        y += 28;
       }
-      y += 14;
+      y += 16;
     }
 
     // 6 bullet points
