@@ -264,11 +264,11 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
 
     if (s.scriptureReference) {
       doc.setFont("times", "italic");
-      doc.setFontSize(18);
+      doc.setFontSize(22);
       const refLines: string[] = doc.splitTextToSize(s.scriptureReference, CONTENT_W);
       for (const line of refLines) {
         doc.text(line, A4_W / 2, y, { align: "center" });
-        y += 24;
+        y += 30;
       }
       y += 16;
     }
