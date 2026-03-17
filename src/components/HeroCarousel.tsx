@@ -103,6 +103,13 @@ export default function HeroCarousel() {
             Browse Sermons
           </Link>
         </div>
+        {/* Membership CTA – visible on mobile & tablet only */}
+        <Link
+          to="/membership"
+          className="lg:hidden mt-4 w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-3.5 rounded-full bg-primary/15 border border-primary/40 text-primary font-semibold text-sm hover:bg-primary/25 transition-all"
+        >
+          Join & Support Our Ministry <ArrowRight className="h-4 w-4" />
+        </Link>
       </div>
 
       {/* Navigation arrows */}
