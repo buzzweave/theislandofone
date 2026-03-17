@@ -102,7 +102,7 @@ export default function Login() {
             {step === "email" && (
               <form onSubmit={handleRequestCode} className="space-y-5">
                 <CardDescription className="text-center">
-                  Enter your email to receive a login code, or enter your lifetime access code below.
+                  Enter your email to receive a 6-digit login code.
                 </CardDescription>
                 <div className="space-y-2">
                   <Label htmlFor="login-email">Email Address</Label>
