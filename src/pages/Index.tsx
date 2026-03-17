@@ -176,6 +176,20 @@ function FeaturedBooksSection() {
             View All Books <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
+        <div className="mt-12 sm:mt-16 text-center">
+          <div className="inline-block rounded-2xl bg-primary/10 border border-primary/20 px-8 sm:px-12 py-8 sm:py-10">
+            <h3 className="font-display text-xl sm:text-2xl font-bold mb-3">Join & Save as a Member</h3>
+            <p className="text-muted-foreground text-sm sm:text-base max-w-md mx-auto mb-6">
+              Unlock exclusive books, sermons, and resources. Support our ministry and grow in your faith journey.
+            </p>
+            <Link
+              to="/membership"
+              className="inline-flex items-center gap-2 px-8 py-3.5 rounded-full bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-all shadow-gold"
+            >
+              Support Our Ministry <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
       </div>
     </section>
   );
