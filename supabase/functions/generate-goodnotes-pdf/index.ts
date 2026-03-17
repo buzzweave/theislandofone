@@ -275,12 +275,12 @@ function generatePdf(data: SermonPayload): ArrayBuffer {
 
     if (s.scriptureText) {
       doc.setFont("times", "normal");
-      doc.setFontSize(16);
+      doc.setFontSize(20);
       const textLines: string[] = doc.splitTextToSize(s.scriptureText, CONTENT_W);
       for (const line of textLines) {
-        if (y + 22 > A4_H - MARGIN) { doc.addPage([A4_W, A4_H]); y = MARGIN; }
+        if (y + 28 > A4_H - MARGIN) { doc.addPage([A4_W, A4_H]); y = MARGIN; }
         doc.text(line, MARGIN, y);
-        y += 22;
+        y += 28;
       }
     }
   }
