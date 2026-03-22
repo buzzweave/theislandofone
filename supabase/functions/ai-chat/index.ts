@@ -284,7 +284,20 @@ serve(async (req) => {
         console.log(`[generate_draft] Attempt 2: plain text fallback`);
         try {
           const fallbackPrompt = isSermon
-            ? `Write a complete sermon on: "${userPrompt}". Use the voice of Jentezen Franklin and T.D. Jakes. Include these sections with headings in ALL CAPS on their own lines: OPENING ILLUSTRATION, SCRIPTURE, MAIN POINT I, MAIN POINT II, MAIN POINT III, CLOSING DECLARATION, ALTAR CALL. Use • for bullet points. Write at least 1500 words.`
+            ? `Write a complete sermon on: "${userPrompt}" in the prophetic preaching voice of Jentezen Franklin and T.D. Jakes. Tone: prophetic authority, rhythmic momentum, revelation-heavy, declarative. NO filler language.
+
+Use these section headings in ALL CAPS on their own lines:
+SERMON NOTES (1-2 prophetic paragraphs)
+ILLUSTRATION (real, specific, vivid — from science, nature, history, or biology)
+KEY TRUTH (exactly 4 bullet points, each exactly 2 sentences)
+I. [MAIN POINT TITLE] (teaching paragraph + exactly 4 bullets of 2 sentences each + KEY POINT paragraph)
+II. [MAIN POINT TITLE] (same structure)
+MIDWAY ILLUSTRATION (high-power: scientific phenomena, historical breakthroughs, or extreme natural events)
+III. [MAIN POINT TITLE] (same structure)
+CLOSING DECLARATION (exactly 4 bullets, each 2 sentences)
+ALTAR CALL (authoritative, urgent, with repeat-after-me declarations)
+
+Use the bullet character for all bullet points. Write at least 1500 words.`
             : `Write a complete Christian book about: "${userPrompt}". Include a Preface and at least 5 chapters. Each chapter should be at least 500 words. Write in an engaging, faith-driven style.`;
 
           const response = await fetch("https://api.openai.com/v1/chat/completions", {
