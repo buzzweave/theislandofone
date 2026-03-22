@@ -6,7 +6,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Safe-string helper: guarantees a string, never null/undefined/object
 const safeStr = (val: unknown, fallback = ""): string => {
   if (val == null) return fallback;
   if (typeof val === "string") return val;
@@ -14,7 +13,6 @@ const safeStr = (val: unknown, fallback = ""): string => {
   try { return JSON.stringify(val); } catch { return fallback; }
 };
 
-// Extract scripture reference: if AI returned an object like {reference, text}, extract just the reference string
 const extractScriptureRef = (val: unknown): string => {
   if (val == null) return "";
   if (typeof val === "string") {
@@ -32,6 +30,122 @@ const extractScriptureRef = (val: unknown): string => {
   }
   return String(val);
 };
+
+// ── Sermon tool schema for structured output via tool calling ──
+const SERMON_TOOL = {
+  type: "function",
+  function: {
+    name: "save_sermon",
+    description: "Save a generated sermon with all required fields",
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "A strong, memorable sermon title" },
+        scripture_reference: { type: "string", description: "Scripture reference like 'Romans 8:28 (KJV)'" },
+        category: { type: "string", enum: ["Faith", "Worship", "Calling", "Leadership", "Deliverance", "Prayer", "Family"] },
+        excerpt: { type: "string", description: "A compelling 2-3 sentence summary of the sermon" },
+        full_text: { type: "string", description: "The COMPLETE formatted sermon manuscript with section headings in ALL CAPS, bullet points using •, and clear paragraph breaks. Must include: OPENING ILLUSTRATION, SCRIPTURE, MAIN POINT I, MAIN POINT II, MAIN POINT III, CLOSING DECLARATION, ALTAR CALL sections." },
+      },
+      required: ["title", "scripture_reference", "category", "excerpt", "full_text"],
+      additionalProperties: false,
+    },
+  },
+};
+
+// ── Book tool schema ──
+const BOOK_TOOL = {
+  type: "function",
+  function: {
+    name: "save_book",
+    description: "Save a generated book with all required fields",
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Book title" },
+        subtitle: { type: "string", description: "Book subtitle" },
+        author: { type: "string", description: "Author name" },
+        description: { type: "string", description: "Book description/summary" },
+        chapters: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              content: { type: "string" },
+            },
+            required: ["title", "content"],
+          },
+          description: "Array of chapters, each with title and content (minimum 500 words per chapter)",
+        },
+      },
+      required: ["title", "subtitle", "author", "description", "chapters"],
+      additionalProperties: false,
+    },
+  },
+};
+
+const SERMON_SYSTEM_PROMPT = `You are a powerful sermon writer in the voice of Jentezen Franklin and T.D. Jakes. Write bold, Spirit-filled sermons with vivid illustrations and strong biblical teaching.
+
+You MUST call the save_sermon function with ALL fields filled. The full_text field must be the COMPLETE sermon manuscript formatted exactly like this:
+
+OPENING ILLUSTRATION
+
+[Vivid opening story, 2-3 paragraphs]
+
+SCRIPTURE
+[Scripture reference and full text]
+
+I. [FIRST MAIN POINT TITLE IN ALL CAPS]
+
+[Teaching paragraph]
+
+• [Bullet point 1]
+• [Bullet point 2]
+• [Bullet point 3]
+• [Bullet point 4]
+
+KEY POINT: [Summary sentence]
+
+II. [SECOND MAIN POINT TITLE IN ALL CAPS]
+
+[Teaching paragraph]
+
+• [Bullet point 1]
+• [Bullet point 2]
+• [Bullet point 3]
+• [Bullet point 4]
+
+KEY POINT: [Summary sentence]
+
+III. [THIRD MAIN POINT TITLE IN ALL CAPS]
+
+[Teaching paragraph]
+
+• [Bullet point 1]
+• [Bullet point 2]
+• [Bullet point 3]
+• [Bullet point 4]
+
+KEY POINT: [Summary sentence]
+
+CLOSING DECLARATION
+
+[Strong closing paragraphs]
+
+ALTAR CALL
+
+[Invitation to respond]
+
+IMPORTANT RULES:
+- full_text MUST contain the entire sermon, not a summary
+- Section headings must be ALL CAPS on their own line
+- Use • for bullet points
+- Include clear paragraph breaks between sections
+- The sermon must be at least 1500 words`;
+
+const BOOK_SYSTEM_PROMPT = `You are a Christian book author writing in an engaging, faith-driven style similar to Jentezen Franklin. Generate a complete book with substantial chapters.
+
+You MUST call the save_book function with ALL fields. Each chapter must have at least 500 words of content. Include a Preface as the first chapter. Write with passion, biblical depth, and practical application.`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -53,7 +167,7 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization") || "";
     const token = authHeader.replace("Bearer ", "");
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "";
-    
+
     let userId: string | null = null;
     let isAdmin = false;
     if (token && token !== anonKey) {
@@ -71,7 +185,9 @@ serve(async (req) => {
       console.log("Auth soft-pass: session may be expired, allowing action:", action);
     }
 
-    // --- Generate Draft (book or sermon) ---
+    // ═══════════════════════════════════════════════════════
+    // GENERATE DRAFT (book or sermon) — tool calling approach
+    // ═══════════════════════════════════════════════════════
     if (action === "generate_draft") {
       if (!draftType || !userPrompt) {
         return new Response(JSON.stringify({ error: "Missing draftType or userPrompt" }), {
@@ -79,342 +195,218 @@ serve(async (req) => {
         });
       }
 
-      const sysPrompt = customSystemPrompt || (draftType === "book"
-        ? "You are a Christian book author. Return valid JSON with: title, subtitle, author, description, chapters (array of {title, content}). Each chapter should have at least 300 words."
-        : "You are a sermon writer for a Christian ministry. Return valid JSON with these exact keys: title (string — a strong, memorable sermon title), scripture (plain scripture reference string like \"Romans 8:28\" — do NOT return an object), excerpt (a compelling 2-3 sentence summary of the sermon that captures the main theme and draws the reader in), manuscript (the full sermon text as a single string — this is the most important field and must contain the complete sermon body with headings, bullet points, and all content), category (one of: Faith, Worship, Calling, Leadership, Deliverance, Prayer, Family — choose the best fit for the sermon topic). ALL fields are required. The excerpt MUST be a meaningful summary, not empty.");
+      const isSermon = draftType !== "book";
+      const sysPrompt = customSystemPrompt || (isSermon ? SERMON_SYSTEM_PROMPT : BOOK_SYSTEM_PROMPT);
+      const tool = isSermon ? SERMON_TOOL : BOOK_TOOL;
+      const toolName = isSermon ? "save_sermon" : "save_book";
 
-      console.log(`[generate_draft] Starting ${draftType} generation with model: ${model}`);
+      console.log(`[generate_draft] Starting ${draftType} generation for: "${userPrompt.substring(0, 100)}"`);
 
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: "system", content: sysPrompt + "\n\nIMPORTANT: Return ONLY valid JSON, no markdown code blocks." },
-            { role: "user", content: userPrompt },
-          ],
-          max_tokens: 8000,
-          temperature: 0.7,
-        }),
-      });
+      // ── Attempt 1: Tool calling for guaranteed structure ──
+      let parsed: Record<string, any> | null = null;
 
-      if (!response.ok) {
-        const errText = await response.text();
-        console.error(`[generate_draft] OpenAI API error: ${response.status}`, errText.substring(0, 300));
-        return new Response(JSON.stringify({ error: `OpenAI error (${response.status}): ${errText.substring(0, 200)}` }), {
+      try {
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: "system", content: sysPrompt },
+              { role: "user", content: userPrompt },
+            ],
+            tools: [tool],
+            tool_choice: { type: "function", function: { name: toolName } },
+            max_tokens: 8000,
+            temperature: 0.7,
+          }),
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          console.error(`[generate_draft] Attempt 1 API error: ${response.status}`, errText.substring(0, 300));
+          throw new Error(`OpenAI API error: ${response.status}`);
+        }
+
+        const aiResult = await response.json();
+        const toolCall = aiResult.choices?.[0]?.message?.tool_calls?.[0];
+
+        if (toolCall?.function?.arguments) {
+          console.log(`[generate_draft] Tool call received, parsing arguments (${toolCall.function.arguments.length} chars)`);
+          parsed = JSON.parse(toolCall.function.arguments);
+          console.log(`[generate_draft] Attempt 1 SUCCESS — keys: ${Object.keys(parsed!).join(", ")}`);
+        } else {
+          // Model returned content instead of tool call — try to extract
+          const content = aiResult.choices?.[0]?.message?.content || "";
+          console.log(`[generate_draft] No tool call, got content (${content.length} chars), trying JSON parse`);
+          const cleaned = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+          try {
+            parsed = JSON.parse(cleaned);
+          } catch {
+            // Content is plain text — use as manuscript
+            if (isSermon && content.length > 100) {
+              parsed = { title: userPrompt, full_text: content, scripture_reference: "", category: "Faith", excerpt: "" };
+            }
+          }
+        }
+      } catch (e) {
+        console.error(`[generate_draft] Attempt 1 failed:`, e);
+      }
+
+      // ── Attempt 2: Plain text fallback if attempt 1 failed ──
+      if (!parsed || (isSermon && !parsed.full_text && !parsed.manuscript && !parsed.content)) {
+        console.log(`[generate_draft] Attempt 2: plain text fallback`);
+        try {
+          const fallbackPrompt = isSermon
+            ? `Write a complete sermon on: "${userPrompt}". Use the voice of Jentezen Franklin and T.D. Jakes. Include these sections with headings in ALL CAPS on their own lines: OPENING ILLUSTRATION, SCRIPTURE, MAIN POINT I, MAIN POINT II, MAIN POINT III, CLOSING DECLARATION, ALTAR CALL. Use • for bullet points. Write at least 1500 words.`
+            : `Write a complete Christian book about: "${userPrompt}". Include a Preface and at least 5 chapters. Each chapter should be at least 500 words. Write in an engaging, faith-driven style.`;
+
+          const response = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model,
+              messages: [{ role: "user", content: fallbackPrompt }],
+              max_tokens: 8000,
+              temperature: 0.7,
+            }),
+          });
+
+          if (response.ok) {
+            const aiResult = await response.json();
+            const content = aiResult.choices?.[0]?.message?.content || "";
+            console.log(`[generate_draft] Attempt 2 got ${content.length} chars`);
+
+            if (content.length > 100) {
+              if (isSermon) {
+                // Extract title from first line
+                const lines = content.split("\n").map((l: string) => l.trim()).filter(Boolean);
+                let title = userPrompt;
+                let manuscriptBody = content;
+                if (lines.length > 0) {
+                  const firstLine = lines[0].replace(/^#+\s*/, "").replace(/^\*\*(.+)\*\*$/, "$1").trim();
+                  if (firstLine.length > 3 && firstLine.length < 150) {
+                    title = firstLine;
+                    const idx = content.indexOf(lines[0]);
+                    if (idx >= 0) manuscriptBody = content.substring(idx + lines[0].length).trim();
+                  }
+                }
+                let scripture = "";
+                const scriptureMatch = content.match(/(?:scripture|text|passage)\s*[:—–-]\s*(.+)/i);
+                if (scriptureMatch) scripture = scriptureMatch[1].trim().replace(/\*+/g, "").substring(0, 150);
+
+                parsed = { title, full_text: manuscriptBody, scripture_reference: scripture, category: "Faith", excerpt: "" };
+              } else {
+                // Book: split by chapter headings
+                parsed = { title: userPrompt, subtitle: "", author: "Bryant Clark", description: "", chapters: [{ title: "Full Content", content }] };
+                // Try to split chapters
+                const chapterSplits = content.split(/\n(?=(?:Chapter\s+\d+|CHAPTER\s+\d+|Preface|PREFACE)\b)/i);
+                if (chapterSplits.length > 1) {
+                  parsed.chapters = chapterSplits.map((c: string, i: number) => {
+                    const firstLine = c.split("\n")[0]?.replace(/^#+\s*/, "").replace(/\*+/g, "").trim() || `Chapter ${i + 1}`;
+                    return { title: firstLine, content: c.trim() };
+                  });
+                }
+              }
+              console.log(`[generate_draft] Attempt 2 SUCCESS`);
+            }
+          }
+        } catch (e2) {
+          console.error(`[generate_draft] Attempt 2 failed:`, e2);
+        }
+      }
+
+      // ── Final check ──
+      if (!parsed) {
+        return new Response(JSON.stringify({ error: "AI generation failed after 2 attempts. Please try again." }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const aiResult = await response.json();
-      let content = aiResult.choices?.[0]?.message?.content || "";
-      
-      console.log(`[generate_draft] OpenAI response received, length: ${content.length}`);
-
-      // Clean markdown code blocks if present
-      content = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-      
-      let parsed: Record<string, any>;
-      let isPlainText = false;
-      try {
-        parsed = JSON.parse(content);
-      } catch (parseErr) {
-        console.log("[generate_draft] JSON parse failed, treating as plain text manuscript");
-        isPlainText = true;
-        // Extract title from first line if it looks like a heading
-        const lines = content.split("\n").map((l: string) => l.trim()).filter(Boolean);
-        let extractedTitle = userPrompt;
-        let manuscriptBody = content;
-        if (lines.length > 0) {
-          const firstLine = lines[0].replace(/^#+\s*/, "").replace(/^\*\*(.+)\*\*$/, "$1").trim();
-          // Use first line as title if it's short enough and looks like a title
-          if (firstLine.length > 3 && firstLine.length < 150) {
-            extractedTitle = firstLine;
-            // Remove the title line from the manuscript body
-            const idx = content.indexOf(lines[0]);
-            if (idx >= 0) {
-              manuscriptBody = content.substring(idx + lines[0].length).trim();
-            }
-          }
-        }
-        // Extract scripture reference if present (e.g. "Scripture: Romans 8:28" or "Text: John 3:16")
-        let extractedScripture = "";
-        const scriptureMatch = content.match(/(?:scripture|text|passage|reference)\s*[:—–-]\s*(.+)/i);
-        if (scriptureMatch) {
-          extractedScripture = scriptureMatch[1].trim().replace(/\*+/g, "");
-        }
-        // Extract category
-        let extractedCategory = "Faith";
-        const categoryMatch = content.match(/(?:category|theme)\s*[:—–-]\s*(.+)/i);
-        if (categoryMatch) {
-          const cat = categoryMatch[1].trim();
-          const validCats = ["Faith", "Worship", "Calling", "Leadership", "Deliverance", "Prayer", "Family"];
-          const found = validCats.find(c => cat.toLowerCase().includes(c.toLowerCase()));
-          if (found) extractedCategory = found;
-        }
-        parsed = {
-          title: extractedTitle,
-          scripture: extractedScripture,
-          manuscript: manuscriptBody || content,
-          category: extractedCategory,
-          excerpt: "",
-        };
-      }
-
-      // Log actual keys for debugging
-      console.log(`[generate_draft] Parsed ${draftType} JSON keys:`, Object.keys(parsed).join(", "));
-
-      // Unwrap nested sermon object if present (e.g. { sermon: { title, ... } })
-      const root: Record<string, any> = parsed.sermon && typeof parsed.sermon === "object" ? { ...parsed, ...parsed.sermon } : parsed;
-
-      // Robust field resolver: tries multiple possible field names on root
-      const pick = (...keys: string[]): unknown => {
-        for (const k of keys) {
-          if (root[k] != null && root[k] !== "") return root[k];
-        }
-        return undefined;
-      };
-
-      // Extract title robustly with fallback to user topic
-      const extractTitle = (fallback: string): string => {
-        const raw = pick("title", "sermon_title", "name", "heading");
-        const title = safeStr(raw);
-        if (title && title !== "undefined" && title.length > 2) return title;
-        return fallback;
-      };
-
-      // Strip prompt artifacts and ensure proper line breaks in manuscript text
-      const normalizeManuscriptText = (text: string): string => {
-        let t = text;
-        // Strip markdown bold wrappers from headings
-        t = t.replace(/\*\*([A-Z][A-Z .:'!?0-9\-—–]+)\*\*/g, "$1");
-        // Strip prompt artifact prefixes like "BOLD SECTION TITLE:"
-        t = t.replace(/(?:BOLD\s+SECTION\s+TITLE|MAIN\s+POINT\s+TITLE(?:\s+IN\s+ALL\s+CAPS)?|SECTION\s+HEADING|SECTION\s+TITLE)\s*[:—–-]\s*/gi, "");
-        // Ensure line breaks before Roman numeral headings
-        t = t.replace(/([.!?…"')\s])\s*([IVXLCDM]+\.\s+[A-Z])/g, "$1\n\n$2");
-        // Ensure line breaks before known section labels when inline
-        const labels = [
-          "TRUE OPENING ILLUSTRATION", "OPENING ILLUSTRATION", "MID-SERMON ILLUSTRATION",
-          "ILLUSTRATION CALLBACK", "ILLUSTRATION", "INTRODUCTION", "CLOSING BUILD",
-          "CLOSING DECLARATION", "ALTAR CALL", "APPLICATION", "POWER DECLARATIONS",
-          "SCRIPTURE", "CONTINUED MAIN POINTS",
-        ];
-        for (const label of labels) {
-          const re = new RegExp("([.!?…\"')\\s])\\s*(" + label + ")", "gi");
-          t = t.replace(re, "$1\n\n$2");
-        }
-        // Ensure line breaks before KEY POINT
-        t = t.replace(/([.!?…"')\s])\s*(KEY\s+POINT\s*[:—–-])/gi, "$1\n\n$2");
-        // Ensure line breaks before bullet characters
-        t = t.replace(/([.!?…"')\s])\s*([•●]\s)/g, "$1\n$2");
-        // Normalize excessive blank lines
-        t = t.replace(/\n{3,}/g, "\n\n");
-        return t.trim();
-      };
-
-      // Render structured AI response into a full manuscript string
-      const renderSermonManuscript = (): string => {
-        // 1. Check for a direct flat manuscript/content string first
-        for (const k of ["manuscript", "content", "body", "sermon_body", "sermonBody", "sermon_content", "text", "full_text"]) {
-          const v = root[k];
-          if (typeof v === "string" && v.length > 50) return normalizeManuscriptText(v);
-        }
-
-        // 2. Build manuscript from structured fields
-        const parts: string[] = [];
-
-        // Title
-        const title = safeStr(pick("title", "sermon_title"));
-        if (title) parts.push(title.toUpperCase());
-
-        // Subtitle
-        const subtitle = safeStr(pick("subtitle"));
-        if (subtitle) parts.push(subtitle);
-
-        // Scripture
-        const scriptureRef = extractScriptureRef(pick("scripture", "scripture_reference", "verse", "reference"));
-        const scriptureTextRaw = pick("scripture");
-        let scriptureText = "";
-        if (scriptureTextRaw && typeof scriptureTextRaw === "object" && (scriptureTextRaw as any).text) {
-          scriptureText = safeStr((scriptureTextRaw as any).text);
-        }
-        if (scriptureRef || scriptureText) {
-          let s = "SCRIPTURE";
-          if (scriptureRef) s += `\n${scriptureRef}`;
-          if (scriptureText) s += `\n\n${scriptureText}`;
-          parts.push(s);
-        }
-
-        // Opening illustration
-        const illRaw = pick("opening_illustration", "openingIllustration", "illustration");
-        if (illRaw) {
-          const illText = typeof illRaw === "object" && (illRaw as any).content
-            ? safeStr((illRaw as any).content)
-            : safeStr(illRaw);
-          if (illText) parts.push(`OPENING ILLUSTRATION\n\n${illText}`);
-        }
-
-        // Main points
-        const pointsRaw = pick("main_points", "mainPoints", "points", "sections") as any[];
-        if (Array.isArray(pointsRaw)) {
-          pointsRaw.forEach((p: any, i: number) => {
-            if (typeof p === "string") { parts.push(p); return; }
-            const pTitle = safeStr(p.main_point || p.title || p.name || p.heading || `MAIN POINT ${i + 1}`);
-            const teaching = safeStr(p.teaching_paragraph || p.teaching || p.content || p.text || p.body || "");
-            let section = pTitle;
-            if (teaching) section += `\n\n${teaching}`;
-            const bullets = p.bullet_points || p.bullets || p.key_points || [];
-            if (Array.isArray(bullets)) {
-              section += "\n\n" + bullets.map((b: any) => `• ${safeStr(b)}`).join("\n");
-            }
-            // Key point for this section
-            const kp = p.key_point || p.keyPoint || p.summary;
-            if (kp) {
-              section += `\n\nKEY POINT: ${safeStr(kp)}`;
-            }
-            parts.push(section);
-          });
-        }
-
-        // Sermon body (some responses use sermonBody as an object with sections)
-        const sermonBodyRaw = pick("sermonBody", "sermon_body");
-        if (sermonBodyRaw && typeof sermonBodyRaw === "object" && !Array.isArray(sermonBodyRaw)) {
-          const sb = sermonBodyRaw as Record<string, any>;
-          for (const [key, val] of Object.entries(sb)) {
-            if (typeof val === "string") {
-              parts.push(`${key.replace(/([A-Z])/g, " $1").toUpperCase()}\n\n${val}`);
-            } else if (typeof val === "object" && val !== null) {
-              const heading = safeStr(val.header || val.title || key);
-              const body = safeStr(val.content || val.text || "");
-              if (body) parts.push(`${heading}\n\n${body}`);
-            }
-          }
-        }
-
-        // Application
-        const appRaw = pick("application", "applicationMoments", "application_moments");
-        if (appRaw) {
-          const appText = typeof appRaw === "string" ? appRaw : safeStr(appRaw);
-          if (appText) parts.push(`APPLICATION\n\n${appText}`);
-        }
-
-        // Illustration callback
-        const cbRaw = pick("illustration_callback", "illustrationCallback");
-        if (cbRaw) {
-          const cbText = typeof cbRaw === "object" && (cbRaw as any).content ? safeStr((cbRaw as any).content) : safeStr(cbRaw);
-          if (cbText) parts.push(`ILLUSTRATION CALLBACK\n\n${cbText}`);
-        }
-
-        // Power declarations
-        const declRaw = pick("power_declarations", "powerDeclarations", "declaration_moments");
-        if (declRaw) {
-          if (Array.isArray(declRaw)) {
-            parts.push("POWER DECLARATIONS\n\n" + declRaw.map((d: any) => `• ${safeStr(d)}`).join("\n"));
-          } else {
-            parts.push(`POWER DECLARATIONS\n\n${safeStr(declRaw)}`);
-          }
-        }
-
-        // Closing
-        const closeRaw = pick("closing_declaration", "closingDeclaration", "closing", "closing_structure", "closingStructure");
-        if (closeRaw) {
-          const closeText = typeof closeRaw === "object" && (closeRaw as any).content
-            ? safeStr((closeRaw as any).content)
-            : typeof closeRaw === "object" && (closeRaw as any).declaration
-              ? safeStr((closeRaw as any).declaration)
-              : safeStr(closeRaw);
-          if (closeText) parts.push(`CLOSING DECLARATION\n\n${closeText}`);
-        }
-
-        return normalizeManuscriptText(parts.join("\n\n"));
-      };
-
-      // Save draft to DB
+      // ── Normalize and save ──
       if (draftType === "book") {
         const bookPayload = {
-          title: extractTitle(userPrompt),
-          subtitle: safeStr(pick("subtitle")),
-          author: safeStr(pick("author"), "Bryant Clark"),
-          description: safeStr(pick("description", "summary")),
+          title: safeStr(parsed.title, userPrompt),
+          subtitle: safeStr(parsed.subtitle),
+          author: safeStr(parsed.author, "Bryant Clark"),
+          description: safeStr(parsed.description),
           is_published: false,
           is_free: true,
           price: 0,
           category: "Faith",
         };
-        console.log("[generate_draft] Inserting book:", JSON.stringify(bookPayload));
+        console.log("[generate_draft] Inserting book:", bookPayload.title);
 
         const { data: book, error: bookErr } = await supabase.from("books").insert(bookPayload).select().single();
-
         if (bookErr) {
           console.error("[generate_draft] Book insert FAILED:", JSON.stringify(bookErr));
           throw bookErr;
         }
 
-        console.log(`[generate_draft] Book created. ID: ${book.id}`);
-
         if (parsed.chapters?.length && book) {
           const chapterRows = parsed.chapters.map((ch: any, i: number) => ({
             book_id: book.id,
-            title: ch.title || `Chapter ${i + 1}`,
-            content: ch.content || "",
+            title: safeStr(ch.title, `Chapter ${i + 1}`),
+            content: safeStr(ch.content),
             sort_order: i,
           }));
           const { error: chapErr } = await supabase.from("book_chapters").insert(chapterRows);
-          if (chapErr) {
-            console.error("[generate_draft] Chapter insert error (non-fatal):", JSON.stringify(chapErr));
-          } else {
-            console.log(`[generate_draft] ${chapterRows.length} chapters inserted`);
-          }
+          if (chapErr) console.error("[generate_draft] Chapter insert error:", JSON.stringify(chapErr));
+          else console.log(`[generate_draft] ${chapterRows.length} chapters inserted`);
         }
 
         return new Response(JSON.stringify({ success: true, title: bookPayload.title, id: book?.id }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       } else {
-        // SERMON DRAFT
-        const sermonTitle = extractTitle(userPrompt);
-        const sermonManuscript = renderSermonManuscript();
-        const sermonScripture = extractScriptureRef(pick("scripture", "scripture_reference", "verse", "reference"));
-        let sermonExcerpt = safeStr(pick("excerpt", "summary", "description"));
-        const sermonCategory = safeStr(pick("category"), "Faith");
+        // ── SERMON ──
+        const title = safeStr(parsed.title, userPrompt);
 
-        // Auto-generate excerpt from manuscript if AI didn't provide one
-        if (!sermonExcerpt || sermonExcerpt.length < 10) {
-          // Extract first meaningful paragraph (skip headings/bullets)
-          const lines = sermonManuscript.split("\n").filter((l: string) => {
+        // Get manuscript: prefer full_text, then manuscript, then content
+        let manuscript = safeStr(parsed.full_text || parsed.manuscript || parsed.content || parsed.body || parsed.sermon_body || parsed.text);
+
+        // Normalize manuscript formatting
+        manuscript = manuscript
+          .replace(/\*\*([A-Z][A-Z .:'!?0-9\-—–]+)\*\*/g, "$1")
+          .replace(/(?:BOLD\s+SECTION\s+TITLE|MAIN\s+POINT\s+TITLE(?:\s+IN\s+ALL\s+CAPS)?|SECTION\s+HEADING|SECTION\s+TITLE)\s*[:—–-]\s*/gi, "")
+          .replace(/\n{3,}/g, "\n\n")
+          .trim();
+
+        const scripture = extractScriptureRef(parsed.scripture_reference || parsed.scripture || parsed.verse || "");
+        const category = safeStr(parsed.category, "Faith");
+
+        // Auto-generate excerpt
+        let excerpt = safeStr(parsed.excerpt);
+        if (!excerpt || excerpt.length < 10) {
+          const lines = manuscript.split("\n").filter((l: string) => {
             const t = l.trim();
-            return t.length > 30 && !t.startsWith("•") && !t.startsWith("-") && !t.startsWith("*") && t !== t.toUpperCase();
+            return t.length > 30 && !t.startsWith("•") && !t.startsWith("-") && t !== t.toUpperCase();
           });
           if (lines.length > 0) {
-            // Take first 2 sentences or 250 chars
             const raw = lines.slice(0, 2).join(" ");
-            sermonExcerpt = raw.length > 250 ? raw.substring(0, 247) + "..." : raw;
+            excerpt = raw.length > 250 ? raw.substring(0, 247) + "..." : raw;
           }
         }
 
-        console.log("[generate_draft] Rendered manuscript length:", sermonManuscript.length);
-        console.log("[generate_draft] Title:", sermonTitle);
+        console.log(`[generate_draft] Sermon — title: "${title}", manuscript: ${manuscript.length} chars, scripture: "${scripture}"`);
 
-        // Validate: do not save empty sermons
-        if (!sermonManuscript || sermonManuscript.length < 50) {
-          console.error("[generate_draft] Sermon manuscript too short! Length:", sermonManuscript.length);
-          console.error("[generate_draft] Root keys:", Object.keys(root).join(", "));
-          console.error("[generate_draft] Raw preview:", content.substring(0, 1000));
-          return new Response(JSON.stringify({ 
-            error: "Generated sermon content was empty or too short. The AI may have used unexpected field names. Please try again.", 
-            raw_keys: Object.keys(root),
+        // Only reject if truly empty
+        if (manuscript.length < 20) {
+          console.error("[generate_draft] Manuscript truly empty, parsed keys:", Object.keys(parsed).join(", "));
+          return new Response(JSON.stringify({
+            error: "AI returned no sermon content. Please try again.",
+            raw_keys: Object.keys(parsed),
           }), {
             status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
 
         const sermonPayload = {
-          title: sermonTitle,
-          scripture: sermonScripture,
-          excerpt: sermonExcerpt,
-          manuscript: sermonManuscript,
-          category: sermonCategory,
+          title,
+          scripture,
+          excerpt,
+          manuscript,
+          category,
           is_free: true,
           price: 0,
           is_published: false,
@@ -426,38 +418,20 @@ serve(async (req) => {
           date: new Date().toISOString().slice(0, 10),
         };
 
-        console.log("[generate_draft] Inserting sermon:", JSON.stringify({
-          title: sermonPayload.title,
-          category: sermonPayload.category,
-          scripture: sermonPayload.scripture,
-          manuscript_length: sermonPayload.manuscript.length,
-          excerpt_length: sermonPayload.excerpt.length,
-        }));
-
-        const { data: sermon, error: sermonErr } = await supabase
-          .from("sermons")
-          .insert(sermonPayload)
-          .select()
-          .single();
+        const { data: sermon, error: sermonErr } = await supabase.from("sermons").insert(sermonPayload).select().single();
 
         if (sermonErr) {
           console.error("[generate_draft] Sermon insert FAILED:", JSON.stringify(sermonErr));
-          return new Response(JSON.stringify({ 
-            success: false, 
+          return new Response(JSON.stringify({
+            success: false,
             error: `Database save failed: ${sermonErr.message}`,
-            generatedContent: {
-              title: sermonPayload.title,
-              scripture: sermonPayload.scripture,
-              excerpt: sermonPayload.excerpt,
-              manuscript: sermonPayload.manuscript,
-              category: sermonPayload.category,
-            }
+            generatedContent: { title, scripture, excerpt, manuscript, category },
           }), {
             status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
 
-        console.log(`[generate_draft] Sermon saved! ID: ${sermon.id}, Title: "${sermon.title}", Manuscript: ${sermonPayload.manuscript.length} chars`);
+        console.log(`[generate_draft] Sermon saved! ID: ${sermon.id}, Title: "${title}", ${manuscript.length} chars`);
 
         return new Response(JSON.stringify({ success: true, title: sermon.title, id: sermon.id }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -465,7 +439,7 @@ serve(async (req) => {
       }
     }
 
-    // --- List conversations ---
+    // ── List conversations ──
     if (action === "list_conversations") {
       const { data, error } = await supabase
         .from("ai_conversations").select("*").order("updated_at", { ascending: false }).limit(50);
@@ -475,7 +449,7 @@ serve(async (req) => {
       });
     }
 
-    // --- Load messages ---
+    // ── Load messages ──
     if (action === "load_messages") {
       const { data, error } = await supabase
         .from("ai_messages").select("*").eq("conversation_id", conversationId).order("created_at", { ascending: true });
@@ -485,7 +459,7 @@ serve(async (req) => {
       });
     }
 
-    // --- Delete conversation ---
+    // ── Delete conversation ──
     if (action === "delete_conversation") {
       await supabase.from("ai_conversations").delete().eq("id", conversationId);
       return new Response(JSON.stringify({ ok: true }), {
@@ -493,7 +467,7 @@ serve(async (req) => {
       });
     }
 
-    // --- Chat completion with streaming ---
+    // ── Chat completion with streaming ──
     if (!messages?.length) {
       return new Response(JSON.stringify({ error: "No messages provided" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
