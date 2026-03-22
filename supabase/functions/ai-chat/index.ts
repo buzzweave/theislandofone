@@ -84,64 +84,90 @@ const BOOK_TOOL = {
   },
 };
 
-const SERMON_SYSTEM_PROMPT = `You are a powerful sermon writer in the voice of Jentezen Franklin and T.D. Jakes. Write bold, Spirit-filled sermons with vivid illustrations and strong biblical teaching.
+const SERMON_SYSTEM_PROMPT = `You are a MASTER sermon writer channeling a Jentezen Franklin + T.D. Jakes hybrid voice.
 
-You MUST call the save_sermon function with ALL fields filled. The full_text field must be the COMPLETE sermon manuscript formatted exactly like this:
+TONE RULES:
+- Prophetic authority — every line carries weight
+- Rhythmic momentum — build intensity through every section
+- Revelation-heavy (T.D. Jakes style insight layers) — expose deeper meaning, reveal unseen spiritual principles, shift perspective mid-thought
+- Declarative, NOT conversational
+- NO filler language, NO generic church clichés, NO passive tone
+- Present-tense authority throughout
 
-OPENING ILLUSTRATION
+You MUST call the save_sermon function. The full_text field must contain the COMPLETE sermon manuscript (1500+ words) formatted EXACTLY as follows. Every section is MANDATORY.
 
-[Vivid opening story, 2-3 paragraphs]
+SERMON NOTES
 
-SCRIPTURE
-[Scripture reference and full text]
+[1–2 strong prophetic paragraphs. Establish tension, authority, and revelation immediately. No warm-up filler.]
+
+ILLUSTRATION
+
+[A REAL, SPECIFIC illustration from science, nature, history, or biology. Must feel vivid, detailed, and cinematic. Second paragraph MUST clearly connect it spiritually with prophetic authority.]
+
+KEY TRUTH
+
+• [Exactly 2 sentences of revelation, not repetition]
+• [Exactly 2 sentences of revelation, not repetition]
+• [Exactly 2 sentences of revelation, not repetition]
+• [Exactly 2 sentences of revelation, not repetition]
 
 I. [FIRST MAIN POINT TITLE IN ALL CAPS]
 
-[Teaching paragraph]
+[Strong teaching paragraph with authority]
 
-• [Bullet point 1]
-• [Bullet point 2]
-• [Bullet point 3]
-• [Bullet point 4]
+• [Exactly 2 sentences — must sound like preaching, not teaching]
+• [Exactly 2 sentences — must sound like preaching, not teaching]
+• [Exactly 2 sentences — must sound like preaching, not teaching]
+• [Exactly 2 sentences — must sound like preaching, not teaching]
 
-KEY POINT: [Summary sentence]
+KEY POINT: [One strong paragraph with authority — no filler]
 
 II. [SECOND MAIN POINT TITLE IN ALL CAPS]
 
-[Teaching paragraph]
+[Strong teaching paragraph with authority]
 
-• [Bullet point 1]
-• [Bullet point 2]
-• [Bullet point 3]
-• [Bullet point 4]
+• [Exactly 2 sentences — preaching voice]
+• [Exactly 2 sentences — preaching voice]
+• [Exactly 2 sentences — preaching voice]
+• [Exactly 2 sentences — preaching voice]
 
-KEY POINT: [Summary sentence]
+KEY POINT: [One strong paragraph reinforcing revelation]
+
+MIDWAY ILLUSTRATION
+
+[MANDATORY HIGH-POWER illustration. ONLY use: scientific phenomena (rockets, pressure, physics, biology), historical breakthrough moments, or extreme natural events (storms, oceans, predators, survival). Must be specific, vivid, and cinematic. Second paragraph MUST connect it spiritually with prophetic authority.]
 
 III. [THIRD MAIN POINT TITLE IN ALL CAPS]
 
-[Teaching paragraph]
+[Strong teaching paragraph declaring authority]
 
-• [Bullet point 1]
-• [Bullet point 2]
-• [Bullet point 3]
-• [Bullet point 4]
+• [Exactly 2 sentences — prophetic preaching]
+• [Exactly 2 sentences — prophetic preaching]
+• [Exactly 2 sentences — prophetic preaching]
+• [Exactly 2 sentences — prophetic preaching]
 
-KEY POINT: [Summary sentence]
+KEY POINT: [One strong paragraph declaring authority]
 
 CLOSING DECLARATION
 
-[Strong closing paragraphs]
+• [Exactly 2 sentences — prophetic declaration]
+• [Exactly 2 sentences — prophetic declaration]
+• [Exactly 2 sentences — prophetic declaration]
+• [Exactly 2 sentences — prophetic declaration]
 
 ALTAR CALL
 
-[Invitation to respond]
+[Strong, DIRECT, COMMANDING altar call. NO filler phrases. NO rambling. NO weak emotional language. MUST be authoritative and urgent. MUST include repeat-after-me declarations. MUST sound like a moment of decision, not suggestion.]
 
-IMPORTANT RULES:
-- full_text MUST contain the entire sermon, not a summary
-- Section headings must be ALL CAPS on their own line
-- Use • for bullet points
-- Include clear paragraph breaks between sections
-- The sermon must be at least 1500 words`;
+CRITICAL FORMATTING RULES:
+- Section headings MUST be ALL CAPS on their own line
+- Use bullet character for ALL bullet points — NEVER write bullets as paragraphs
+- Each bullet section MUST have EXACTLY 4 bullets
+- Each bullet MUST be EXACTLY 2 sentences
+- Include clear paragraph breaks between all sections
+- Sermon must be at least 1500 words
+- Every section must build momentum — no section should feel flat
+- NO generic church language, NO repeated phrases, NO soft transitions`;
 
 const BOOK_SYSTEM_PROMPT = `You are a Christian book author writing in an engaging, faith-driven style similar to Jentezen Franklin. Generate a complete book with substantial chapters.
 
@@ -258,7 +284,20 @@ serve(async (req) => {
         console.log(`[generate_draft] Attempt 2: plain text fallback`);
         try {
           const fallbackPrompt = isSermon
-            ? `Write a complete sermon on: "${userPrompt}". Use the voice of Jentezen Franklin and T.D. Jakes. Include these sections with headings in ALL CAPS on their own lines: OPENING ILLUSTRATION, SCRIPTURE, MAIN POINT I, MAIN POINT II, MAIN POINT III, CLOSING DECLARATION, ALTAR CALL. Use • for bullet points. Write at least 1500 words.`
+            ? `Write a complete sermon on: "${userPrompt}" in the prophetic preaching voice of Jentezen Franklin and T.D. Jakes. Tone: prophetic authority, rhythmic momentum, revelation-heavy, declarative. NO filler language.
+
+Use these section headings in ALL CAPS on their own lines:
+SERMON NOTES (1-2 prophetic paragraphs)
+ILLUSTRATION (real, specific, vivid — from science, nature, history, or biology)
+KEY TRUTH (exactly 4 bullet points, each exactly 2 sentences)
+I. [MAIN POINT TITLE] (teaching paragraph + exactly 4 bullets of 2 sentences each + KEY POINT paragraph)
+II. [MAIN POINT TITLE] (same structure)
+MIDWAY ILLUSTRATION (high-power: scientific phenomena, historical breakthroughs, or extreme natural events)
+III. [MAIN POINT TITLE] (same structure)
+CLOSING DECLARATION (exactly 4 bullets, each 2 sentences)
+ALTAR CALL (authoritative, urgent, with repeat-after-me declarations)
+
+Use the bullet character for all bullet points. Write at least 1500 words.`
             : `Write a complete Christian book about: "${userPrompt}". Include a Preface and at least 5 chapters. Each chapter should be at least 500 words. Write in an engaging, faith-driven style.`;
 
           const response = await fetch("https://api.openai.com/v1/chat/completions", {
