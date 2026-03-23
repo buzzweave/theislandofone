@@ -205,7 +205,23 @@ export function useClipEditor() {
   }, [drawFrame]);
 
   // Export video
-  const exportClip = useCallback(async (): Promise<string | null> => {
+  // Determine best MP4-first mime type for MediaRecorder
+  const getRecorderMime = useCallback((): { mimeType: string; isMP4: boolean } => {
+    const mp4Types = [
+      "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+      "video/mp4;codecs=avc1",
+      "video/mp4",
+    ];
+    for (const t of mp4Types) {
+      if (MediaRecorder.isTypeSupported(t)) return { mimeType: t, isMP4: true };
+    }
+    // Fallback to webm if MP4 not supported (Firefox)
+    if (MediaRecorder.isTypeSupported("video/webm;codecs=vp9"))
+      return { mimeType: "video/webm;codecs=vp9", isMP4: false };
+    return { mimeType: "video/webm", isMP4: false };
+  }, []);
+
+  const exportClip = useCallback(async (): Promise<Blob | null> => {
     const v = videoRef.current;
     const c = canvasRef.current;
     if (!v || !c) return null;
@@ -228,9 +244,12 @@ export function useClipEditor() {
         }
       }
 
+      const { mimeType, isMP4 } = getRecorderMime();
+      console.log("[ClipStudio] Recording with mimeType:", mimeType, "isMP4:", isMP4);
+
       const chunks: Blob[] = [];
       const recorder = new MediaRecorder(stream, {
-        mimeType: "video/webm;codecs=vp9",
+        mimeType,
         videoBitsPerSecond: 8_000_000,
       });
 
@@ -239,10 +258,10 @@ export function useClipEditor() {
       };
 
       recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: "video/webm" });
-        const url = URL.createObjectURL(blob);
+        const blobType = isMP4 ? "video/mp4" : "video/webm";
+        const blob = new Blob(chunks, { type: blobType });
         update({ isExporting: false, exportProgress: 100 });
-        resolve(url);
+        resolve(blob);
       };
 
       const clipDuration = state.trimEnd - state.trimStart;
@@ -269,7 +288,7 @@ export function useClipEditor() {
       v.addEventListener("timeupdate", checkEnd);
       v.play();
     });
-  }, [state.trimStart, state.trimEnd, state.speed, state.isMuted, update]);
+  }, [state.trimStart, state.trimEnd, state.speed, state.isMuted, update, getRecorderMime]);
 
   const reset = useCallback(() => {
     if (state.videoUrl) URL.revokeObjectURL(state.videoUrl);

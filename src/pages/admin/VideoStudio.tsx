@@ -34,13 +34,13 @@ export default function VideoStudio() {
   }, [loadVideo]);
 
   const handleExport = useCallback(async () => {
-    const url = await exportClip();
-    if (url) {
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `clip-${Date.now()}.webm`;
-      a.click();
-      toast({ title: "Export Complete", description: "Your clip has been downloaded." });
+    const blob = await exportClip();
+    if (blob) {
+      const filename = `sermon-clip-${Date.now()}.mp4`;
+      // Use cross-platform download helper (handles iOS Safari)
+      const { triggerDownload } = await import("@/lib/downloadHelper");
+      await triggerDownload(blob, filename);
+      toast({ title: "Export Complete", description: "Your MP4 clip has been downloaded." });
     }
   }, [exportClip, toast]);
 
