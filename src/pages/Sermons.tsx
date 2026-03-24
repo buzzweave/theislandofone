@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { BookOpen, Lock, Eye, ShoppingCart } from "lucide-react";
 import { useSermons } from "@/hooks/useSermons";
