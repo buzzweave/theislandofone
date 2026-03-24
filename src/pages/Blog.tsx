@@ -1,12 +1,10 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, PenLine, Calendar, User } from "lucide-react";
 import { useBlogPosts } from "@/hooks/useBlogPosts";
-import { useSermonsEnabled } from "@/hooks/useSermonsEnabled";
 import { format } from "date-fns";
 
 export default function Blog() {
   const { data: posts, isLoading } = useBlogPosts(true);
-  const { enabled: sermonsOn } = useSermonsEnabled();
 
   return (
     <div className="min-h-screen">
@@ -80,14 +78,12 @@ export default function Blog() {
             <p className="text-muted-foreground mb-8">
               Blog posts are on the way. Stay tuned for devotionals, ministry insights, and behind-the-scenes stories.
             </p>
-            {sermonsOn && (
-              <Link
-                to="/sermons"
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors"
-              >
-                Browse Sermons <ArrowRight className="h-4 w-4" />
-              </Link>
-            )}
+            <Link
+              to="/sermons"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors"
+            >
+              Browse Sermons <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
         )}
       </div>
