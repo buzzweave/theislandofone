@@ -50,6 +50,7 @@ export default function AdminSettings() {
   const notifyBookPurchases = useSiteSettings("notify_book_purchases", "false");
   const maintenanceMode = useSiteSettings("maintenance_mode", "false");
   const allowRegistration = useSiteSettings("allow_registration", "true");
+  const sermonsEnabled = useSiteSettings("sermons_enabled", "true");
   
 
   const chatgptApiKey = useSiteSettings("chatgpt_api_key", "");
