@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, memo } from "react";
 import { Link } from "react-router-dom";
 import { BookOpen, Lock, Eye, ShoppingCart } from "lucide-react";
 import { useSermons } from "@/hooks/useSermons";
 
+const PAGE_SIZE = 20;
 const accessFilters = ["All", "free", "member", "pastor", "inner_circle"];
 
 function formatAccessLabel(level?: string) {
@@ -14,11 +15,72 @@ function formatAccessLabel(level?: string) {
   return level.replace(/_/g, " ");
 }
 
+const SermonCard = memo(function SermonCard({ sermon }: { sermon: any }) {
+  const accessLevel = sermon.access_level ?? "free";
+  const priceNum = Number(sermon.price ?? 0);
+  const isFree = accessLevel === "free" || sermon.is_free === true;
+  const hasPrice = priceNum > 0;
+  const isLocked = !isFree;
+
+  return (
+    <Link
+      key={sermon.id}
+      to={`/sermons/${sermon.id}`}
+      className="group block p-6 rounded-xl border border-border bg-card hover:border-primary/30 transition-all duration-300"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-primary">
+              {sermon.category}
+            </span>
+            {isFree ? (
+              <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/5 text-primary/70 border border-primary/10">
+                Free
+              </span>
+            ) : hasPrice ? (
+              <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                <Lock className="h-2.5 w-2.5" /> ${priceNum.toFixed(2)}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                <Lock className="h-2.5 w-2.5" /> {formatAccessLabel(accessLevel)}
+              </span>
+            )}
+            {!isFree && (
+              <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                {formatAccessLabel(accessLevel)}
+              </span>
+            )}
+          </div>
+          <h3 className="font-display text-xl font-semibold mb-1 group-hover:text-primary transition-colors">
+            {sermon.title}
+          </h3>
+          <p className="text-sm text-primary/80 mb-2">{sermon.scripture}</p>
+          <p className="text-sm text-muted-foreground line-clamp-2">{sermon.excerpt}</p>
+        </div>
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          <span className="text-xs text-muted-foreground whitespace-nowrap">{sermon.date}</span>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground group-hover:text-primary transition-colors">
+            {isFree ? (
+              <><Eye className="h-3 w-3" /> Read</>
+            ) : (
+              <><ShoppingCart className="h-3 w-3" /> {isLocked ? "Preview" : "Read"}</>
+            )}
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+});
+
 export default function Sermons() {
   const { data: sermons = [], isLoading } = useSermons();
   const categories = ["All", ...Array.from(new Set(sermons.map((s: any) => s.category).filter(Boolean)))];
   const [activeCategory, setActiveCategory] = useState("All");
   const [accessFilter, setAccessFilter] = useState("All");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const filtered = sermons.filter((s: any) => {
     if (s.is_published === false) return false;
@@ -26,6 +88,23 @@ export default function Sermons() {
     if (accessFilter !== "All" && (s.access_level ?? "free") !== accessFilter) return false;
     return true;
   });
+
+  const visible = filtered.slice(0, visibleCount);
+  const hasMore = visibleCount < filtered.length;
+
+  // Reset on filter change
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [activeCategory, accessFilter]);
+
+  // Infinite scroll
+  useEffect(() => {
+    if (!hasMore || !sentinelRef.current) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setVisibleCount(p => p + PAGE_SIZE); },
+      { rootMargin: "400px" }
+    );
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, visibleCount]);
 
   return (
     <div className="min-h-screen">
@@ -84,79 +163,17 @@ export default function Sermons() {
 
         {isLoading && <p className="text-center text-muted-foreground animate-pulse">Loading sermons…</p>}
 
-        {/* Sermons List — paginated */}
-        <SermonList sermons={filtered} isLoading={isLoading} />
-            const accessLevel = sermon.access_level ?? "free";
-            const priceNum = Number(sermon.price ?? 0);
+        {/* Sermons List */}
+        <div className="max-w-3xl mx-auto space-y-4 pb-24">
+          {visible.map((sermon: any) => (
+            <SermonCard key={sermon.id} sermon={sermon} />
+          ))}
 
-            // Treat anything not explicitly free as locked.
-            // If you want ONLY price-based locking, tell me and I’ll adjust.
-            const isFree = accessLevel === "free" || sermon.is_free === true;
-            const hasPrice = priceNum > 0;
-            const isLocked = !isFree;
-
-            return (
-              <Link
-                key={sermon.id}
-                to={`/sermons/${sermon.id}`}
-                className="group block p-6 rounded-xl border border-border bg-card hover:border-primary/30 transition-all duration-300"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-                        {sermon.category}
-                      </span>
-
-                      {/* Primary badge */}
-                      {isFree ? (
-                        <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/5 text-primary/70 border border-primary/10">
-                          Free
-                        </span>
-                      ) : hasPrice ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                          <Lock className="h-2.5 w-2.5" /> ${priceNum.toFixed(2)}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                          <Lock className="h-2.5 w-2.5" /> {formatAccessLabel(accessLevel)}
-                        </span>
-                      )}
-
-                      {/* Secondary label (optional) */}
-                      {!isFree && (
-                        <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
-                          {formatAccessLabel(accessLevel)}
-                        </span>
-                      )}
-                    </div>
-
-                    <h3 className="font-display text-xl font-semibold mb-1 group-hover:text-primary transition-colors">
-                      {sermon.title}
-                    </h3>
-
-                    <p className="text-sm text-primary/80 mb-2">{sermon.scripture}</p>
-                    <p className="text-sm text-muted-foreground line-clamp-2">{sermon.excerpt}</p>
-                  </div>
-
-                  <div className="flex flex-col items-end gap-2 shrink-0">
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">{sermon.date}</span>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground group-hover:text-primary transition-colors">
-                      {isFree ? (
-                        <>
-                          <Eye className="h-3 w-3" /> Read
-                        </>
-                      ) : (
-                        <>
-                          <ShoppingCart className="h-3 w-3" /> {isLocked ? "Preview" : "Read"}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
+          {hasMore && (
+            <div ref={sentinelRef} className="flex justify-center py-8">
+              <div className="animate-pulse text-muted-foreground text-sm">Loading more…</div>
+            </div>
+          )}
 
           {filtered.length === 0 && !isLoading && (
             <p className="text-center text-muted-foreground py-12">No sermons match your filters.</p>
