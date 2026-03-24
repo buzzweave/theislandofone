@@ -20,7 +20,7 @@ function useOgShareImage() {
   }, [ogImage]);
 }
 
-const navLinks = [
+const allNavLinks = [
   { to: "/", label: "Home" },
   { to: "/books", label: "Books" },
   { to: "/sermons", label: "Sermons" },
