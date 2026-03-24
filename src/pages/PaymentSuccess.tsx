@@ -61,9 +61,11 @@ export default function PaymentSuccess() {
                   Browse Books <ArrowRight className="h-4 w-4 ml-2" />
                 </Link>
               </Button>
-              <Button variant="outline" asChild>
-                <Link to="/sermons">Browse Sermons</Link>
-              </Button>
+              {sermonsOn && (
+                <Button variant="outline" asChild>
+                  <Link to="/sermons">Browse Sermons</Link>
+                </Button>
+              )}
             </div>
           </>
         )}
