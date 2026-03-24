@@ -6,6 +6,7 @@ import { format } from "date-fns";
 
 export default function Blog() {
   const { data: posts, isLoading } = useBlogPosts(true);
+  const { enabled: sermonsOn } = useSermonsEnabled();
 
   return (
     <div className="min-h-screen">
