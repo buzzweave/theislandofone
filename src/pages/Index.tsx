@@ -5,6 +5,7 @@ import HeroCarousel from "@/components/HeroCarousel";
 import LazySection from "@/components/LazySection";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { useSermonsEnabled } from "@/hooks/useSermonsEnabled";
 
 const SubscribeForm = lazy(() => import("@/components/SubscribeForm"));
 
