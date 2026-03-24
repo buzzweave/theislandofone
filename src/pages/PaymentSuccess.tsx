@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { CheckCircle2, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useSermonsEnabled } from "@/hooks/useSermonsEnabled";
 
 export default function PaymentSuccess() {
   const [searchParams] = useSearchParams();
