@@ -9,6 +9,7 @@ const heroBgFallback = "/hero-bg.jpg";
 
 export default function HeroCarousel() {
   const { banners } = useHeroBanners();
+  const { enabled: sermonsOn } = useSermonsEnabled();
   const [current, setCurrent] = useState(0);
 
   const slides = banners.length > 0
