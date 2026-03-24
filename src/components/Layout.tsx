@@ -63,7 +63,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
   const { user, signOut } = useAuth();
+  const { enabled: sermonsEnabled } = useSermonsEnabled();
   useOgShareImage();
+
+  const navLinks = useMemo(
+    () => sermonsEnabled ? allNavLinks : allNavLinks.filter(l => l.to !== "/sermons"),
+    [sermonsEnabled]
+  );
 
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => e.preventDefault();
