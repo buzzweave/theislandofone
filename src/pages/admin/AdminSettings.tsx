@@ -381,7 +381,32 @@ export default function AdminSettings() {
       </Card>
 
 
-      {/* Integrations */}
+      {/* Content Sections */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Mic className="h-4 w-4 text-primary" />
+            Content Sections
+          </CardTitle>
+          <CardDescription>Show or hide public content sections</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Enable Sermons Section</p>
+              <p className="text-xs text-muted-foreground">
+                Show the Sermons page, nav links, and homepage section
+              </p>
+            </div>
+            <Switch
+              checked={sermonsEnabled.value === "true"}
+              onCheckedChange={(checked) => toggleSetting(sermonsEnabled, checked)}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
