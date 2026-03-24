@@ -517,6 +517,8 @@ function MembershipSection() {
 /* ── Main Index Page ───────────────────────────────────────── */
 
 export default function Index() {
+  const { enabled: sermonsEnabled } = useSermonsEnabled();
+
   return (
     <div>
       {/* HERO — eagerly loaded, above fold */}
@@ -526,9 +528,11 @@ export default function Index() {
       <FeaturedBooksSection />
 
       {/* Everything below is deferred until user scrolls near it */}
-      <LazySection minHeight="400px">
-        <SermonsSection />
-      </LazySection>
+      {sermonsEnabled && (
+        <LazySection minHeight="400px">
+          <SermonsSection />
+        </LazySection>
+      )}
 
       <LazySection minHeight="400px">
         <BlogSection />
