@@ -84,9 +84,8 @@ export default function Sermons() {
 
         {isLoading && <p className="text-center text-muted-foreground animate-pulse">Loading sermons…</p>}
 
-        {/* Sermons List */}
-        <div className="max-w-3xl mx-auto space-y-4 pb-24">
-          {filtered.map((sermon: any) => {
+        {/* Sermons List — paginated */}
+        <SermonList sermons={filtered} isLoading={isLoading} />
             const accessLevel = sermon.access_level ?? "free";
             const priceNum = Number(sermon.price ?? 0);
 
