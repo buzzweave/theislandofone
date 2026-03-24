@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { useHeroBanners } from "@/hooks/useHeroBanners";
+import { useSermonsEnabled } from "@/hooks/useSermonsEnabled";
 
 // Stable public URL — matches the preload link in index.html so the browser reuses the same request
 const heroBgFallback = "/hero-bg.jpg";
