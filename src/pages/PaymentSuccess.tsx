@@ -9,6 +9,7 @@ import { useSermonsEnabled } from "@/hooks/useSermonsEnabled";
 export default function PaymentSuccess() {
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get("session_id");
+  const { enabled: sermonsOn } = useSermonsEnabled();
   const { checkSubscription, user } = useAuth();
   const [verified, setVerified] = useState(false);
   const [verifying, setVerifying] = useState(true);
