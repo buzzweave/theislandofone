@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, PenLine, Calendar, User } from "lucide-react";
 import { useBlogPosts } from "@/hooks/useBlogPosts";
+import { useSermonsEnabled } from "@/hooks/useSermonsEnabled";
 import { format } from "date-fns";
 
 export default function Blog() {
