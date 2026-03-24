@@ -4,10 +4,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { CheckCircle2, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useSermonsEnabled } from "@/hooks/useSermonsEnabled";
 
 export default function PaymentSuccess() {
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get("session_id");
+  const { enabled: sermonsOn } = useSermonsEnabled();
   const { checkSubscription, user } = useAuth();
   const [verified, setVerified] = useState(false);
   const [verifying, setVerifying] = useState(true);
@@ -59,9 +61,11 @@ export default function PaymentSuccess() {
                   Browse Books <ArrowRight className="h-4 w-4 ml-2" />
                 </Link>
               </Button>
-              <Button variant="outline" asChild>
-                <Link to="/sermons">Browse Sermons</Link>
-              </Button>
+              {sermonsOn && (
+                <Button variant="outline" asChild>
+                  <Link to="/sermons">Browse Sermons</Link>
+                </Button>
+              )}
             </div>
           </>
         )}

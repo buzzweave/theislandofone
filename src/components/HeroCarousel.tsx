@@ -2,12 +2,14 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { useHeroBanners } from "@/hooks/useHeroBanners";
+import { useSermonsEnabled } from "@/hooks/useSermonsEnabled";
 
 // Stable public URL — matches the preload link in index.html so the browser reuses the same request
 const heroBgFallback = "/hero-bg.jpg";
 
 export default function HeroCarousel() {
   const { banners } = useHeroBanners();
+  const { enabled: sermonsOn } = useSermonsEnabled();
   const [current, setCurrent] = useState(0);
 
   const slides = banners.length > 0
@@ -96,12 +98,14 @@ export default function HeroCarousel() {
               {slide.cta_text} <ArrowRight className="h-4 w-4" />
             </Link>
           )}
-          <Link
-            to="/sermons"
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-3.5 rounded-full border border-primary/30 text-foreground font-semibold text-sm hover:bg-primary/10 transition-all"
-          >
-            Browse Sermons
-          </Link>
+          {sermonsOn && (
+            <Link
+              to="/sermons"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-3.5 rounded-full border border-primary/30 text-foreground font-semibold text-sm hover:bg-primary/10 transition-all"
+            >
+              Browse Sermons
+            </Link>
+          )}
         </div>
         {/* Membership CTA – visible on mobile & tablet only */}
         <Link
