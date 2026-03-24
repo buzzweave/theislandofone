@@ -14,7 +14,11 @@ const allTabs = [
 
 export default function BottomNav() {
   const { pathname } = useLocation();
-
+  const { enabled: sermonsEnabled } = useSermonsEnabled();
+  const tabs = useMemo(
+    () => sermonsEnabled ? allTabs : allTabs.filter(t => t.to !== "/sermons"),
+    [sermonsEnabled]
+  );
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden border-t border-border/60 bg-card/95 backdrop-blur-xl"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
