@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabaseImageUrl } from "@/lib/supabaseImage";
 import { Link, useLocation } from "react-router-dom";
 import { Menu, X, BookOpen, User, LogOut } from "lucide-react";
 import { useSiteLogo } from "@/hooks/useSiteLogo";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { useSermonsEnabled } from "@/hooks/useSermonsEnabled";
 import InstallPrompt from "@/components/InstallPrompt";
 import { useAuth } from "@/contexts/AuthContext";
 import BottomNav from "@/components/BottomNav";
@@ -19,7 +20,7 @@ function useOgShareImage() {
   }, [ogImage]);
 }
 
-const navLinks = [
+const allNavLinks = [
   { to: "/", label: "Home" },
   { to: "/books", label: "Books" },
   { to: "/sermons", label: "Sermons" },
@@ -62,7 +63,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
   const { user, signOut } = useAuth();
+  const { enabled: sermonsEnabled } = useSermonsEnabled();
   useOgShareImage();
+
+  const navLinks = useMemo(
+    () => sermonsEnabled ? allNavLinks : allNavLinks.filter(l => l.to !== "/sermons"),
+    [sermonsEnabled]
+  );
 
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => e.preventDefault();

@@ -1,8 +1,10 @@
+import { useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Home, ShoppingBag, BookOpen, Mic, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSermonsEnabled } from "@/hooks/useSermonsEnabled";
 
-const tabs = [
+const allTabs = [
   { to: "/books", label: "Store", icon: ShoppingBag },
   { to: "/blog", label: "Devotion", icon: BookOpen },
   { to: "/", label: "Home", icon: Home },
@@ -12,7 +14,11 @@ const tabs = [
 
 export default function BottomNav() {
   const { pathname } = useLocation();
-
+  const { enabled: sermonsEnabled } = useSermonsEnabled();
+  const tabs = useMemo(
+    () => sermonsEnabled ? allTabs : allTabs.filter(t => t.to !== "/sermons"),
+    [sermonsEnabled]
+  );
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden border-t border-border/60 bg-card/95 backdrop-blur-xl"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}

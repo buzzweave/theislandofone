@@ -5,6 +5,7 @@ import HeroCarousel from "@/components/HeroCarousel";
 import LazySection from "@/components/LazySection";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { useSermonsEnabled } from "@/hooks/useSermonsEnabled";
 
 const SubscribeForm = lazy(() => import("@/components/SubscribeForm"));
 
@@ -516,6 +517,8 @@ function MembershipSection() {
 /* ── Main Index Page ───────────────────────────────────────── */
 
 export default function Index() {
+  const { enabled: sermonsEnabled } = useSermonsEnabled();
+
   return (
     <div>
       {/* HERO — eagerly loaded, above fold */}
@@ -525,9 +528,11 @@ export default function Index() {
       <FeaturedBooksSection />
 
       {/* Everything below is deferred until user scrolls near it */}
-      <LazySection minHeight="400px">
-        <SermonsSection />
-      </LazySection>
+      {sermonsEnabled && (
+        <LazySection minHeight="400px">
+          <SermonsSection />
+        </LazySection>
+      )}
 
       <LazySection minHeight="400px">
         <BlogSection />
