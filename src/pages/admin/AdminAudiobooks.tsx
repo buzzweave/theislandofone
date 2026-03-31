@@ -328,8 +328,37 @@ export default function AdminAudiobooks() {
       const { triggerDownload } = await import("@/lib/downloadHelper");
       await triggerDownload(blob, filename);
     } catch {
-      // fallback: open in new tab
       window.open(audioUrl, "_blank");
+    }
+  };
+
+  /* ---- COVER IMAGE ---- */
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Invalid file", description: "Please upload an image (JPG, PNG, etc).", variant: "destructive" });
+      return;
+    }
+    setCustomCoverFile(file);
+    const localUrl = URL.createObjectURL(file);
+    setCoverImageUrl(localUrl);
+    toast({ title: "Cover loaded", description: file.name });
+    if (e.target) e.target.value = "";
+  };
+
+  const handleDownloadCover = async (imageUrl: string, title: string) => {
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const ext = blob.type.includes("png") ? "png" : "jpg";
+      const safeName = title.replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "-").toLowerCase() || "cover";
+      const filename = `${safeName}-cover.${ext}`;
+      const { triggerDownload } = await import("@/lib/downloadHelper");
+      await triggerDownload(blob, filename);
+      toast({ title: "Cover downloaded", description: "Save to Photos to post on Facebook." });
+    } catch {
+      window.open(imageUrl, "_blank");
     }
   };
 
