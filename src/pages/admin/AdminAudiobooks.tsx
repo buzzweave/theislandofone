@@ -729,6 +729,11 @@ export default function AdminAudiobooks() {
                   <Button variant="ghost" size="icon" onClick={() => handleToggleVisibility(ab)} title={ab.is_visible ? "Hide from public" : "Show on public"}>
                     {ab.is_visible ? <Eye className="h-4 w-4 text-primary" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
                   </Button>
+                  {abCover && (
+                    <Button variant="ghost" size="icon" onClick={() => handleDownloadCover(abCover, getContentTitle(ab))} title="Download cover to Photos">
+                      <ImageIcon className="h-4 w-4" />
+                    </Button>
+                  )}
                   {ab.audio_url && (
                     <Button variant="ghost" size="icon" onClick={() => handleDownload(ab.audio_url, getContentTitle(ab))}>
                       <Download className="h-4 w-4" />
@@ -744,7 +749,8 @@ export default function AdminAudiobooks() {
                   </Button>
                 </div>
               </Card>
-            ))
+              );
+            })
           )}
         </TabsContent>
 
