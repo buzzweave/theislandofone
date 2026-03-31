@@ -16,7 +16,9 @@ import { Progress } from "@/components/ui/progress";
 import {
   Headphones, Loader2, Volume2, Download, Trash2, Eye, EyeOff,
   DollarSign, Play, Pause, Music, Upload, VolumeX, Gauge, RotateCcw,
+  ImageIcon,
 } from "lucide-react";
+import { uploadToStorage } from "@/lib/supabaseUpload";
 
 /* ------------------------------------------------------------------ */
 /*  Voice constants                                                    */
