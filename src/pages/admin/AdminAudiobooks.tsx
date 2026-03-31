@@ -576,6 +576,54 @@ export default function AdminAudiobooks() {
             </div>
           </Card>
 
+          {/* ============== COVER IMAGE ============== */}
+          {selectedContentId && (
+            <Card className="p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <ImageIcon className="h-5 w-5 text-primary" />
+                <span className="font-semibold">Cover Image</span>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4 items-start">
+                {coverImageUrl ? (
+                  <img
+                    src={coverImageUrl}
+                    alt="Cover"
+                    className="w-32 h-44 object-cover rounded-lg border border-border shrink-0"
+                  />
+                ) : (
+                  <div className="w-32 h-44 rounded-lg border border-dashed border-border bg-muted/30 flex items-center justify-center shrink-0">
+                    <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
+                  </div>
+                )}
+
+                <div className="space-y-2 flex-1">
+                  <p className="text-xs text-muted-foreground">
+                    {coverImageUrl
+                      ? "This cover will be available to download before your audiobook. Save it to Photos to post on Facebook."
+                      : "Upload a cover image for this audiobook. Great for sharing on Facebook and social media."}
+                  </p>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" className="gap-1.5" onClick={() => coverInputRef.current?.click()}>
+                      <Upload className="h-3.5 w-3.5" /> {coverImageUrl ? "Change Cover" : "Upload Cover"}
+                    </Button>
+                    <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} />
+
+                    {coverImageUrl && (
+                      <Button variant="outline" size="sm" className="gap-1.5" onClick={() => {
+                        const { title } = getContentText();
+                        handleDownloadCover(coverImageUrl, title);
+                      }}>
+                        <Download className="h-3.5 w-3.5" /> Download Cover to Photos
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          )}
+
           {/* ============== PREVIEW PLAYER ============== */}
           {previewAudioUrl && (
             <Card className="p-4 space-y-3">
@@ -610,7 +658,23 @@ export default function AdminAudiobooks() {
                 </div>
               </div>
 
-              {/* Download */}
+              {/* Download section with cover */}
+              {coverImageUrl && (
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
+                  <img src={coverImageUrl} alt="Cover" className="w-12 h-16 object-cover rounded shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium truncate">{getContentText().title}</p>
+                    <p className="text-[10px] text-muted-foreground">Download cover to post on Facebook</p>
+                  </div>
+                  <Button variant="outline" size="sm" className="gap-1.5 shrink-0" onClick={() => {
+                    const { title } = getContentText();
+                    handleDownloadCover(coverImageUrl, title);
+                  }}>
+                    <ImageIcon className="h-3.5 w-3.5" /> Save Cover
+                  </Button>
+                </div>
+              )}
+
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" className="gap-1.5" onClick={() => {
                   const { title } = getContentText();
