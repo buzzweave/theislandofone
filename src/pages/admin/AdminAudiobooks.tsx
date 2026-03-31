@@ -16,7 +16,9 @@ import { Progress } from "@/components/ui/progress";
 import {
   Headphones, Loader2, Volume2, Download, Trash2, Eye, EyeOff,
   DollarSign, Play, Pause, Music, Upload, VolumeX, Gauge, RotateCcw,
+  ImageIcon,
 } from "lucide-react";
+import { uploadToStorage } from "@/lib/supabaseUpload";
 
 /* ------------------------------------------------------------------ */
 /*  Voice constants                                                    */
@@ -93,6 +95,12 @@ export default function AdminAudiobooks() {
   const [musicMuted, setMusicMuted] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
 
+  /* cover image state */
+  const [coverImageUrl, setCoverImageUrl] = useState("");
+  const [customCoverFile, setCustomCoverFile] = useState<File | null>(null);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+
   /* playback state */
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackTime, setPlaybackTime] = useState(0);
@@ -105,12 +113,14 @@ export default function AdminAudiobooks() {
 
   const voices = provider === "elevenlabs" ? ELEVENLABS_VOICES : OPENAI_VOICES;
 
-  /* ---- auto-prepare content ---- */
+  /* ---- auto-prepare content + cover ---- */
   useEffect(() => {
     if (!selectedContentId) {
       setContentReady(false);
       setContentPreview("");
       setCharCount(0);
+      setCoverImageUrl("");
+      setCustomCoverFile(null);
       return;
     }
     const { text } = getContentText();
@@ -124,6 +134,14 @@ export default function AdminAudiobooks() {
       setContentPreview("");
       setCharCount(0);
     }
+    // Auto-set cover from content
+    if (contentType === "book") {
+      const book = books?.find((b) => b.id === selectedContentId);
+      setCoverImageUrl(book?.cover_image || "");
+    } else {
+      setCoverImageUrl(""); // sermons don't have covers by default
+    }
+    setCustomCoverFile(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedContentId, contentType, books, sermons]);
 
@@ -310,8 +328,37 @@ export default function AdminAudiobooks() {
       const { triggerDownload } = await import("@/lib/downloadHelper");
       await triggerDownload(blob, filename);
     } catch {
-      // fallback: open in new tab
       window.open(audioUrl, "_blank");
+    }
+  };
+
+  /* ---- COVER IMAGE ---- */
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Invalid file", description: "Please upload an image (JPG, PNG, etc).", variant: "destructive" });
+      return;
+    }
+    setCustomCoverFile(file);
+    const localUrl = URL.createObjectURL(file);
+    setCoverImageUrl(localUrl);
+    toast({ title: "Cover loaded", description: file.name });
+    if (e.target) e.target.value = "";
+  };
+
+  const handleDownloadCover = async (imageUrl: string, title: string) => {
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const ext = blob.type.includes("png") ? "png" : "jpg";
+      const safeName = title.replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "-").toLowerCase() || "cover";
+      const filename = `${safeName}-cover.${ext}`;
+      const { triggerDownload } = await import("@/lib/downloadHelper");
+      await triggerDownload(blob, filename);
+      toast({ title: "Cover downloaded", description: "Save to Photos to post on Facebook." });
+    } catch {
+      window.open(imageUrl, "_blank");
     }
   };
 
@@ -529,6 +576,54 @@ export default function AdminAudiobooks() {
             </div>
           </Card>
 
+          {/* ============== COVER IMAGE ============== */}
+          {selectedContentId && (
+            <Card className="p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <ImageIcon className="h-5 w-5 text-primary" />
+                <span className="font-semibold">Cover Image</span>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4 items-start">
+                {coverImageUrl ? (
+                  <img
+                    src={coverImageUrl}
+                    alt="Cover"
+                    className="w-32 h-44 object-cover rounded-lg border border-border shrink-0"
+                  />
+                ) : (
+                  <div className="w-32 h-44 rounded-lg border border-dashed border-border bg-muted/30 flex items-center justify-center shrink-0">
+                    <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
+                  </div>
+                )}
+
+                <div className="space-y-2 flex-1">
+                  <p className="text-xs text-muted-foreground">
+                    {coverImageUrl
+                      ? "This cover will be available to download before your audiobook. Save it to Photos to post on Facebook."
+                      : "Upload a cover image for this audiobook. Great for sharing on Facebook and social media."}
+                  </p>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" className="gap-1.5" onClick={() => coverInputRef.current?.click()}>
+                      <Upload className="h-3.5 w-3.5" /> {coverImageUrl ? "Change Cover" : "Upload Cover"}
+                    </Button>
+                    <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} />
+
+                    {coverImageUrl && (
+                      <Button variant="outline" size="sm" className="gap-1.5" onClick={() => {
+                        const { title } = getContentText();
+                        handleDownloadCover(coverImageUrl, title);
+                      }}>
+                        <Download className="h-3.5 w-3.5" /> Download Cover to Photos
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          )}
+
           {/* ============== PREVIEW PLAYER ============== */}
           {previewAudioUrl && (
             <Card className="p-4 space-y-3">
@@ -563,7 +658,23 @@ export default function AdminAudiobooks() {
                 </div>
               </div>
 
-              {/* Download */}
+              {/* Download section with cover */}
+              {coverImageUrl && (
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
+                  <img src={coverImageUrl} alt="Cover" className="w-12 h-16 object-cover rounded shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium truncate">{getContentText().title}</p>
+                    <p className="text-[10px] text-muted-foreground">Download cover to post on Facebook</p>
+                  </div>
+                  <Button variant="outline" size="sm" className="gap-1.5 shrink-0" onClick={() => {
+                    const { title } = getContentText();
+                    handleDownloadCover(coverImageUrl, title);
+                  }}>
+                    <ImageIcon className="h-3.5 w-3.5" /> Save Cover
+                  </Button>
+                </div>
+              )}
+
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" className="gap-1.5" onClick={() => {
                   const { title } = getContentText();
@@ -591,8 +702,15 @@ export default function AdminAudiobooks() {
           ) : !audiobooks?.length ? (
             <p className="text-muted-foreground text-center py-12">No audiobooks yet. Generate one above.</p>
           ) : (
-            audiobooks.map((ab) => (
+            audiobooks.map((ab) => {
+              const abCover = ab.content_type === "book"
+                ? books?.find((b) => b.id === ab.content_id)?.cover_image
+                : undefined;
+              return (
               <Card key={ab.id} className="p-4 flex flex-col md:flex-row items-start md:items-center gap-4">
+                {abCover && (
+                  <img src={abCover} alt="Cover" className="w-16 h-22 object-cover rounded-lg border border-border shrink-0" />
+                )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <Headphones className="h-4 w-4 text-primary shrink-0" />
@@ -611,6 +729,11 @@ export default function AdminAudiobooks() {
                   <Button variant="ghost" size="icon" onClick={() => handleToggleVisibility(ab)} title={ab.is_visible ? "Hide from public" : "Show on public"}>
                     {ab.is_visible ? <Eye className="h-4 w-4 text-primary" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
                   </Button>
+                  {abCover && (
+                    <Button variant="ghost" size="icon" onClick={() => handleDownloadCover(abCover, getContentTitle(ab))} title="Download cover to Photos">
+                      <ImageIcon className="h-4 w-4" />
+                    </Button>
+                  )}
                   {ab.audio_url && (
                     <Button variant="ghost" size="icon" onClick={() => handleDownload(ab.audio_url, getContentTitle(ab))}>
                       <Download className="h-4 w-4" />
@@ -626,7 +749,8 @@ export default function AdminAudiobooks() {
                   </Button>
                 </div>
               </Card>
-            ))
+              );
+            })
           )}
         </TabsContent>
 
