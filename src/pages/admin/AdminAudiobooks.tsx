@@ -113,12 +113,14 @@ export default function AdminAudiobooks() {
 
   const voices = provider === "elevenlabs" ? ELEVENLABS_VOICES : OPENAI_VOICES;
 
-  /* ---- auto-prepare content ---- */
+  /* ---- auto-prepare content + cover ---- */
   useEffect(() => {
     if (!selectedContentId) {
       setContentReady(false);
       setContentPreview("");
       setCharCount(0);
+      setCoverImageUrl("");
+      setCustomCoverFile(null);
       return;
     }
     const { text } = getContentText();
@@ -132,6 +134,14 @@ export default function AdminAudiobooks() {
       setContentPreview("");
       setCharCount(0);
     }
+    // Auto-set cover from content
+    if (contentType === "book") {
+      const book = books?.find((b) => b.id === selectedContentId);
+      setCoverImageUrl(book?.cover_image || "");
+    } else {
+      setCoverImageUrl(""); // sermons don't have covers by default
+    }
+    setCustomCoverFile(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedContentId, contentType, books, sermons]);
 
