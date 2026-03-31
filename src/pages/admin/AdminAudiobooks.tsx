@@ -95,6 +95,12 @@ export default function AdminAudiobooks() {
   const [musicMuted, setMusicMuted] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
 
+  /* cover image state */
+  const [coverImageUrl, setCoverImageUrl] = useState("");
+  const [customCoverFile, setCustomCoverFile] = useState<File | null>(null);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+
   /* playback state */
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackTime, setPlaybackTime] = useState(0);
