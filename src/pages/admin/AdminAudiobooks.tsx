@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useBooks } from "@/hooks/useBooks";
 import { useSermons } from "@/hooks/useSermons";
 import { useAudiobooks, useUpsertAudiobook, useUpdateAudiobook, useDeleteAudiobook } from "@/hooks/useAudiobooks";
@@ -7,12 +7,20 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Headphones, Loader2, Volume2, Download, Trash2, Eye, EyeOff, DollarSign, BookOpen, FileText, Sparkles } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import {
+  Headphones, Loader2, Volume2, Download, Trash2, Eye, EyeOff,
+  DollarSign, Play, Pause, Music, Upload, VolumeX, Gauge, RotateCcw,
+} from "lucide-react";
 
+/* ------------------------------------------------------------------ */
+/*  Voice constants                                                    */
+/* ------------------------------------------------------------------ */
 const ELEVENLABS_VOICES = [
   { id: "deep-smooth", label: "Deep & Smooth", desc: "Rich baritone" },
   { id: "warm-narrator", label: "Warm Narrator", desc: "Engaging male" },
@@ -25,13 +33,37 @@ const ELEVENLABS_VOICES = [
 
 const OPENAI_VOICES = [
   { id: "alloy", label: "Alloy", desc: "Neutral, balanced" },
+  { id: "ash", label: "Ash", desc: "Calm, measured" },
   { id: "echo", label: "Echo", desc: "Warm, confident" },
   { id: "fable", label: "Fable", desc: "Expressive, storytelling" },
   { id: "onyx", label: "Onyx", desc: "Deep, authoritative" },
   { id: "nova", label: "Nova", desc: "Friendly, upbeat" },
   { id: "shimmer", label: "Shimmer", desc: "Clear, gentle" },
+  { id: "coral", label: "Coral", desc: "Smooth, warm" },
+  { id: "sage", label: "Sage", desc: "Calm, wise" },
 ];
 
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+function stripHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/* ------------------------------------------------------------------ */
+/*  Component                                                          */
+/* ------------------------------------------------------------------ */
 export default function AdminAudiobooks() {
   const { data: books, isLoading: booksLoading } = useBooks();
   const { data: sermons, isLoading: sermonsLoading } = useSermons();
@@ -41,19 +73,39 @@ export default function AdminAudiobooks() {
   const deleteAudiobook = useDeleteAudiobook();
   const { toast } = useToast();
 
+  /* generation state */
   const [contentType, setContentType] = useState<"book" | "sermon">("book");
   const [selectedContentId, setSelectedContentId] = useState("");
-  const [provider, setProvider] = useState<"elevenlabs" | "openai">("elevenlabs");
-  const [voiceId, setVoiceId] = useState("deep-smooth");
+  const [provider, setProvider] = useState<"elevenlabs" | "openai">("openai");
+  const [voiceId, setVoiceId] = useState("onyx");
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState("");
+  const [genPercent, setGenPercent] = useState(0);
   const [contentReady, setContentReady] = useState(false);
   const [contentPreview, setContentPreview] = useState("");
   const [charCount, setCharCount] = useState(0);
 
+  /* soundtrack state */
+  const [soundtrackFile, setSoundtrackFile] = useState<File | null>(null);
+  const [soundtrackUrl, setSoundtrackUrl] = useState("");
+  const [voiceVolume, setVoiceVolume] = useState(100);
+  const [musicVolume, setMusicVolume] = useState(30);
+  const [musicMuted, setMusicMuted] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+
+  /* playback state */
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackTime, setPlaybackTime] = useState(0);
+  const [playbackDuration, setPlaybackDuration] = useState(0);
+  const [previewAudioUrl, setPreviewAudioUrl] = useState("");
+
+  const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
+  const musicAudioRef = useRef<HTMLAudioElement | null>(null);
+  const soundtrackInputRef = useRef<HTMLInputElement>(null);
+
   const voices = provider === "elevenlabs" ? ELEVENLABS_VOICES : OPENAI_VOICES;
 
-  // Auto-prepare content when a book/sermon is selected
+  /* ---- auto-prepare content ---- */
   useEffect(() => {
     if (!selectedContentId) {
       setContentReady(false);
@@ -61,10 +113,9 @@ export default function AdminAudiobooks() {
       setCharCount(0);
       return;
     }
-    const { text, title } = getContentText();
-    if (text.trim()) {
-      // Strip HTML for preview
-      const plain = text.replace(/<[^>]*>/g, "").trim();
+    const { text } = getContentText();
+    const plain = stripHtml(text);
+    if (plain) {
       setContentPreview(plain.slice(0, 300) + (plain.length > 300 ? "..." : ""));
       setCharCount(plain.length);
       setContentReady(true);
@@ -73,40 +124,85 @@ export default function AdminAudiobooks() {
       setContentPreview("");
       setCharCount(0);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedContentId, contentType, books, sermons]);
 
-  // When switching provider, reset voice to first option
+  /* ---- sync audio volumes ---- */
+  useEffect(() => {
+    if (voiceAudioRef.current) {
+      voiceAudioRef.current.volume = voiceVolume / 100;
+      voiceAudioRef.current.playbackRate = playbackSpeed;
+    }
+    if (musicAudioRef.current) {
+      musicAudioRef.current.volume = musicMuted ? 0 : musicVolume / 100;
+    }
+  }, [voiceVolume, musicVolume, musicMuted, playbackSpeed]);
+
+  /* ---- playback time tracking ---- */
+  useEffect(() => {
+    const el = voiceAudioRef.current;
+    if (!el) return;
+    const onTime = () => setPlaybackTime(el.currentTime);
+    const onMeta = () => setPlaybackDuration(el.duration || 0);
+    const onEnd = () => { setIsPlaying(false); musicAudioRef.current?.pause(); };
+    el.addEventListener("timeupdate", onTime);
+    el.addEventListener("loadedmetadata", onMeta);
+    el.addEventListener("ended", onEnd);
+    return () => {
+      el.removeEventListener("timeupdate", onTime);
+      el.removeEventListener("loadedmetadata", onMeta);
+      el.removeEventListener("ended", onEnd);
+    };
+  }, [previewAudioUrl]);
+
   const handleProviderChange = (p: "elevenlabs" | "openai") => {
     setProvider(p);
-    setVoiceId(p === "elevenlabs" ? "deep-smooth" : "alloy");
+    setVoiceId(p === "elevenlabs" ? "deep-smooth" : "onyx");
   };
 
-  const getContentText = (): { text: string; title: string } => {
+  const getContentText = (): { text: string; title: string; chapters: { title: string; content: string }[] } => {
     if (contentType === "book") {
       const book = books?.find((b) => b.id === selectedContentId);
-      if (!book) return { text: "", title: "" };
-      const chapterText = book.chapters?.map((c) => `${c.title}\n\n${c.content}`).join("\n\n") || "";
-      return { text: chapterText || book.description, title: book.title };
+      if (!book) return { text: "", title: "", chapters: [] };
+      const chapters = book.chapters || [];
+      const text = chapters.map((c) => `${c.title}\n\n${c.content}`).join("\n\n") || book.description;
+      return { text, title: book.title, chapters };
     } else {
       const sermon = sermons?.find((s) => s.id === selectedContentId);
-      if (!sermon) return { text: "", title: "" };
-      return { text: sermon.manuscript || sermon.excerpt, title: sermon.title };
+      if (!sermon) return { text: "", title: "", chapters: [] };
+      return { text: sermon.manuscript || sermon.excerpt, title: sermon.title, chapters: [] };
     }
   };
 
+  /* ---- GENERATE ---- */
   const handleGenerate = async () => {
-    const { text, title } = getContentText();
-    if (!text.trim()) {
+    const { text, title, chapters } = getContentText();
+    const plainText = stripHtml(text);
+    if (!plainText.trim()) {
       toast({ title: "No content", description: "Selected item has no text to convert.", variant: "destructive" });
       return;
     }
 
     setIsGenerating(true);
+    setGenPercent(10);
     setProgress(`Generating with ${provider === "openai" ? "OpenAI" : "ElevenLabs"}...`);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
+      if (!session) throw new Error("Not authenticated. Please sign in first.");
+
+      setGenPercent(20);
+
+      // Build payload — use chapters mode for books with chapters
+      const payload: any = { voice: voiceId, title, provider };
+      if (chapters.length > 0) {
+        payload.chapters = chapters.map((ch) => ({ title: ch.title, text: ch.content }));
+        setProgress(`Processing ${chapters.length} chapters...`);
+      } else {
+        payload.text = plainText;
+      }
+
+      setGenPercent(30);
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/text-to-speech`,
@@ -116,16 +212,23 @@ export default function AdminAudiobooks() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ text, voice: voiceId, title, provider }),
+          body: JSON.stringify(payload),
         }
       );
 
+      setGenPercent(70);
+
       if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || "Generation failed");
+        let errMsg = `Generation failed (${response.status})`;
+        try {
+          const err = await response.json();
+          errMsg = err.error || errMsg;
+        } catch { /* ignore parse errors */ }
+        throw new Error(errMsg);
       }
 
       const data = await response.json();
+      setGenPercent(90);
 
       // Upsert the audiobook record
       await upsertAudiobook.mutateAsync({
@@ -140,17 +243,79 @@ export default function AdminAudiobooks() {
         title,
       });
 
-      setProgress("");
+      setGenPercent(100);
+      setPreviewAudioUrl(data.audioUrl);
       toast({ title: "Audio generated!", description: "Audiobook created and saved." });
     } catch (err: any) {
       console.error("Audio generation error:", err);
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: "Error", description: err.message || "Generation failed", variant: "destructive" });
     } finally {
       setIsGenerating(false);
       setProgress("");
+      setTimeout(() => setGenPercent(0), 1500);
     }
   };
 
+  /* ---- SOUNDTRACK ---- */
+  const handleSoundtrackUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("audio/")) {
+      toast({ title: "Invalid file", description: "Please upload an audio file (MP3, WAV, etc).", variant: "destructive" });
+      return;
+    }
+    setSoundtrackFile(file);
+    const url = URL.createObjectURL(file);
+    setSoundtrackUrl(url);
+    toast({ title: "Soundtrack loaded", description: file.name });
+    if (e.target) e.target.value = "";
+  };
+
+  /* ---- PLAYBACK ---- */
+  const togglePlayback = useCallback(() => {
+    const voice = voiceAudioRef.current;
+    const music = musicAudioRef.current;
+    if (!voice) return;
+
+    if (isPlaying) {
+      voice.pause();
+      music?.pause();
+      setIsPlaying(false);
+    } else {
+      voice.volume = voiceVolume / 100;
+      voice.playbackRate = playbackSpeed;
+      voice.play().catch(() => {});
+      if (music && soundtrackUrl && !musicMuted) {
+        music.volume = musicVolume / 100;
+        music.currentTime = voice.currentTime;
+        music.play().catch(() => {});
+      }
+      setIsPlaying(true);
+    }
+  }, [isPlaying, voiceVolume, musicVolume, musicMuted, playbackSpeed, soundtrackUrl]);
+
+  const seekTo = (time: number) => {
+    if (voiceAudioRef.current) voiceAudioRef.current.currentTime = time;
+    if (musicAudioRef.current && soundtrackUrl) musicAudioRef.current.currentTime = time;
+    setPlaybackTime(time);
+  };
+
+  /* ---- DOWNLOAD ---- */
+  const handleDownload = async (audioUrl: string, title: string) => {
+    try {
+      const response = await fetch(audioUrl);
+      const blob = await response.blob();
+      const safeName = title.replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "-").toLowerCase() || "audiobook";
+      const filename = `${safeName}.mp3`;
+      const { triggerDownload } = await import("@/lib/downloadHelper");
+      await triggerDownload(blob, filename);
+    } catch {
+      // fallback: open in new tab
+      window.open(audioUrl, "_blank");
+    }
+  };
+
+  /* ---- LIBRARY ACTIONS ---- */
   const handleToggleVisibility = async (ab: any) => {
     await updateAudiobook.mutateAsync({ id: ab.id, is_visible: !ab.is_visible });
     toast({ title: ab.is_visible ? "Hidden" : "Visible", description: `Audio is now ${ab.is_visible ? "hidden" : "visible"} on the public page.` });
@@ -181,6 +346,12 @@ export default function AdminAudiobooks() {
 
   const isLoading = booksLoading || sermonsLoading || audiobooksLoading;
 
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2, "0")}`;
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -195,7 +366,7 @@ export default function AdminAudiobooks() {
           <TabsTrigger value="pricing">Pricing</TabsTrigger>
         </TabsList>
 
-        {/* GENERATE TAB */}
+        {/* ============== GENERATE TAB ============== */}
         <TabsContent value="generate" className="space-y-4">
           <Card className="p-4 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -230,8 +401,8 @@ export default function AdminAudiobooks() {
                 <Select value={provider} onValueChange={(v) => handleProviderChange(v as any)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="elevenlabs">ElevenLabs</SelectItem>
                     <SelectItem value="openai">OpenAI</SelectItem>
+                    <SelectItem value="elevenlabs">ElevenLabs</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -253,32 +424,40 @@ export default function AdminAudiobooks() {
               </div>
             </div>
 
-            {/* AUDIO PREP — auto-shown when content is selected */}
+            {/* AUDIO PREP */}
             {contentReady && (
               <div className="border border-border rounded-lg p-4 space-y-3 bg-muted/30">
                 <div className="flex items-center gap-2">
                   <Headphones className="h-4 w-4 text-primary" />
                   <span className="text-sm font-semibold uppercase tracking-wide">Audio Prep</span>
                   <Badge variant="secondary" className="text-[10px]">{charCount.toLocaleString()} chars</Badge>
+                  {contentType === "book" && books?.find(b => b.id === selectedContentId)?.chapters?.length ? (
+                    <Badge variant="outline" className="text-[10px]">
+                      {books.find(b => b.id === selectedContentId)!.chapters!.length} chapters
+                    </Badge>
+                  ) : null}
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">{contentPreview}</p>
                 <div className="flex flex-wrap gap-2">
                   <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => {
                     toast({ title: "Text prepared", description: "Content formatted for audiobook narration." });
                   }}>
-                    <Headphones className="h-3.5 w-3.5" /> Prepare text for audiobook narration
+                    <Headphones className="h-3.5 w-3.5" /> Prepare text for narration
                   </Button>
                   <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => {
                     toast({ title: "Pacing added", description: "Natural pauses and pacing cues applied." });
                   }}>
-                    <Headphones className="h-3.5 w-3.5" /> Add natural pauses and pacing cues
-                  </Button>
-                  <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => {
-                    toast({ title: "Simplified", description: "Complex sentences simplified for listening." });
-                  }}>
-                    <Headphones className="h-3.5 w-3.5" /> Simplify complex sentences for listening
+                    <Headphones className="h-3.5 w-3.5" /> Add natural pauses
                   </Button>
                 </div>
+              </div>
+            )}
+
+            {/* Generation progress */}
+            {isGenerating && genPercent > 0 && (
+              <div className="space-y-1">
+                <Progress value={genPercent} className="h-2" />
+                <p className="text-xs text-muted-foreground text-center">{progress}</p>
               </div>
             )}
 
@@ -290,9 +469,122 @@ export default function AdminAudiobooks() {
               )}
             </Button>
           </Card>
+
+          {/* ============== SOUNDTRACK & SOUNDBOARD ============== */}
+          <Card className="p-4 space-y-4">
+            <div className="flex items-center gap-2">
+              <Music className="h-5 w-5 text-primary" />
+              <span className="font-semibold">Soundtrack & Soundboard</span>
+            </div>
+
+            {/* Upload soundtrack */}
+            <div className="flex items-center gap-3">
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => soundtrackInputRef.current?.click()}>
+                <Upload className="h-3.5 w-3.5" /> Upload Soundtrack
+              </Button>
+              <input ref={soundtrackInputRef} type="file" accept="audio/*" className="hidden" onChange={handleSoundtrackUpload} />
+              {soundtrackFile && <span className="text-xs text-muted-foreground truncate max-w-[200px]">{soundtrackFile.name}</span>}
+              {soundtrackUrl && (
+                <Button variant="ghost" size="sm" className="text-xs" onClick={() => { setSoundtrackFile(null); setSoundtrackUrl(""); }}>
+                  <Trash2 className="h-3 w-3 mr-1" /> Remove
+                </Button>
+              )}
+            </div>
+
+            {/* Volume controls */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium flex items-center gap-1.5">
+                    <Volume2 className="h-3.5 w-3.5 text-primary" /> Voice Volume
+                  </label>
+                  <span className="text-xs text-muted-foreground">{voiceVolume}%</span>
+                </div>
+                <Slider value={[voiceVolume]} onValueChange={([v]) => setVoiceVolume(v)} min={0} max={100} step={5} />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium flex items-center gap-1.5">
+                    <Music className="h-3.5 w-3.5 text-primary" /> Soundtrack Volume
+                    <button onClick={() => setMusicMuted(!musicMuted)} className="ml-1">
+                      {musicMuted ? <VolumeX className="h-3 w-3 text-destructive" /> : null}
+                    </button>
+                  </label>
+                  <span className="text-xs text-muted-foreground">{musicMuted ? "Muted" : `${musicVolume}%`}</span>
+                </div>
+                <Slider value={[musicVolume]} onValueChange={([v]) => setMusicVolume(v)} min={0} max={100} step={5} disabled={musicMuted} />
+              </div>
+            </div>
+
+            {/* Speed control */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium flex items-center gap-1.5">
+                  <Gauge className="h-3.5 w-3.5 text-primary" /> Narration Speed
+                </label>
+                <span className="text-xs text-muted-foreground">{playbackSpeed}x</span>
+              </div>
+              <Slider value={[playbackSpeed * 100]} onValueChange={([v]) => setPlaybackSpeed(v / 100)} min={50} max={200} step={5} />
+            </div>
+          </Card>
+
+          {/* ============== PREVIEW PLAYER ============== */}
+          {previewAudioUrl && (
+            <Card className="p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Headphones className="h-5 w-5 text-primary" />
+                <span className="font-semibold">Preview</span>
+              </div>
+
+              {/* Hidden audio elements */}
+              <audio ref={voiceAudioRef} src={previewAudioUrl} preload="metadata" />
+              {soundtrackUrl && <audio ref={musicAudioRef} src={soundtrackUrl} preload="metadata" loop />}
+
+              {/* Controls */}
+              <div className="flex items-center gap-3">
+                <Button size="icon" variant="outline" className="h-10 w-10 rounded-full shrink-0" onClick={togglePlayback}>
+                  {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
+                </Button>
+
+                <div className="flex-1 space-y-1">
+                  <Slider
+                    value={[playbackTime]}
+                    onValueChange={([v]) => seekTo(v)}
+                    min={0}
+                    max={playbackDuration || 1}
+                    step={0.5}
+                    className="cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[10px] text-muted-foreground">
+                    <span>{formatTime(playbackTime)}</span>
+                    <span>{formatTime(playbackDuration)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Download */}
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => {
+                  const { title } = getContentText();
+                  handleDownload(previewAudioUrl, title);
+                }}>
+                  <Download className="h-3.5 w-3.5" /> Download MP3
+                </Button>
+                <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => {
+                  setPreviewAudioUrl("");
+                  setIsPlaying(false);
+                  voiceAudioRef.current?.pause();
+                  musicAudioRef.current?.pause();
+                }}>
+                  <RotateCcw className="h-3.5 w-3.5" /> Clear
+                </Button>
+              </div>
+            </Card>
+          )}
         </TabsContent>
 
-        {/* LIBRARY TAB */}
+        {/* ============== LIBRARY TAB ============== */}
         <TabsContent value="library" className="space-y-3">
           {isLoading ? (
             <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
@@ -320,10 +612,15 @@ export default function AdminAudiobooks() {
                     {ab.is_visible ? <Eye className="h-4 w-4 text-primary" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
                   </Button>
                   {ab.audio_url && (
-                    <a href={ab.audio_url} download>
-                      <Button variant="ghost" size="icon"><Download className="h-4 w-4" /></Button>
-                    </a>
+                    <Button variant="ghost" size="icon" onClick={() => handleDownload(ab.audio_url, getContentTitle(ab))}>
+                      <Download className="h-4 w-4" />
+                    </Button>
                   )}
+                  <Button variant="ghost" size="icon" onClick={() => {
+                    if (ab.audio_url) { setPreviewAudioUrl(ab.audio_url); }
+                  }}>
+                    <Play className="h-4 w-4" />
+                  </Button>
                   <Button variant="ghost" size="icon" onClick={() => handleDelete(ab.id)}>
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
@@ -333,7 +630,7 @@ export default function AdminAudiobooks() {
           )}
         </TabsContent>
 
-        {/* PRICING TAB */}
+        {/* ============== PRICING TAB ============== */}
         <TabsContent value="pricing" className="space-y-3">
           {isLoading ? (
             <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
@@ -347,27 +644,21 @@ export default function AdminAudiobooks() {
                   <span className="font-medium">{getContentTitle(ab)}</span>
                   <Badge variant="outline" className="text-xs">{ab.content_type}</Badge>
                 </div>
-
                 <div className="flex flex-col sm:flex-row gap-4">
                   <div className="flex items-center gap-3">
                     <label className="text-sm text-muted-foreground whitespace-nowrap">Sell separately</label>
                     <Switch checked={ab.is_separate_price} onCheckedChange={() => handleToggleSeparatePrice(ab)} />
                   </div>
-
                   {ab.is_separate_price && (
                     <div className="flex items-center gap-2">
                       <label className="text-sm text-muted-foreground">Price $</label>
                       <Input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        className="w-24"
+                        type="number" min="0" step="0.01" className="w-24"
                         defaultValue={ab.price}
                         onBlur={(e) => handleUpdatePrice(ab, parseFloat(e.target.value) || 0)}
                       />
                     </div>
                   )}
-
                   {!ab.is_separate_price && (
                     <span className="text-sm text-muted-foreground">Bundled with {ab.content_type} price</span>
                   )}
