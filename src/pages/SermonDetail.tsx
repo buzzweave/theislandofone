@@ -239,6 +239,7 @@ export default function SermonDetail() {
   const title = safeText((sermon as any)?.title) || "Sermon";
   const scripture = safeText((sermon as any)?.scripture);
   const excerpt = safeText((sermon as any)?.excerpt ?? (sermon as any)?.summary);
+  const audioUrl = safeText((sermon as any)?.audio_url);
   const manuscriptRaw = safeText(
     (sermon as any)?.manuscript ??
       (sermon as any)?.content ??
