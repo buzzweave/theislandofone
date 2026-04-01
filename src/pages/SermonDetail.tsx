@@ -522,6 +522,26 @@ export default function SermonDetail() {
           ) : null}
         </div>
 
+        {/* Audio Player */}
+        {audioUrl && (
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Headphones className="h-5 w-5 text-[#d4af37]" />
+              <span className="text-sm font-semibold text-white/90 uppercase tracking-[0.12em]">Listen to Audio</span>
+            </div>
+            <audio controls className="w-full" style={{ filter: "invert(1) hue-rotate(180deg)", opacity: 0.85 }} src={audioUrl}>
+              Your browser does not support the audio element.
+            </audio>
+            <a
+              href={audioUrl}
+              download={`${title.replace(/\s+/g, "-").toLowerCase()}.mp3`}
+              className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-xs font-semibold text-white/70 hover:text-white hover:border-white/30 transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" /> Download MP3
+            </a>
+          </div>
+        )}
+
         {showPaywall ? (
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 sm:p-8">
             <p className="mb-5 text-base leading-8 text-white/75">
