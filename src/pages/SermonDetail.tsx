@@ -24,6 +24,7 @@ import {
   BookOpen,
   File,
   NotebookPen,
+  Headphones,
 } from "lucide-react";
 
 function safeText(v: any) {

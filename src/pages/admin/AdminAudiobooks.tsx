@@ -762,7 +762,7 @@ export default function AdminAudiobooks() {
             <p className="text-muted-foreground text-center py-12">No audiobooks to price yet.</p>
           ) : (
             audiobooks.map((ab) => (
-              <Card key={ab.id} className="p-4 space-y-3">
+              <Card key={ab.id} className="p-4 space-y-4">
                 <div className="flex items-center gap-2">
                   <DollarSign className="h-4 w-4 text-primary" />
                   <span className="font-medium">{getContentTitle(ab)}</span>
@@ -786,6 +786,107 @@ export default function AdminAudiobooks() {
                   {!ab.is_separate_price && (
                     <span className="text-sm text-muted-foreground">Bundled with {ab.content_type} price</span>
                   )}
+                </div>
+
+                {/* Publish Audio Version section */}
+                <div className="border-t border-border pt-3 space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Publish Audio Version</p>
+
+                  {ab.content_type === "sermon" && (
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">Publish Audio to Sermon</p>
+                        <p className="text-xs text-muted-foreground">Audio player will appear on the sermon page.</p>
+                      </div>
+                      <Switch
+                        checked={ab.is_visible}
+                        onCheckedChange={async () => {
+                          // Set visibility AND update the sermon's audio_url
+                          const newVisible = !ab.is_visible;
+                          await updateAudiobook.mutateAsync({ id: ab.id, is_visible: newVisible });
+                          if (ab.content_id) {
+                            await supabase.from("sermons").update({
+                              audio_url: newVisible ? ab.audio_url : null,
+                            }).eq("id", ab.content_id);
+                          }
+                          toast({
+                            title: newVisible ? "Published to sermon" : "Removed from sermon",
+                            description: newVisible
+                              ? "Audio player is now visible on the sermon page."
+                              : "Audio removed from the sermon page.",
+                          });
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {ab.content_type === "book" && (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">Publish Audio to Book</p>
+                          <p className="text-xs text-muted-foreground">Audio player will appear on the book page.</p>
+                        </div>
+                        <Switch
+                          checked={ab.is_visible}
+                          onCheckedChange={async () => {
+                            const newVisible = !ab.is_visible;
+                            await updateAudiobook.mutateAsync({ id: ab.id, is_visible: newVisible });
+                            if (ab.content_id) {
+                              await supabase.from("books").update({
+                                audio_url: newVisible ? ab.audio_url : null,
+                              }).eq("id", ab.content_id);
+                            }
+                            toast({
+                              title: newVisible ? "Published to book" : "Removed from book",
+                              description: newVisible
+                                ? "Audio player is now visible on the book page."
+                                : "Audio removed from the book page.",
+                            });
+                          }}
+                        />
+                      </div>
+
+                      {/* Attach to a sermon */}
+                      <div className="space-y-1.5">
+                        <p className="text-sm font-medium">Attach Audio to a Sermon</p>
+                        <p className="text-xs text-muted-foreground">Publish this audio into a sermon page as well.</p>
+                        <Select
+                          value=""
+                          onValueChange={async (sermonId) => {
+                            if (!sermonId) return;
+                            await supabase.from("sermons").update({
+                              audio_url: ab.audio_url,
+                            }).eq("id", sermonId);
+                            toast({
+                              title: "Audio attached to sermon",
+                              description: "The audio player will now show on that sermon page.",
+                            });
+                          }}
+                        >
+                          <SelectTrigger className="text-xs">
+                            <SelectValue placeholder="Select a sermon..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(sermons || []).map((s) => (
+                              <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">Feature Audio on Front Page</p>
+                      <p className="text-xs text-muted-foreground">Highlight this audiobook on the homepage.</p>
+                    </div>
+                    <Switch
+                      checked={ab.is_visible}
+                      onCheckedChange={() => handleToggleVisibility(ab)}
+                    />
+                  </div>
                 </div>
               </Card>
             ))
