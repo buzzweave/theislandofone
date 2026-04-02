@@ -533,7 +533,7 @@ export default function AdminAudiobooks() {
               <Button variant="outline" size="sm" className="gap-1.5" onClick={() => soundtrackInputRef.current?.click()}>
                 <Upload className="h-3.5 w-3.5" /> Upload Soundtrack
               </Button>
-              <input ref={soundtrackInputRef} type="file" accept="audio/*" className="hidden" onChange={handleSoundtrackUpload} />
+              <input ref={soundtrackInputRef} type="file" accept=".mp3,.wav,.m4a,.aac,.ogg,.flac,.wma,.webm,audio/*" className="hidden" onChange={handleSoundtrackUpload} />
               {soundtrackFile && <span className="text-xs text-muted-foreground truncate max-w-[200px]">{soundtrackFile.name}</span>}
               {soundtrackUrl && (
                 <Button variant="ghost" size="sm" className="text-xs" onClick={() => { setSoundtrackFile(null); setSoundtrackUrl(""); }}>
