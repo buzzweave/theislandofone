@@ -275,11 +275,15 @@ export default function AdminAudiobooks() {
   };
 
   /* ---- SOUNDTRACK ---- */
+  const ALLOWED_AUDIO_EXTENSIONS = [".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac", ".wma", ".webm"];
   const handleSoundtrackUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith("audio/")) {
-      toast({ title: "Invalid file", description: "Please upload an audio file (MP3, WAV, etc).", variant: "destructive" });
+    const ext = "." + (file.name.split(".").pop() || "").toLowerCase();
+    const isAudioMime = file.type.startsWith("audio/");
+    const isAllowedExt = ALLOWED_AUDIO_EXTENSIONS.includes(ext);
+    if (!isAudioMime && !isAllowedExt) {
+      toast({ title: "Unsupported file type", description: `Please upload an audio file: ${ALLOWED_AUDIO_EXTENSIONS.join(", ")}`, variant: "destructive" });
       return;
     }
     setSoundtrackFile(file);
