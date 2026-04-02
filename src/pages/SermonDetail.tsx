@@ -532,10 +532,39 @@ export default function SermonDetail() {
         {/* Audio Player */}
         {audioUrl && (
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Headphones className="h-5 w-5 text-[#d4af37]" />
-              <span className="text-sm font-semibold text-white/90 uppercase tracking-[0.12em]">Listen to Audio</span>
-            </div>
+            {/* Show audiobook cover if available */}
+            {audiobookCover && (
+              <div className="flex items-center gap-4 mb-4">
+                <img src={audiobookCover} alt="Audio cover" className="w-20 h-28 object-cover rounded-lg border border-white/10 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Headphones className="h-5 w-5 text-[#d4af37]" />
+                    <span className="text-sm font-semibold text-white/90 uppercase tracking-[0.12em]">Audio Version</span>
+                  </div>
+                  <p className="text-xs text-white/50">Listen or download the audio version of this sermon.</p>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const resp = await fetch(audiobookCover);
+                        const blob = await resp.blob();
+                        const ext = blob.type.includes("png") ? "png" : "jpg";
+                        const { triggerDownload } = await import("@/lib/downloadHelper");
+                        await triggerDownload(blob, `${title.replace(/\s+/g, "-").toLowerCase()}-cover.${ext}`);
+                      } catch { window.open(audiobookCover, "_blank"); }
+                    }}
+                    className="mt-2 inline-flex items-center gap-1.5 text-[10px] font-semibold text-white/60 hover:text-white transition-colors"
+                  >
+                    <Download className="h-3 w-3" /> Download Cover
+                  </button>
+                </div>
+              </div>
+            )}
+            {!audiobookCover && (
+              <div className="flex items-center gap-2 mb-4">
+                <Headphones className="h-5 w-5 text-[#d4af37]" />
+                <span className="text-sm font-semibold text-white/90 uppercase tracking-[0.12em]">Listen to Audio</span>
+              </div>
+            )}
             <audio controls className="w-full" style={{ filter: "invert(1) hue-rotate(180deg)", opacity: 0.85 }} src={audioUrl}>
               Your browser does not support the audio element.
             </audio>
