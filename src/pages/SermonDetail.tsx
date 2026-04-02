@@ -233,8 +233,24 @@ export default function SermonDetail() {
   const [purchased, setPurchased] = useState(false);
   const [checkingPurchase, setCheckingPurchase] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [audiobookCover, setAudiobookCover] = useState("");
 
   const sermonRef = useRef<any>(null);
+
+  // Fetch audiobook cover for this sermon
+  useEffect(() => {
+    if (!id) return;
+    supabase
+      .from("audiobooks")
+      .select("cover_image")
+      .eq("content_type", "sermon")
+      .eq("content_id", id)
+      .eq("is_visible", true)
+      .limit(1)
+      .then(({ data }) => {
+        if (data?.[0]?.cover_image) setAudiobookCover(data[0].cover_image);
+      });
+  }, [id]);
 
   const title = safeText((sermon as any)?.title) || "Sermon";
   const scripture = safeText((sermon as any)?.scripture);
