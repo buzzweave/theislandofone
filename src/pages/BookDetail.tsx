@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, Crown, Download, FileText, Lock, Mail, ShoppingCart, CheckCircle2, Loader2 } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, Crown, Download, FileText, Lock, Mail, ShoppingCart, CheckCircle2, Loader2, Headphones } from "lucide-react";
 import { exportBookToPdf, exportBookToEpub, exportBookToWord } from "@/lib/bookExport";
 import { useBook } from "@/hooks/useBooks";
 import { useAuth } from "@/contexts/AuthContext";
