@@ -248,6 +248,14 @@ export default function AdminAudiobooks() {
       const data = await response.json();
       setGenPercent(90);
 
+      // Upload cover image if custom file exists
+      let finalCoverUrl = coverImageUrl;
+      if (customCoverFile) {
+        try {
+          finalCoverUrl = await uploadToStorage("audio-files", customCoverFile, "covers");
+        } catch { /* keep existing URL */ }
+      }
+
       // Upsert the audiobook record
       await upsertAudiobook.mutateAsync({
         content_type: contentType,
@@ -258,6 +266,9 @@ export default function AdminAudiobooks() {
         price: 0,
         is_separate_price: false,
         is_visible: false,
+        is_featured: false,
+        is_free: true,
+        cover_image: finalCoverUrl || "",
         title,
       });
 
