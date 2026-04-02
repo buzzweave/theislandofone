@@ -275,11 +275,15 @@ export default function AdminAudiobooks() {
   };
 
   /* ---- SOUNDTRACK ---- */
+  const ALLOWED_AUDIO_EXTENSIONS = [".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac", ".wma", ".webm"];
   const handleSoundtrackUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith("audio/")) {
-      toast({ title: "Invalid file", description: "Please upload an audio file (MP3, WAV, etc).", variant: "destructive" });
+    const ext = "." + (file.name.split(".").pop() || "").toLowerCase();
+    const isAudioMime = file.type.startsWith("audio/");
+    const isAllowedExt = ALLOWED_AUDIO_EXTENSIONS.includes(ext);
+    if (!isAudioMime && !isAllowedExt) {
+      toast({ title: "Unsupported file type", description: `Please upload an audio file: ${ALLOWED_AUDIO_EXTENSIONS.join(", ")}`, variant: "destructive" });
       return;
     }
     setSoundtrackFile(file);
@@ -529,7 +533,7 @@ export default function AdminAudiobooks() {
               <Button variant="outline" size="sm" className="gap-1.5" onClick={() => soundtrackInputRef.current?.click()}>
                 <Upload className="h-3.5 w-3.5" /> Upload Soundtrack
               </Button>
-              <input ref={soundtrackInputRef} type="file" accept="audio/*" className="hidden" onChange={handleSoundtrackUpload} />
+              <input ref={soundtrackInputRef} type="file" accept=".mp3,.wav,.m4a,.aac,.ogg,.flac,.wma,.webm,audio/*" className="hidden" onChange={handleSoundtrackUpload} />
               {soundtrackFile && <span className="text-xs text-muted-foreground truncate max-w-[200px]">{soundtrackFile.name}</span>}
               {soundtrackUrl && (
                 <Button variant="ghost" size="sm" className="text-xs" onClick={() => { setSoundtrackFile(null); setSoundtrackUrl(""); }}>
@@ -801,7 +805,6 @@ export default function AdminAudiobooks() {
                       <Switch
                         checked={ab.is_visible}
                         onCheckedChange={async () => {
-                          // Set visibility AND update the sermon's audio_url
                           const newVisible = !ab.is_visible;
                           await updateAudiobook.mutateAsync({ id: ab.id, is_visible: newVisible });
                           if (ab.content_id) {
@@ -880,11 +883,20 @@ export default function AdminAudiobooks() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium">Feature Audio on Front Page</p>
-                      <p className="text-xs text-muted-foreground">Highlight this audiobook on the homepage.</p>
+                      <p className="text-xs text-muted-foreground">Highlight this audiobook on the homepage. Independent from publish above.</p>
                     </div>
                     <Switch
-                      checked={ab.is_visible}
-                      onCheckedChange={() => handleToggleVisibility(ab)}
+                      checked={Boolean((ab as any).is_featured)}
+                      onCheckedChange={async () => {
+                        const newFeatured = !((ab as any).is_featured);
+                        await updateAudiobook.mutateAsync({ id: ab.id, is_featured: newFeatured } as any);
+                        toast({
+                          title: newFeatured ? "Featured on front page" : "Removed from front page",
+                          description: newFeatured
+                            ? "This audiobook will appear on the homepage."
+                            : "This audiobook is no longer featured.",
+                        });
+                      }}
                     />
                   </div>
                 </div>

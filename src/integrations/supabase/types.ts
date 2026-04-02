@@ -283,6 +283,7 @@ export type Database = {
           content_type: string
           created_at: string
           id: string
+          is_featured: boolean
           is_separate_price: boolean
           is_visible: boolean
           price: number
@@ -297,6 +298,7 @@ export type Database = {
           content_type: string
           created_at?: string
           id?: string
+          is_featured?: boolean
           is_separate_price?: boolean
           is_visible?: boolean
           price?: number
@@ -311,6 +313,7 @@ export type Database = {
           content_type?: string
           created_at?: string
           id?: string
+          is_featured?: boolean
           is_separate_price?: boolean
           is_visible?: boolean
           price?: number

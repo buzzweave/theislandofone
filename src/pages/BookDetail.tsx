@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, Crown, Download, FileText, Lock, Mail, ShoppingCart, CheckCircle2, Loader2 } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, Crown, Download, FileText, Lock, Mail, ShoppingCart, CheckCircle2, Loader2, Headphones } from "lucide-react";
 import { exportBookToPdf, exportBookToEpub, exportBookToWord } from "@/lib/bookExport";
 import { useBook } from "@/hooks/useBooks";
 import { useAuth } from "@/contexts/AuthContext";
@@ -148,6 +148,11 @@ export default function BookDetail() {
                 {book.is_free && (
                   <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/5 text-primary/70 border border-primary/10">
                     Free
+                  </span>
+                )}
+                {book.audio_url && (
+                  <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                    <Headphones className="h-2.5 w-2.5" /> Audio Version
                   </span>
                 )}
               </div>
