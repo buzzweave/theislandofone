@@ -732,6 +732,9 @@ export default function AdminAudiobooks() {
                     <span className="font-medium truncate">{getContentTitle(ab)}</span>
                     <Badge variant="outline" className="text-xs shrink-0">{ab.content_type}</Badge>
                     <Badge variant="secondary" className="text-xs shrink-0">{ab.voice_provider}</Badge>
+                    <Badge variant={(ab as any).is_free ? "default" : "outline"} className="text-xs shrink-0">
+                      {(ab as any).is_free ? "Free" : ab.is_separate_price ? `$${ab.price}` : "Paid"}
+                    </Badge>
                   </div>
                   {ab.audio_url && (
                     <audio controls className="w-full h-9 mt-2" src={ab.audio_url}>
