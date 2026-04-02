@@ -776,31 +776,108 @@ export default function AdminAudiobooks() {
           ) : !audiobooks?.length ? (
             <p className="text-muted-foreground text-center py-12">No audiobooks to price yet.</p>
           ) : (
-            audiobooks.map((ab) => (
+            audiobooks.map((ab) => {
+              const abCover = (ab as any).cover_image
+                || (ab.content_type === "book" ? books?.find((b) => b.id === ab.content_id)?.cover_image : "")
+                || "";
+              return (
               <Card key={ab.id} className="p-4 space-y-4">
-                <div className="flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-primary" />
-                  <span className="font-medium">{getContentTitle(ab)}</span>
-                  <Badge variant="outline" className="text-xs">{ab.content_type}</Badge>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="flex items-center gap-3">
-                    <label className="text-sm text-muted-foreground whitespace-nowrap">Sell separately</label>
-                    <Switch checked={ab.is_separate_price} onCheckedChange={() => handleToggleSeparatePrice(ab)} />
+                <div className="flex items-center gap-3">
+                  {abCover && (
+                    <img src={abCover} alt="Cover" className="w-12 h-16 object-cover rounded border border-border shrink-0" />
+                  )}
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <DollarSign className="h-4 w-4 text-primary shrink-0" />
+                    <span className="font-medium truncate">{getContentTitle(ab)}</span>
+                    <Badge variant="outline" className="text-xs shrink-0">{ab.content_type}</Badge>
                   </div>
-                  {ab.is_separate_price && (
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm text-muted-foreground">Price $</label>
-                      <Input
-                        type="number" min="0" step="0.01" className="w-24"
-                        defaultValue={ab.price}
-                        onBlur={(e) => handleUpdatePrice(ab, parseFloat(e.target.value) || 0)}
-                      />
+                </div>
+
+                {/* Free / Paid toggle */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Free Audio</p>
+                    <p className="text-xs text-muted-foreground">When enabled, anyone can play and download this audio version.</p>
+                  </div>
+                  <Switch
+                    checked={Boolean((ab as any).is_free)}
+                    onCheckedChange={async () => {
+                      const newFree = !((ab as any).is_free);
+                      await updateAudiobook.mutateAsync({ id: ab.id, is_free: newFree } as any);
+                      toast({
+                        title: newFree ? "Set to free" : "Set to paid",
+                        description: newFree
+                          ? "This audio version is now free for everyone."
+                          : "This audio version now requires purchase or membership.",
+                      });
+                    }}
+                  />
+                </div>
+
+                {/* Separate pricing (only when not free) */}
+                {!(ab as any).is_free && (
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="flex items-center gap-3">
+                      <label className="text-sm text-muted-foreground whitespace-nowrap">Sell separately</label>
+                      <Switch checked={ab.is_separate_price} onCheckedChange={() => handleToggleSeparatePrice(ab)} />
                     </div>
-                  )}
-                  {!ab.is_separate_price && (
-                    <span className="text-sm text-muted-foreground">Bundled with {ab.content_type} price</span>
-                  )}
+                    {ab.is_separate_price && (
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm text-muted-foreground">Price $</label>
+                        <Input
+                          type="number" min="0" step="0.01" className="w-24"
+                          defaultValue={ab.price}
+                          onBlur={(e) => handleUpdatePrice(ab, parseFloat(e.target.value) || 0)}
+                        />
+                      </div>
+                    )}
+                    {!ab.is_separate_price && (
+                      <span className="text-sm text-muted-foreground">Bundled with {ab.content_type} price</span>
+                    )}
+                  </div>
+                )}
+
+                {/* Cover image for this audiobook */}
+                <div className="border-t border-border pt-3 space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cover Image</p>
+                  <div className="flex items-center gap-3">
+                    {abCover ? (
+                      <img src={abCover} alt="Cover" className="w-16 h-22 object-cover rounded border border-border shrink-0" />
+                    ) : (
+                      <div className="w-16 h-22 rounded border border-dashed border-border bg-muted/30 flex items-center justify-center shrink-0">
+                        <ImageIcon className="h-5 w-5 text-muted-foreground/40" />
+                      </div>
+                    )}
+                    <div className="space-y-1.5 flex-1">
+                      <p className="text-xs text-muted-foreground">This cover publishes with the audio version on the public site.</p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => {
+                          const input = document.createElement("input");
+                          input.type = "file";
+                          input.accept = "image/*";
+                          input.onchange = async (ev: any) => {
+                            const file = ev.target?.files?.[0];
+                            if (!file) return;
+                            try {
+                              const url = await uploadToStorage("audio-files", file, "covers");
+                              await updateAudiobook.mutateAsync({ id: ab.id, cover_image: url } as any);
+                              toast({ title: "Cover updated" });
+                            } catch (err: any) {
+                              toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+                            }
+                          };
+                          input.click();
+                        }}>
+                          <Upload className="h-3 w-3" /> {abCover ? "Change" : "Upload"}
+                        </Button>
+                        {abCover && (
+                          <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => handleDownloadCover(abCover, getContentTitle(ab))}>
+                            <Download className="h-3 w-3" /> Download Cover
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Publish Audio Version section */}
@@ -912,7 +989,8 @@ export default function AdminAudiobooks() {
                   </div>
                 </div>
               </Card>
-            ))
+              );
+            })
           )}
         </TabsContent>
       </Tabs>
