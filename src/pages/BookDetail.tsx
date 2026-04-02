@@ -227,7 +227,7 @@ export default function BookDetail() {
 
               {canRead && book.audio_url && (
                 <div className="mt-6">
-                  <AudioPlayer audioUrl={book.audio_url} title={book.title} />
+                  <AudioPlayerWithCover audioUrl={book.audio_url} title={book.title} bookId={id || ""} fallbackCover={book.cover_image} />
                 </div>
               )}
             </div>
