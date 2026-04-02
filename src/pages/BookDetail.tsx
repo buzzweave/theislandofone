@@ -17,6 +17,70 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { membershipPlans } from "@/data/content";
 import { toast } from "sonner";
 
+/** AudioPlayer with cover from audiobooks table */
+function AudioPlayerWithCover({ audioUrl, title, bookId, fallbackCover }: { audioUrl: string; title: string; bookId: string; fallbackCover?: string }) {
+  const [cover, setCover] = useState(fallbackCover || "");
+  useEffect(() => {
+    if (!bookId) return;
+    supabase
+      .from("audiobooks")
+      .select("cover_image")
+      .eq("content_type", "book")
+      .eq("content_id", bookId)
+      .eq("is_visible", true)
+      .limit(1)
+      .then(({ data }) => {
+        if (data?.[0]?.cover_image) setCover(data[0].cover_image);
+      });
+  }, [bookId]);
+
+  const handleDownloadCover = async () => {
+    if (!cover) return;
+    try {
+      const resp = await fetch(cover);
+      const blob = await resp.blob();
+      const ext = blob.type.includes("png") ? "png" : "jpg";
+      const { triggerDownload } = await import("@/lib/downloadHelper");
+      await triggerDownload(blob, `${title.replace(/\s+/g, "-").toLowerCase()}-cover.${ext}`);
+    } catch { window.open(cover, "_blank"); }
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+      {cover && (
+        <div className="flex items-center gap-3 mb-2">
+          <img src={cover} alt="Audio cover" className="w-16 h-22 object-cover rounded-lg border border-border shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <Headphones className="h-4 w-4 text-primary" />
+              <span className="font-display text-sm font-semibold">Audio Version</span>
+            </div>
+            <button onClick={handleDownloadCover} className="mt-1 inline-flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 transition-colors">
+              <Download className="h-3 w-3" /> Download Cover
+            </button>
+          </div>
+        </div>
+      )}
+      {!cover && (
+        <div className="flex items-center gap-2">
+          <Headphones className="h-5 w-5 text-primary" />
+          <span className="font-display text-sm font-semibold">Audio Version</span>
+        </div>
+      )}
+      <audio controls className="w-full h-10" src={audioUrl}>
+        Your browser does not support the audio element.
+      </audio>
+      <a
+        href={audioUrl}
+        download={`${title.replace(/\s+/g, "-").toLowerCase()}.mp3`}
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-primary/30 text-primary text-xs font-semibold hover:bg-primary/10 transition-colors"
+      >
+        <Download className="h-3.5 w-3.5" /> Download Audiobook
+      </a>
+    </div>
+  );
+}
+
 export default function BookDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -227,7 +291,7 @@ export default function BookDetail() {
 
               {canRead && book.audio_url && (
                 <div className="mt-6">
-                  <AudioPlayer audioUrl={book.audio_url} title={book.title} />
+                  <AudioPlayerWithCover audioUrl={book.audio_url} title={book.title} bookId={id || ""} fallbackCover={book.cover_image} />
                 </div>
               )}
             </div>

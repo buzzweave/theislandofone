@@ -281,9 +281,11 @@ export type Database = {
           audio_url: string
           content_id: string
           content_type: string
+          cover_image: string
           created_at: string
           id: string
           is_featured: boolean
+          is_free: boolean
           is_separate_price: boolean
           is_visible: boolean
           price: number
@@ -296,9 +298,11 @@ export type Database = {
           audio_url?: string
           content_id: string
           content_type: string
+          cover_image?: string
           created_at?: string
           id?: string
           is_featured?: boolean
+          is_free?: boolean
           is_separate_price?: boolean
           is_visible?: boolean
           price?: number
@@ -311,9 +315,11 @@ export type Database = {
           audio_url?: string
           content_id?: string
           content_type?: string
+          cover_image?: string
           created_at?: string
           id?: string
           is_featured?: boolean
+          is_free?: boolean
           is_separate_price?: boolean
           is_visible?: boolean
           price?: number
