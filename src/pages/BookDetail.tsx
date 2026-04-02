@@ -150,6 +150,11 @@ export default function BookDetail() {
                     Free
                   </span>
                 )}
+                {book.audio_url && (
+                  <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                    <Headphones className="h-2.5 w-2.5" /> Audio Version
+                  </span>
+                )}
               </div>
               <h1 className="font-display text-4xl md:text-5xl font-bold mb-2">{book.title}</h1>
               {book.subtitle && (

@@ -444,6 +444,13 @@ export default function SermonDetail() {
               </span>
             )}
 
+            {audioUrl ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-[#d4af37]/25 bg-[#d4af37]/8 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#f2d98a]">
+                <Headphones className="h-3 w-3" />
+                Audio Version
+              </span>
+            ) : null}
+
             {checkingPurchase ? (
               <span className="inline-flex items-center gap-2 text-xs text-white/55">
                 <Loader2 className="h-3 w-3 animate-spin" />

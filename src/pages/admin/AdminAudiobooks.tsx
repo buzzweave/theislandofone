@@ -805,7 +805,6 @@ export default function AdminAudiobooks() {
                       <Switch
                         checked={ab.is_visible}
                         onCheckedChange={async () => {
-                          // Set visibility AND update the sermon's audio_url
                           const newVisible = !ab.is_visible;
                           await updateAudiobook.mutateAsync({ id: ab.id, is_visible: newVisible });
                           if (ab.content_id) {
@@ -884,11 +883,20 @@ export default function AdminAudiobooks() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium">Feature Audio on Front Page</p>
-                      <p className="text-xs text-muted-foreground">Highlight this audiobook on the homepage.</p>
+                      <p className="text-xs text-muted-foreground">Highlight this audiobook on the homepage. Independent from publish above.</p>
                     </div>
                     <Switch
-                      checked={ab.is_visible}
-                      onCheckedChange={() => handleToggleVisibility(ab)}
+                      checked={Boolean((ab as any).is_featured)}
+                      onCheckedChange={async () => {
+                        const newFeatured = !((ab as any).is_featured);
+                        await updateAudiobook.mutateAsync({ id: ab.id, is_featured: newFeatured } as any);
+                        toast({
+                          title: newFeatured ? "Featured on front page" : "Removed from front page",
+                          description: newFeatured
+                            ? "This audiobook will appear on the homepage."
+                            : "This audiobook is no longer featured.",
+                        });
+                      }}
                     />
                   </div>
                 </div>
