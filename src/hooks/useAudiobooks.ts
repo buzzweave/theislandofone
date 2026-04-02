@@ -11,6 +11,9 @@ export interface Audiobook {
   price: number;
   is_separate_price: boolean;
   is_visible: boolean;
+  is_featured: boolean;
+  is_free: boolean;
+  cover_image: string;
   title: string;
   created_at: string;
   updated_at: string;

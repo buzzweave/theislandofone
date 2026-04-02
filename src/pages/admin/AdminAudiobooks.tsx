@@ -718,9 +718,9 @@ export default function AdminAudiobooks() {
             <p className="text-muted-foreground text-center py-12">No audiobooks yet. Generate one above.</p>
           ) : (
             audiobooks.map((ab) => {
-              const abCover = ab.content_type === "book"
-                ? books?.find((b) => b.id === ab.content_id)?.cover_image
-                : undefined;
+              const abCover = (ab as any).cover_image
+                || (ab.content_type === "book" ? books?.find((b) => b.id === ab.content_id)?.cover_image : "")
+                || "";
               return (
               <Card key={ab.id} className="p-4 flex flex-col md:flex-row items-start md:items-center gap-4">
                 {abCover && (
