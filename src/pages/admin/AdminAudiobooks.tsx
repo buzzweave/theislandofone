@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useBooks } from "@/hooks/useBooks";
 import { useSermons } from "@/hooks/useSermons";
+import { useBlogPosts } from "@/hooks/useBlogPosts";
 import { useAudiobooks, useUpsertAudiobook, useUpdateAudiobook, useDeleteAudiobook } from "@/hooks/useAudiobooks";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
