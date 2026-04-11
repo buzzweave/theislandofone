@@ -1,0 +1,1 @@
+ALTER TABLE public.blog_posts ADD COLUMN IF NOT EXISTS audio_url text NOT NULL DEFAULT '';

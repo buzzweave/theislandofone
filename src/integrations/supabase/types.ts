@@ -332,6 +332,7 @@ export type Database = {
       }
       blog_posts: {
         Row: {
+          audio_url: string
           author: string
           content: string
           created_at: string
@@ -346,6 +347,7 @@ export type Database = {
           video_url: string
         }
         Insert: {
+          audio_url?: string
           author?: string
           content?: string
           created_at?: string
@@ -360,6 +362,7 @@ export type Database = {
           video_url?: string
         }
         Update: {
+          audio_url?: string
           author?: string
           content?: string
           created_at?: string
