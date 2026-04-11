@@ -167,9 +167,29 @@ export default function BlogPost() {
             <Calendar className="h-4 w-4" />
             {format(new Date(post.published_at || post.created_at), "MMMM d, yyyy")}
           </span>
-        </div>
+          </div>
 
-        {(post as any).video_url && (
+        {post.audio_url && post.audio_url.length > 0 && (
+          <div className="flex items-center gap-2 text-sm text-primary mb-6">
+            <Headphones className="h-4 w-4" />
+            <span className="font-semibold">Audio Version</span>
+          </div>
+        )}
+
+        {post.audio_url && post.audio_url.length > 0 && (
+          <div className="rounded-xl border border-border bg-card p-4 space-y-3 mb-6">
+            <audio controls className="w-full h-10" src={post.audio_url}>
+              Your browser does not support the audio element.
+            </audio>
+            <a
+              href={post.audio_url}
+              download={`${post.title.replace(/\s+/g, "-").toLowerCase()}.mp3`}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-primary/30 text-primary text-xs font-semibold hover:bg-primary/10 transition-colors"
+            >
+              <Headphones className="h-3.5 w-3.5" /> Download Audio
+            </a>
+          </div>
+        )}
           <div className="my-6 rounded-xl overflow-hidden border border-border">
             <video
               src={(post as any).video_url}
