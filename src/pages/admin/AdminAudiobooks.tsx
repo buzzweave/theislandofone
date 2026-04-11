@@ -927,6 +927,33 @@ export default function AdminAudiobooks() {
                     </div>
                   )}
 
+                  {ab.content_type === "blog" && (
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">Publish Audio to Blog Post</p>
+                        <p className="text-xs text-muted-foreground">Audio player will appear on the blog post page.</p>
+                      </div>
+                      <Switch
+                        checked={ab.is_visible}
+                        onCheckedChange={async () => {
+                          const newVisible = !ab.is_visible;
+                          await updateAudiobook.mutateAsync({ id: ab.id, is_visible: newVisible });
+                          if (ab.content_id) {
+                            await supabase.from("blog_posts").update({
+                              audio_url: newVisible ? ab.audio_url : "",
+                            }).eq("id", ab.content_id);
+                          }
+                          toast({
+                            title: newVisible ? "Published to blog post" : "Removed from blog post",
+                            description: newVisible
+                              ? "Audio player is now visible on the blog post page."
+                              : "Audio removed from the blog post page.",
+                          });
+                        }}
+                      />
+                    </div>
+                  )
+
                   {ab.content_type === "book" && (
                     <>
                       <div className="flex items-center justify-between">

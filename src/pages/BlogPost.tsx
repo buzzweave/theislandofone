@@ -2,7 +2,7 @@ import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, Calendar, User } from "lucide-react";
+import { ArrowLeft, Calendar, User, Headphones } from "lucide-react";
 import DOMPurify from "dompurify";
 import { format } from "date-fns";
 import SocialShareLinks from "@/components/SocialShareLinks";
