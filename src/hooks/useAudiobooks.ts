@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 export interface Audiobook {
   id: string;
-  content_type: "book" | "sermon";
+  content_type: "book" | "sermon" | "blog";
   content_id: string;
   audio_url: string;
   voice_provider: "elevenlabs" | "openai";

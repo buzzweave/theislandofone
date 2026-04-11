@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useBooks } from "@/hooks/useBooks";
 import { useSermons } from "@/hooks/useSermons";
+import { useBlogPosts } from "@/hooks/useBlogPosts";
 import { useAudiobooks, useUpsertAudiobook, useUpdateAudiobook, useDeleteAudiobook } from "@/hooks/useAudiobooks";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -69,6 +70,7 @@ function stripHtml(html: string): string {
 export default function AdminAudiobooks() {
   const { data: books, isLoading: booksLoading } = useBooks();
   const { data: sermons, isLoading: sermonsLoading } = useSermons();
+  const { data: blogPosts, isLoading: blogsLoading } = useBlogPosts();
   const { data: audiobooks, isLoading: audiobooksLoading } = useAudiobooks();
   const upsertAudiobook = useUpsertAudiobook();
   const updateAudiobook = useUpdateAudiobook();
@@ -76,7 +78,7 @@ export default function AdminAudiobooks() {
   const { toast } = useToast();
 
   /* generation state */
-  const [contentType, setContentType] = useState<"book" | "sermon">("book");
+  const [contentType, setContentType] = useState<"book" | "sermon" | "blog">("book");
   const [selectedContentId, setSelectedContentId] = useState("");
   const [provider, setProvider] = useState<"elevenlabs" | "openai">("openai");
   const [voiceId, setVoiceId] = useState("onyx");
@@ -138,12 +140,15 @@ export default function AdminAudiobooks() {
     if (contentType === "book") {
       const book = books?.find((b) => b.id === selectedContentId);
       setCoverImageUrl(book?.cover_image || "");
+    } else if (contentType === "blog") {
+      const blog = blogPosts?.find((b) => b.id === selectedContentId);
+      setCoverImageUrl(blog?.image_url || "");
     } else {
       setCoverImageUrl(""); // sermons don't have covers by default
     }
     setCustomCoverFile(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedContentId, contentType, books, sermons]);
+  }, [selectedContentId, contentType, books, sermons, blogPosts]);
 
   /* ---- sync audio volumes ---- */
   useEffect(() => {
@@ -185,6 +190,10 @@ export default function AdminAudiobooks() {
       const chapters = book.chapters || [];
       const text = chapters.map((c) => `${c.title}\n\n${c.content}`).join("\n\n") || book.description;
       return { text, title: book.title, chapters };
+    } else if (contentType === "blog") {
+      const blog = blogPosts?.find((b) => b.id === selectedContentId);
+      if (!blog) return { text: "", title: "", chapters: [] };
+      return { text: blog.content || blog.excerpt, title: blog.title, chapters: [] };
     } else {
       const sermon = sermons?.find((s) => s.id === selectedContentId);
       if (!sermon) return { text: "", title: "", chapters: [] };
@@ -399,14 +408,17 @@ export default function AdminAudiobooks() {
 
   const getContentTitle = (ab: any) => {
     if (ab.content_type === "book") return books?.find((b) => b.id === ab.content_id)?.title || ab.title;
+    if (ab.content_type === "blog") return blogPosts?.find((b) => b.id === ab.content_id)?.title || ab.title;
     return sermons?.find((s) => s.id === ab.content_id)?.title || ab.title;
   };
 
   const contentOptions = contentType === "book"
     ? (books || []).map((b) => ({ id: b.id, label: b.title }))
+    : contentType === "blog"
+    ? (blogPosts || []).map((b) => ({ id: b.id, label: b.title }))
     : (sermons || []).map((s) => ({ id: s.id, label: s.title }));
 
-  const isLoading = booksLoading || sermonsLoading || audiobooksLoading;
+  const isLoading = booksLoading || sermonsLoading || blogsLoading || audiobooksLoading;
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
@@ -440,13 +452,14 @@ export default function AdminAudiobooks() {
                   <SelectContent>
                     <SelectItem value="book">Book</SelectItem>
                     <SelectItem value="sermon">Sermon</SelectItem>
+                    <SelectItem value="blog">Blog Post</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               {/* Content selection */}
               <div>
-                <label className="text-sm font-medium mb-1 block">Select {contentType === "book" ? "Book" : "Sermon"}</label>
+                <label className="text-sm font-medium mb-1 block">Select {contentType === "book" ? "Book" : contentType === "blog" ? "Blog Post" : "Sermon"}</label>
                 <Select value={selectedContentId} onValueChange={setSelectedContentId}>
                   <SelectTrigger><SelectValue placeholder={`Choose a ${contentType}...`} /></SelectTrigger>
                   <SelectContent>
@@ -908,6 +921,33 @@ export default function AdminAudiobooks() {
                             description: newVisible
                               ? "Audio player is now visible on the sermon page."
                               : "Audio removed from the sermon page.",
+                          });
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {ab.content_type === "blog" && (
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">Publish Audio to Blog Post</p>
+                        <p className="text-xs text-muted-foreground">Audio player will appear on the blog post page.</p>
+                      </div>
+                      <Switch
+                        checked={ab.is_visible}
+                        onCheckedChange={async () => {
+                          const newVisible = !ab.is_visible;
+                          await updateAudiobook.mutateAsync({ id: ab.id, is_visible: newVisible });
+                          if (ab.content_id) {
+                            await supabase.from("blog_posts").update({
+                              audio_url: newVisible ? ab.audio_url : "",
+                            }).eq("id", ab.content_id);
+                          }
+                          toast({
+                            title: newVisible ? "Published to blog post" : "Removed from blog post",
+                            description: newVisible
+                              ? "Audio player is now visible on the blog post page."
+                              : "Audio removed from the blog post page.",
                           });
                         }}
                       />
