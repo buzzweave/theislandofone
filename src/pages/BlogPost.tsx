@@ -190,6 +190,7 @@ export default function BlogPost() {
             </a>
           </div>
         )}
+        {(post as any).video_url && (
           <div className="my-6 rounded-xl overflow-hidden border border-border">
             <video
               src={(post as any).video_url}
