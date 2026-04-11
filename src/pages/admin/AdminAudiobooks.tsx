@@ -952,7 +952,7 @@ export default function AdminAudiobooks() {
                         }}
                       />
                     </div>
-                  )
+                  )}
 
                   {ab.content_type === "book" && (
                     <>
