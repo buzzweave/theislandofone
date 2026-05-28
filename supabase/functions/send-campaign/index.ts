@@ -13,6 +13,35 @@ Deno.serve(async (req: Request) => {
     const sbKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const resendKey = Deno.env.get("RESEND_API_KEY");
 
+    // Require authenticated admin
+    const authHeader = req.headers.get("Authorization") || "";
+    const token = authHeader.replace("Bearer ", "").trim();
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "";
+    if (!token || token === anonKey) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const userResp = await fetch(`${sbUrl}/auth/v1/user`, {
+      headers: { apikey: sbKey, Authorization: `Bearer ${token}` },
+    });
+    if (!userResp.ok) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const user = await userResp.json();
+    const rolesResp = await fetch(
+      `${sbUrl}/rest/v1/user_roles?user_id=eq.${user.id}&role=eq.admin&select=role`,
+      { headers: { apikey: sbKey, Authorization: `Bearer ${sbKey}` } }
+    );
+    const roles = await rolesResp.json();
+    if (!Array.isArray(roles) || roles.length === 0) {
+      return new Response(JSON.stringify({ error: "Admin required" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { campaignId } = await req.json();
     if (!campaignId) {
       return new Response(JSON.stringify({ error: "Missing campaignId" }), {

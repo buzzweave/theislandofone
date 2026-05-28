@@ -12,12 +12,14 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 // Validate admin token against VPS auth
 async function validateAdmin(token: string): Promise<boolean> {
+  if (!token) return false;
+  const apiUrl = Deno.env.get("VPS_API_URL");
+  if (!apiUrl) {
+    // Hard fail if not configured — never accept arbitrary tokens
+    console.error("VPS_API_URL not configured; rejecting admin request");
+    return false;
+  }
   try {
-    const apiUrl = Deno.env.get("VPS_API_URL");
-    if (!apiUrl) {
-      // If no VPS URL configured, check token exists (basic guard)
-      return !!token;
-    }
     const res = await fetch(`${apiUrl}/api/auth/verify`, {
       headers: { Authorization: `Bearer ${token}` },
     });

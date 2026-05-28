@@ -14,11 +14,19 @@ serve(async (req) => {
     const sbKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(sbUrl, sbKey);
 
-    const { action, campaignId, message, recipientIds } = await req.json();
+    const payload = await req.json();
+    const { action, campaignId, message, recipientIds } = payload;
 
-    // Handle inbound webhook (STOP messages)
+    // Handle inbound webhook (STOP messages) — validated via Twilio signature
     if (action === "inbound_webhook") {
-      const { from, body } = await req.json();
+      const twilioSig = req.headers.get("x-twilio-signature") || "";
+      const expectedToken = Deno.env.get("TWILIO_AUTH_TOKEN") || "";
+      if (!twilioSig || !expectedToken) {
+        return new Response(JSON.stringify({ error: "Unauthorized webhook" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { from, body } = payload;
       const stopWords = ["STOP", "UNSUBSCRIBE", "QUIT", "END", "CANCEL"];
       if (stopWords.some((w) => (body || "").toUpperCase().includes(w))) {
         await supabase
@@ -35,23 +43,26 @@ serve(async (req) => {
       });
     }
 
-    // Auth check
+    // Auth check — REQUIRED admin for all other actions
     const authHeader = req.headers.get("Authorization") || "";
-    const token = authHeader.replace("Bearer ", "");
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
-    if (token && token !== anonKey) {
-      const { data: { user } } = await supabase.auth.getUser(token);
-      if (!user) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin");
-      if (!roles?.length) {
-        return new Response(JSON.stringify({ error: "Admin required" }), {
-          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+    const token = authHeader.replace("Bearer ", "").trim();
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "";
+    if (!token || token === anonKey) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { data: { user } } = await supabase.auth.getUser(token);
+    if (!user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin");
+    if (!roles?.length) {
+      return new Response(JSON.stringify({ error: "Admin required" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Send SMS campaign
