@@ -14,17 +14,18 @@ function formatSize(bytes: number) {
 const FolderImageCard = memo(function FolderImageCard({ img }: { img: any }) {
   return (
     <div className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300">
-      <div className="aspect-square bg-muted overflow-hidden">
-        <img
-          src={img.file_url}
-          alt={img.file_name}
-          width={600}
-          height={600}
-          loading="lazy"
-          decoding="async"
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-        />
-      </div>
+      <SmartImage
+        src={img.file_url}
+        alt={img.file_name}
+        width={600}
+        height={600}
+        displayWidth={600}
+        widths={[400, 800, 1200]}
+        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+        wrapperClassName="aspect-square"
+        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+      />
+    </div>
       <div className="p-3 flex items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs font-medium truncate">{img.file_name}</p>
