@@ -72,12 +72,25 @@ export default function AdminGraphics() {
       for (let i = 0; i < files.length; i++) {
         setUploadProgress({ current: i + 1, total: files.length });
         try {
-          const compressed = await createCompressedPreview(files[i]);
+          const original = files[i];
+          const { w, h } = await readImageDimensions(original);
+          const oversizedDim = w > 1920 || h > 1080;
+          const oversizedBytes = original.size > 1024 * 1024;
+          if (oversizedDim || oversizedBytes) {
+            toast({
+              title: `Optimizing ${original.name}`,
+              description: `${w}×${h}, ${(original.size / 1024 / 1024).toFixed(2)} MB — auto-compressing.`,
+            });
+          }
+          const fullRes = (oversizedDim || oversizedBytes)
+            ? await compressImage(original, 1920, 0.85)
+            : original;
+          const compressed = await createCompressedPreview(original);
           const [previewUrl, fileUrl] = await Promise.all([
             uploadToStorage("graphics", compressed, "previews"),
-            uploadToStorage("graphics", files[i], "files"),
+            uploadToStorage("graphics", fullRes, "files"),
           ]);
-          const title = files[i].name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
+          const title = original.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
           const { error } = await supabase.from("graphics").insert({
             title,
             preview_url: previewUrl,
