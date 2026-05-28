@@ -394,6 +394,26 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Require authenticated user
+    const sbUrl = Deno.env.get("SUPABASE_URL")!;
+    const sbKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const authHeader = req.headers.get("Authorization") || "";
+    const token = authHeader.replace("Bearer ", "").trim();
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "";
+    if (!token || token === anonKey) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const userResp = await fetch(`${sbUrl}/auth/v1/user`, {
+      headers: { apikey: sbKey, Authorization: `Bearer ${token}` },
+    });
+    if (!userResp.ok) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const data: SermonPayload = await req.json();
 
     if (!data.title) {

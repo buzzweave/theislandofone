@@ -126,6 +126,30 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
+    // Admin actions require authenticated admin
+    if (action === "save_smtp" || action === "test_smtp") {
+      const authHeader = req.headers.get("Authorization") || "";
+      const token = authHeader.replace("Bearer ", "").trim();
+      const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "";
+      if (!token || token === anonKey) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { data: { user } } = await supabase.auth.getUser(token);
+      if (!user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { data: adminRoles } = await supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin");
+      if (!adminRoles?.length) {
+        return new Response(JSON.stringify({ error: "Admin required" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     // Handle email settings save (admin action)
     if (action === "save_smtp") {
       const { data: existing } = await supabase.from("smtp_settings").select("id").limit(1).single();
