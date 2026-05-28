@@ -25,7 +25,7 @@ const FolderImageCard = memo(function FolderImageCard({ img }: { img: any }) {
         wrapperClassName="aspect-square"
         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
       />
-    </div>
+
       <div className="p-3 flex items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs font-medium truncate">{img.file_name}</p>
