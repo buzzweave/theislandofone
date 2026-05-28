@@ -6,6 +6,7 @@ import LazySection from "@/components/LazySection";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useSermonsEnabled } from "@/hooks/useSermonsEnabled";
+import { supabaseImageUrl, supabaseImageSrcSet } from "@/lib/supabaseImage";
 
 const SubscribeForm = lazy(() => import("@/components/SubscribeForm"));
 
