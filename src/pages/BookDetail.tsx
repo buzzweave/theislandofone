@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { membershipPlans } from "@/data/content";
 import { toast } from "sonner";
+import { supabaseImageUrl, supabaseImageSrcSet } from "@/lib/supabaseImage";
 
 /** AudioPlayer with cover from audiobooks table */
 function AudioPlayerWithCover({ audioUrl, title, bookId, fallbackCover }: { audioUrl: string; title: string; bookId: string; fallbackCover?: string }) {
