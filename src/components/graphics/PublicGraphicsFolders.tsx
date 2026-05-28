@@ -124,17 +124,17 @@ export default function PublicGraphicsFolders() {
           className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300"
         >
           {folder.cover_image && (
-            <div className="aspect-video bg-muted overflow-hidden">
-              <img
-                src={folder.cover_image}
-                alt={folder.name}
-                width={600}
-                height={338}
-                loading="lazy"
-                decoding="async"
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-              />
-            </div>
+            <SmartImage
+              src={folder.cover_image}
+              alt={folder.name}
+              width={600}
+              height={338}
+              displayWidth={600}
+              widths={[400, 800, 1200]}
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              wrapperClassName="aspect-video"
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            />
           )}
           <div className="p-5 space-y-3">
             <div className="flex items-start gap-3">
