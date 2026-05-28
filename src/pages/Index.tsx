@@ -280,7 +280,7 @@ function BlogSection() {
             >
               {post.image_url && (
                 <div className="aspect-video overflow-hidden bg-muted">
-                  <img src={post.image_url} alt={post.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" decoding="async" />
+                  <img src={supabaseImageUrl(post.image_url, { width: 800, quality: 70 })} srcSet={supabaseImageSrcSet(post.image_url, [400, 800, 1200], 70)} sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" alt={post.title} width={800} height={450} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" decoding="async" />
                 </div>
               )}
               <div className="p-4 sm:p-5">
