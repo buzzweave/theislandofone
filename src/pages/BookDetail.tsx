@@ -187,8 +187,14 @@ export default function BookDetail() {
               <div className="aspect-[2/3] rounded-xl overflow-hidden border border-border shadow-gold">
                 {book.cover_image ? (
                   <img
-                    src={book.cover_image}
+                    src={supabaseImageUrl(book.cover_image, { width: 800, quality: 75 })}
+                    srcSet={supabaseImageSrcSet(book.cover_image, [400, 800, 1200], 75)}
+                    sizes="(max-width: 768px) 100vw, 33vw"
+                    width={600}
+                    height={900}
                     alt={book.title}
+                    fetchPriority="high"
+                    decoding="async"
                     className="w-full h-full object-cover"
                   />
                 ) : (
