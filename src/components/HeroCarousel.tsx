@@ -56,7 +56,9 @@ export default function HeroCarousel() {
         visibleIndices.has(i) ? (
           <img
             key={s.id}
-            src={s.image_url || heroBgFallback}
+            src={s.image_url ? supabaseImageUrl(s.image_url, { width: 1280, quality: 70 }) : heroBgFallback}
+            srcSet={s.image_url ? supabaseImageSrcSet(s.image_url, [640, 1024, 1600], 70) : undefined}
+            sizes="100vw"
             alt=""
             fetchPriority={i === current ? "high" : "auto"}
             loading={i === current ? "eager" : "lazy"}
