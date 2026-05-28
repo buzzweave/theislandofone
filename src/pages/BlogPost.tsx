@@ -7,6 +7,7 @@ import DOMPurify from "dompurify";
 import { format } from "date-fns";
 import SocialShareLinks from "@/components/SocialShareLinks";
 import CommentsWithRating from "@/components/CommentsWithRating";
+import { supabaseImageUrl, supabaseImageSrcSet } from "@/lib/supabaseImage";
 
 function escapeHtml(text: string) {
   return text
@@ -141,7 +142,7 @@ export default function BlogPost() {
     <div className="min-h-screen">
       {post.image_url && (
         <div className="relative w-full bg-black/40">
-          <img src={post.image_url} alt={post.title} className="w-full h-auto object-contain max-h-[600px] mx-auto" />
+          <img src={supabaseImageUrl(post.image_url, { width: 1200, quality: 75 })} srcSet={supabaseImageSrcSet(post.image_url, [600, 1200, 1600], 75)} sizes="100vw" alt={post.title} fetchPriority="high" decoding="async" className="w-full h-auto object-contain max-h-[600px] mx-auto" />
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
             <span className="text-white/15 font-display text-4xl sm:text-5xl md:text-6xl font-bold rotate-[-25deg] whitespace-nowrap">
               The Island of One

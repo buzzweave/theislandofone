@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { useHeroBanners } from "@/hooks/useHeroBanners";
+import { supabaseImageUrl, supabaseImageSrcSet } from "@/lib/supabaseImage";
 
 // Stable public URL — matches the preload link in index.html so the browser reuses the same request
 const heroBgFallback = "/hero-bg.jpg";
@@ -55,7 +56,9 @@ export default function HeroCarousel() {
         visibleIndices.has(i) ? (
           <img
             key={s.id}
-            src={s.image_url || heroBgFallback}
+            src={s.image_url ? supabaseImageUrl(s.image_url, { width: 1280, quality: 70 }) : heroBgFallback}
+            srcSet={s.image_url ? supabaseImageSrcSet(s.image_url, [640, 1024, 1600], 70) : undefined}
+            sizes="100vw"
             alt=""
             fetchPriority={i === current ? "high" : "auto"}
             loading={i === current ? "eager" : "lazy"}

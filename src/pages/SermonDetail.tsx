@@ -12,6 +12,7 @@ import {
 } from "@/lib/sermonExport";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { supabaseImageUrl } from "@/lib/supabaseImage";
 
 import {
   ArrowLeft,
@@ -551,7 +552,7 @@ export default function SermonDetail() {
             {/* Show audiobook cover if available */}
             {audiobookCover && (
               <div className="flex items-center gap-4 mb-4">
-                <img src={audiobookCover} alt="Audio cover" className="w-20 h-28 object-cover rounded-lg border border-white/10 shrink-0" />
+                <img src={supabaseImageUrl(audiobookCover, { width: 200, quality: 70 })} alt="Audio cover" loading="lazy" decoding="async" width={80} height={112} className="w-20 h-28 object-cover rounded-lg border border-white/10 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <Headphones className="h-5 w-5 text-[#d4af37]" />

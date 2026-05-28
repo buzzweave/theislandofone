@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, PenLine, Calendar, User } from "lucide-react";
 import { useBlogPosts } from "@/hooks/useBlogPosts";
 import { format } from "date-fns";
+import { supabaseImageUrl, supabaseImageSrcSet } from "@/lib/supabaseImage";
 
 export default function Blog() {
   const { data: posts, isLoading } = useBlogPosts(true);
@@ -36,7 +37,9 @@ export default function Blog() {
                 {post.image_url && (
                 <div className="relative aspect-[16/9] overflow-hidden bg-black/40 flex items-center justify-center">
                     <img
-                      src={post.image_url}
+                      src={supabaseImageUrl(post.image_url, { width: 800, quality: 70 })}
+                      srcSet={supabaseImageSrcSet(post.image_url, [400, 800, 1200], 70)}
+                      sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                       alt={post.title}
                       className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                       loading="lazy"

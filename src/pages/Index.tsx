@@ -6,6 +6,7 @@ import LazySection from "@/components/LazySection";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useSermonsEnabled } from "@/hooks/useSermonsEnabled";
+import { supabaseImageUrl, supabaseImageSrcSet } from "@/lib/supabaseImage";
 
 const SubscribeForm = lazy(() => import("@/components/SubscribeForm"));
 
@@ -127,7 +128,8 @@ const BookCard = memo(({ book, priority = false }: { book: any; priority?: boole
     <div className="aspect-[2/3] overflow-hidden">
       {book.cover_image ? (
          <img
-           src={book.cover_image}
+           src={supabaseImageUrl(book.cover_image, { width: 600, quality: 70 })}
+           srcSet={supabaseImageSrcSet(book.cover_image, [300, 600, 900], 70)}
            alt={book.title}
            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
            loading={priority ? "eager" : "lazy"}
@@ -278,7 +280,7 @@ function BlogSection() {
             >
               {post.image_url && (
                 <div className="aspect-video overflow-hidden bg-muted">
-                  <img src={post.image_url} alt={post.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" decoding="async" />
+                  <img src={supabaseImageUrl(post.image_url, { width: 800, quality: 70 })} srcSet={supabaseImageSrcSet(post.image_url, [400, 800, 1200], 70)} sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" alt={post.title} width={800} height={450} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" decoding="async" />
                 </div>
               )}
               <div className="p-4 sm:p-5">
@@ -443,7 +445,7 @@ function GraphicsSection() {
               className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300"
             >
               <div className="aspect-video overflow-hidden bg-muted">
-                <img src={graphic.preview_url} alt={graphic.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" decoding="async" width={600} height={338} sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" />
+                <img src={supabaseImageUrl(graphic.preview_url, { width: 600, quality: 70 })} srcSet={supabaseImageSrcSet(graphic.preview_url, [400, 600, 900], 70)} alt={graphic.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" decoding="async" width={600} height={338} sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" />
               </div>
               <div className="p-4">
                 <p className="text-xs text-primary uppercase tracking-wider mb-1">{graphic.category}</p>

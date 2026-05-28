@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { membershipPlans } from "@/data/content";
 import { toast } from "sonner";
+import { supabaseImageUrl, supabaseImageSrcSet } from "@/lib/supabaseImage";
 
 /** AudioPlayer with cover from audiobooks table */
 function AudioPlayerWithCover({ audioUrl, title, bookId, fallbackCover }: { audioUrl: string; title: string; bookId: string; fallbackCover?: string }) {
@@ -49,7 +50,7 @@ function AudioPlayerWithCover({ audioUrl, title, bookId, fallbackCover }: { audi
     <div className="rounded-xl border border-border bg-card p-4 space-y-3">
       {cover && (
         <div className="flex items-center gap-3 mb-2">
-          <img src={cover} alt="Audio cover" className="w-16 h-22 object-cover rounded-lg border border-border shrink-0" />
+          <img src={supabaseImageUrl(cover, { width: 200, quality: 70 })} alt="Audio cover" loading="lazy" decoding="async" width={64} height={88} className="w-16 h-22 object-cover rounded-lg border border-border shrink-0" />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <Headphones className="h-4 w-4 text-primary" />
@@ -186,8 +187,14 @@ export default function BookDetail() {
               <div className="aspect-[2/3] rounded-xl overflow-hidden border border-border shadow-gold">
                 {book.cover_image ? (
                   <img
-                    src={book.cover_image}
+                    src={supabaseImageUrl(book.cover_image, { width: 800, quality: 75 })}
+                    srcSet={supabaseImageSrcSet(book.cover_image, [400, 800, 1200], 75)}
+                    sizes="(max-width: 768px) 100vw, 33vw"
+                    width={600}
+                    height={900}
                     alt={book.title}
+                    fetchPriority="high"
+                    decoding="async"
                     className="w-full h-full object-cover"
                   />
                 ) : (
