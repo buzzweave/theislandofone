@@ -128,7 +128,8 @@ const BookCard = memo(({ book, priority = false }: { book: any; priority?: boole
     <div className="aspect-[2/3] overflow-hidden">
       {book.cover_image ? (
          <img
-           src={book.cover_image}
+           src={supabaseImageUrl(book.cover_image, { width: 600, quality: 70 })}
+           srcSet={supabaseImageSrcSet(book.cover_image, [300, 600, 900], 70)}
            alt={book.title}
            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
            loading={priority ? "eager" : "lazy"}
