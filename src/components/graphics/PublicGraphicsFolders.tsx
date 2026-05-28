@@ -3,6 +3,7 @@ import { useGraphicsFolders, useGraphicsFolderImages, type GraphicsFolder } from
 import { useToast } from "@/hooks/use-toast";
 import { Download, FolderOpen, ArrowLeft, Image } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import SmartImage from "@/components/SmartImage";
 
 function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
