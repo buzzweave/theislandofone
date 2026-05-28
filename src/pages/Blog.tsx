@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, PenLine, Calendar, User } from "lucide-react";
 import { useBlogPosts } from "@/hooks/useBlogPosts";
 import { format } from "date-fns";
-import { supabaseImageUrl, supabaseImageSrcSet } from "@/lib/supabaseImage";
+import SmartImage from "@/components/SmartImage";
 
 export default function Blog() {
   const { data: posts, isLoading } = useBlogPosts(true);
