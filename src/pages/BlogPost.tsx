@@ -7,6 +7,7 @@ import DOMPurify from "dompurify";
 import { format } from "date-fns";
 import SocialShareLinks from "@/components/SocialShareLinks";
 import CommentsWithRating from "@/components/CommentsWithRating";
+import { supabaseImageUrl, supabaseImageSrcSet } from "@/lib/supabaseImage";
 
 function escapeHtml(text: string) {
   return text
