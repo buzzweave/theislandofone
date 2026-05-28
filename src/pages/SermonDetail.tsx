@@ -12,6 +12,7 @@ import {
 } from "@/lib/sermonExport";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { supabaseImageUrl } from "@/lib/supabaseImage";
 
 import {
   ArrowLeft,
