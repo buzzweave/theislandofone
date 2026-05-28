@@ -3,6 +3,7 @@ import { useGraphicsFolders, useGraphicsFolderImages, type GraphicsFolder } from
 import { useToast } from "@/hooks/use-toast";
 import { Download, FolderOpen, ArrowLeft, Image } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import SmartImage from "@/components/SmartImage";
 
 function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -13,17 +14,18 @@ function formatSize(bytes: number) {
 const FolderImageCard = memo(function FolderImageCard({ img }: { img: any }) {
   return (
     <div className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300">
-      <div className="aspect-square bg-muted overflow-hidden">
-        <img
-          src={img.file_url}
-          alt={img.file_name}
-          width={600}
-          height={600}
-          loading="lazy"
-          decoding="async"
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-        />
-      </div>
+      <SmartImage
+        src={img.file_url}
+        alt={img.file_name}
+        width={600}
+        height={600}
+        displayWidth={600}
+        widths={[400, 800, 1200]}
+        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+        wrapperClassName="aspect-square"
+        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+      />
+
       <div className="p-3 flex items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs font-medium truncate">{img.file_name}</p>
@@ -122,17 +124,17 @@ export default function PublicGraphicsFolders() {
           className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300"
         >
           {folder.cover_image && (
-            <div className="aspect-video bg-muted overflow-hidden">
-              <img
-                src={folder.cover_image}
-                alt={folder.name}
-                width={600}
-                height={338}
-                loading="lazy"
-                decoding="async"
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-              />
-            </div>
+            <SmartImage
+              src={folder.cover_image}
+              alt={folder.name}
+              width={600}
+              height={338}
+              displayWidth={600}
+              widths={[400, 800, 1200]}
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              wrapperClassName="aspect-video"
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            />
           )}
           <div className="p-5 space-y-3">
             <div className="flex items-start gap-3">

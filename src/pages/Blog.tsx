@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, PenLine, Calendar, User } from "lucide-react";
 import { useBlogPosts } from "@/hooks/useBlogPosts";
 import { format } from "date-fns";
-import { supabaseImageUrl, supabaseImageSrcSet } from "@/lib/supabaseImage";
+import SmartImage from "@/components/SmartImage";
 
 export default function Blog() {
   const { data: posts, isLoading } = useBlogPosts(true);
@@ -36,16 +36,16 @@ export default function Blog() {
               >
                 {post.image_url && (
                 <div className="relative aspect-[16/9] overflow-hidden bg-black/40 flex items-center justify-center">
-                    <img
-                      src={supabaseImageUrl(post.image_url, { width: 800, quality: 70 })}
-                      srcSet={supabaseImageSrcSet(post.image_url, [400, 800, 1200], 70)}
-                      sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    <SmartImage
+                      src={post.image_url}
                       alt={post.title}
-                      className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
-                      loading="lazy"
-                      decoding="async"
                       width={640}
                       height={360}
+                      displayWidth={800}
+                      widths={[400, 800, 1200]}
+                      sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      wrapperClassName="absolute inset-0 w-full h-full"
+                      className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                     />
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
                       <span className="text-white/20 font-display text-2xl sm:text-3xl font-bold rotate-[-25deg] whitespace-nowrap">

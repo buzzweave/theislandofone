@@ -13,15 +13,14 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 import AdminGraphicsFoldersTab from "@/components/admin/graphics/AdminGraphicsFoldersTab";
 import AIGraphicGenerator from "@/components/admin/graphics/AIGraphicGenerator";
-/** Compress an image file to a smaller preview (max 800px, 70% quality JPEG) */
-async function createCompressedPreview(file: File): Promise<File> {
+/** Compress an image file. maxDim caps the longest side; quality 0-1. */
+async function compressImage(file: File, maxDim: number, quality: number): Promise<File> {
   return new Promise((resolve) => {
     const img = new window.Image();
     img.onload = () => {
-      const MAX = 800;
       let w = img.width, h = img.height;
-      if (w > MAX || h > MAX) {
-        const ratio = Math.min(MAX / w, MAX / h);
+      if (w > maxDim || h > maxDim) {
+        const ratio = Math.min(maxDim / w, maxDim / h);
         w = Math.round(w * ratio);
         h = Math.round(h * ratio);
       }
@@ -30,13 +29,26 @@ async function createCompressedPreview(file: File): Promise<File> {
       canvas.height = h;
       canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
       canvas.toBlob((blob) => {
-        resolve(new File([blob!], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" }));
-      }, "image/jpeg", 0.7);
+        if (!blob) return resolve(file);
+        resolve(new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" }));
+      }, "image/jpeg", quality);
     };
     img.onerror = () => resolve(file);
     img.src = URL.createObjectURL(file);
   });
 }
+
+/** Read intrinsic dimensions of an image file. */
+async function readImageDimensions(file: File): Promise<{ w: number; h: number }> {
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.onload = () => resolve({ w: img.width, h: img.height });
+    img.onerror = () => resolve({ w: 0, h: 0 });
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+const createCompressedPreview = (file: File) => compressImage(file, 800, 0.7);
 
 
 export default function AdminGraphics() {
@@ -60,12 +72,25 @@ export default function AdminGraphics() {
       for (let i = 0; i < files.length; i++) {
         setUploadProgress({ current: i + 1, total: files.length });
         try {
-          const compressed = await createCompressedPreview(files[i]);
+          const original = files[i];
+          const { w, h } = await readImageDimensions(original);
+          const oversizedDim = w > 1920 || h > 1080;
+          const oversizedBytes = original.size > 1024 * 1024;
+          if (oversizedDim || oversizedBytes) {
+            toast({
+              title: `Optimizing ${original.name}`,
+              description: `${w}×${h}, ${(original.size / 1024 / 1024).toFixed(2)} MB — auto-compressing.`,
+            });
+          }
+          const fullRes = (oversizedDim || oversizedBytes)
+            ? await compressImage(original, 1920, 0.85)
+            : original;
+          const compressed = await createCompressedPreview(original);
           const [previewUrl, fileUrl] = await Promise.all([
             uploadToStorage("graphics", compressed, "previews"),
-            uploadToStorage("graphics", files[i], "files"),
+            uploadToStorage("graphics", fullRes, "files"),
           ]);
-          const title = files[i].name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
+          const title = original.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
           const { error } = await supabase.from("graphics").insert({
             title,
             preview_url: previewUrl,
