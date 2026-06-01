@@ -399,19 +399,30 @@ export default function AdminBookEditor() {
                     placeholder="Upload an image or paste a URL"
                   />
                 </div>
-                <div className="flex items-end">
+                <div className="flex items-end gap-2">
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
                     className="hidden"
                     onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
+                      const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+                      if (!allowed.includes(file.type)) {
+                        toast({ title: "Invalid file type", description: "Use JPG, PNG, or WEBP.", variant: "destructive" });
+                        if (fileInputRef.current) fileInputRef.current.value = "";
+                        return;
+                      }
+                      if (file.size > 10 * 1024 * 1024) {
+                        toast({ title: "File too large", description: "Max size is 10MB.", variant: "destructive" });
+                        if (fileInputRef.current) fileInputRef.current.value = "";
+                        return;
+                      }
                       setUploading(true);
                       try {
                         const url = await uploadToStorage("site-assets", file, "book-covers");
-                        updateLocal({ cover_image: url });
+                        updateLocal({ cover_image: `${url}?t=${Date.now()}` });
                         toast({ title: "Cover uploaded" });
                       } catch (err: any) {
                         toast({ title: "Upload failed", description: err.message, variant: "destructive" });
@@ -427,14 +438,24 @@ export default function AdminBookEditor() {
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
                   >
-                    {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
-                    {uploading ? "Uploading…" : "Upload"}
+                    {uploading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}
+                    {uploading ? "Uploading…" : (local.cover_image ? "Replace" : "Upload")}
                   </Button>
+                  {local.cover_image && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => updateLocal({ cover_image: "" })}
+                      disabled={uploading}
+                    >
+                      Remove
+                    </Button>
+                  )}
                 </div>
               </div>
               {local.cover_image && (
-                <div className="w-32 aspect-[2/3] rounded-lg border border-border overflow-hidden bg-muted">
-                  <img src={local.cover_image} alt="Cover preview" className="w-full h-full object-cover" />
+                <div className="w-[150px] h-[235px] rounded-[10px] border border-border overflow-hidden bg-[#0f172a] flex items-center justify-center">
+                  <img src={local.cover_image} alt="Cover preview" className="w-full h-full object-contain object-center block" />
                 </div>
               )}
             </CardContent>
