@@ -54,30 +54,28 @@ export default function Books() {
             <Link
               key={book.id}
               to={`/books/${book.id}`}
-              className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300 text-left hover:shadow-gold"
+              className="group flex flex-col items-center rounded-xl bg-card border border-border hover:border-primary/30 transition-all duration-300 text-left hover:shadow-gold p-3 sm:p-4"
             >
-              <div className="overflow-hidden bg-[#111827]">
+              <div className="flex items-center justify-center overflow-hidden bg-[#0f172a] rounded-[10px] w-[150px] h-[235px] sm:w-[180px] sm:h-[280px]">
                 {book.cover_image ? (
-                   <img
-                     src={supabaseImageUrl(book.cover_image, { width: 500, quality: 70 })}
-                     srcSet={`${supabaseImageUrl(book.cover_image, { width: 300, quality: 65 })} 300w, ${supabaseImageUrl(book.cover_image, { width: 500, quality: 70 })} 500w, ${supabaseImageUrl(book.cover_image, { width: 800, quality: 72 })} 800w`}
-                     sizes="(max-width: 640px) 45vw, (max-width: 1024px) 30vw, 22vw"
-                     alt={book.title}
-                     className="w-full h-auto block transition-transform duration-500 group-hover:scale-105"
-                     loading="lazy"
-                     decoding="async"
-                   />
+                  <img
+                    src={supabaseImageUrl(book.cover_image, { width: 500, quality: 72 })}
+                    srcSet={`${supabaseImageUrl(book.cover_image, { width: 300, quality: 65 })} 300w, ${supabaseImageUrl(book.cover_image, { width: 500, quality: 72 })} 500w, ${supabaseImageUrl(book.cover_image, { width: 800, quality: 75 })} 800w`}
+                    sizes="180px"
+                    alt={book.title}
+                    className="w-full h-full object-contain object-center block transition-transform duration-500 group-hover:scale-105"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 ) : (
-                  <div className="aspect-[2/3] bg-muted flex items-center justify-center">
-                    <BookOpen className="h-12 w-12 text-muted-foreground" />
-                  </div>
+                  <BookOpen className="h-12 w-12 text-muted-foreground" />
                 )}
               </div>
 
-              <div className="p-5">
+              <div className="pt-4 w-full text-center">
                 <span className="text-xs text-primary uppercase tracking-wider">{book.category}</span>
-                <h3 className="font-display text-lg font-semibold mt-1 mb-1 group-hover:text-primary transition-colors">{book.title}</h3>
-                <p className="text-muted-foreground text-sm line-clamp-2 mb-3">{book.subtitle}</p>
+                <h3 className="font-display text-base sm:text-lg font-semibold mt-1 mb-1 group-hover:text-primary transition-colors line-clamp-1">{book.title}</h3>
+                <p className="text-muted-foreground text-xs sm:text-sm line-clamp-2 mb-3">{book.subtitle}</p>
                 <span className="text-primary text-sm font-semibold inline-flex items-center gap-1.5">
                   {book.is_free ? "Free" : (
                     <>
