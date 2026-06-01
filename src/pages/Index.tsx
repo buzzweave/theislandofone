@@ -125,27 +125,25 @@ const BookCard = memo(({ book, priority = false }: { book: any; priority?: boole
     to="/books"
     className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300 hover:shadow-gold"
   >
-    <div className="aspect-[2/3] overflow-hidden bg-[#111827] flex items-center justify-center">
+    <div className="overflow-hidden bg-[#111827]">
       {book.cover_image ? (
          <img
            src={supabaseImageUrl(book.cover_image, { width: 500, quality: 70 })}
            srcSet={supabaseImageSrcSet(book.cover_image, [300, 500, 800], 70)}
            alt={book.title}
-           className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
+           className="w-full h-auto block transition-transform duration-500 group-hover:scale-105"
            loading={priority ? "eager" : "lazy"}
            decoding={priority ? "sync" : "async"}
            fetchPriority={priority ? "high" : "auto"}
-           width={400}
-           height={600}
            sizes="(max-width: 640px) 45vw, (max-width: 1024px) 30vw, 22vw"
          />
-
       ) : (
-        <div className="w-full h-full bg-muted flex items-center justify-center">
+        <div className="aspect-[2/3] bg-muted flex items-center justify-center">
           <BookOpen className="h-12 w-12 text-muted-foreground" />
         </div>
       )}
     </div>
+
     <div className="p-4 sm:p-5">
       <h3 className="font-display text-lg font-semibold mb-1">{book.title}</h3>
       <p className="text-muted-foreground text-sm mb-3 line-clamp-2">{book.subtitle}</p>
