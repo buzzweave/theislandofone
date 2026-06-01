@@ -49,31 +49,31 @@ export default function Books() {
         )}
 
         {/* Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 max-w-5xl mx-auto pb-24">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 max-w-5xl mx-auto pb-24 items-start">
           {filtered.map((book) => (
             <Link
               key={book.id}
               to={`/books/${book.id}`}
               className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300 text-left hover:shadow-gold"
             >
-              <div className="aspect-[2/3] overflow-hidden bg-[#111827] flex items-center justify-center">
+              <div className="overflow-hidden bg-[#111827]">
                 {book.cover_image ? (
                    <img
                      src={supabaseImageUrl(book.cover_image, { width: 500, quality: 70 })}
                      srcSet={`${supabaseImageUrl(book.cover_image, { width: 300, quality: 65 })} 300w, ${supabaseImageUrl(book.cover_image, { width: 500, quality: 70 })} 500w, ${supabaseImageUrl(book.cover_image, { width: 800, quality: 72 })} 800w`}
                      sizes="(max-width: 640px) 45vw, (max-width: 1024px) 30vw, 22vw"
                      alt={book.title}
-                     className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
+                     className="w-full h-auto block transition-transform duration-500 group-hover:scale-105"
                      loading="lazy"
                      decoding="async"
                    />
-
                 ) : (
-                  <div className="w-full h-full bg-muted flex items-center justify-center">
+                  <div className="aspect-[2/3] bg-muted flex items-center justify-center">
                     <BookOpen className="h-12 w-12 text-muted-foreground" />
                   </div>
                 )}
               </div>
+
               <div className="p-5">
                 <span className="text-xs text-primary uppercase tracking-wider">{book.category}</span>
                 <h3 className="font-display text-lg font-semibold mt-1 mb-1 group-hover:text-primary transition-colors">{book.title}</h3>

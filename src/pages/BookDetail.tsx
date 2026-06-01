@@ -184,7 +184,7 @@ export default function BookDetail() {
           <div className="max-w-5xl mx-auto md:flex gap-10 items-start">
             {/* Cover */}
             <div className="md:w-1/3 mb-8 md:mb-0">
-              <div className="aspect-[2/3] rounded-xl overflow-hidden border border-border shadow-gold bg-[#111827]">
+              <div className="rounded-xl overflow-hidden border border-border shadow-gold bg-[#111827]">
                 {book.cover_image ? (
                   <img
                     src={supabaseImageUrl(book.cover_image, { width: 700, quality: 72 })}
@@ -193,14 +193,15 @@ export default function BookDetail() {
                     alt={book.title}
                     fetchPriority="high"
                     decoding="async"
-                    className="w-full h-full object-cover"
+                    className="w-full h-auto block"
                   />
                 ) : (
-                  <div className="w-full h-full bg-card flex items-center justify-center">
+                  <div className="aspect-[2/3] bg-card flex items-center justify-center">
                     <BookOpen className="h-16 w-16 text-muted-foreground" />
                   </div>
                 )}
               </div>
+
             </div>
 
             {/* Info */}
