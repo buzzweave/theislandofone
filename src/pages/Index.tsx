@@ -123,30 +123,28 @@ function useHomepageMembershipPlans() {
 const BookCard = memo(({ book, priority = false }: { book: any; priority?: boolean }) => (
   <Link
     to="/books"
-    className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300 hover:shadow-gold"
+    className="group flex flex-col items-center rounded-xl bg-card border border-border hover:border-primary/30 transition-all duration-300 hover:shadow-gold p-3 sm:p-4"
   >
-    <div className="overflow-hidden bg-[#111827]">
+    <div className="flex items-center justify-center overflow-hidden bg-[#0f172a] rounded-[10px] w-[150px] h-[235px] sm:w-[180px] sm:h-[280px]">
       {book.cover_image ? (
-         <img
-           src={supabaseImageUrl(book.cover_image, { width: 500, quality: 70 })}
-           srcSet={supabaseImageSrcSet(book.cover_image, [300, 500, 800], 70)}
-           alt={book.title}
-           className="w-full h-auto block transition-transform duration-500 group-hover:scale-105"
-           loading={priority ? "eager" : "lazy"}
-           decoding={priority ? "sync" : "async"}
-           fetchPriority={priority ? "high" : "auto"}
-           sizes="(max-width: 640px) 45vw, (max-width: 1024px) 30vw, 22vw"
-         />
+        <img
+          src={supabaseImageUrl(book.cover_image, { width: 500, quality: 72 })}
+          srcSet={supabaseImageSrcSet(book.cover_image, [300, 500, 800], 72)}
+          alt={book.title}
+          className="w-full h-full object-contain object-center block transition-transform duration-500 group-hover:scale-105"
+          loading={priority ? "eager" : "lazy"}
+          decoding={priority ? "sync" : "async"}
+          fetchPriority={priority ? "high" : "auto"}
+          sizes="180px"
+        />
       ) : (
-        <div className="aspect-[2/3] bg-muted flex items-center justify-center">
-          <BookOpen className="h-12 w-12 text-muted-foreground" />
-        </div>
+        <BookOpen className="h-12 w-12 text-muted-foreground" />
       )}
     </div>
 
-    <div className="p-4 sm:p-5">
-      <h3 className="font-display text-lg font-semibold mb-1">{book.title}</h3>
-      <p className="text-muted-foreground text-sm mb-3 line-clamp-2">{book.subtitle}</p>
+    <div className="pt-4 text-center w-full">
+      <h3 className="font-display text-base sm:text-lg font-semibold mb-1 line-clamp-1">{book.title}</h3>
+      <p className="text-muted-foreground text-xs sm:text-sm mb-2 line-clamp-2">{book.subtitle}</p>
       <span className="text-primary text-sm font-semibold">
         {book.is_free ? "Free Download" : `$${book.price}`}
       </span>
