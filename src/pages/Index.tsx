@@ -170,7 +170,7 @@ function FeaturedBooksSection() {
           <p className="text-primary text-sm tracking-[0.2em] uppercase mb-3">Library</p>
           <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold">Featured Books</h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 max-w-5xl mx-auto">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 max-w-5xl mx-auto">
           {featuredBooks.map((book: any, i: number) => (
             <BookCard key={book.id} book={book} priority={i < 3} />
           ))}
