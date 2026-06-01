@@ -183,22 +183,20 @@ export default function BookDetail() {
 
           <div className="max-w-5xl mx-auto md:flex gap-10 items-start">
             {/* Cover */}
-            <div className="md:w-1/3 mb-8 md:mb-0">
-              <div className="rounded-xl overflow-hidden border border-border shadow-gold bg-[#111827]">
+            <div className="md:w-1/3 mb-8 md:mb-0 flex md:block justify-center">
+              <div className="rounded-xl overflow-hidden border border-border shadow-gold bg-[#0f172a] flex items-center justify-center w-[220px] h-[340px] sm:w-[260px] sm:h-[400px] md:w-full md:h-auto md:aspect-[2/3]">
                 {book.cover_image ? (
                   <img
-                    src={supabaseImageUrl(book.cover_image, { width: 700, quality: 72 })}
-                    srcSet={supabaseImageSrcSet(book.cover_image, [400, 700, 1000], 72)}
-                    sizes="(max-width: 768px) 100vw, 33vw"
+                    src={supabaseImageUrl(book.cover_image, { width: 700, quality: 75 })}
+                    srcSet={supabaseImageSrcSet(book.cover_image, [400, 700, 1000], 75)}
+                    sizes="(max-width: 768px) 260px, 33vw"
                     alt={book.title}
                     fetchPriority="high"
                     decoding="async"
-                    className="w-full h-auto block"
+                    className="w-full h-full object-contain object-center block"
                   />
                 ) : (
-                  <div className="aspect-[2/3] bg-card flex items-center justify-center">
-                    <BookOpen className="h-16 w-16 text-muted-foreground" />
-                  </div>
+                  <BookOpen className="h-16 w-16 text-muted-foreground" />
                 )}
               </div>
 
