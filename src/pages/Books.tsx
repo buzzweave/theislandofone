@@ -56,14 +56,14 @@ export default function Books() {
               to={`/books/${book.id}`}
               className="group rounded-xl overflow-hidden bg-card border border-border hover:border-primary/30 transition-all duration-300 text-left hover:shadow-gold"
             >
-              <div className="aspect-[2/3] overflow-hidden bg-[#111827] flex items-center justify-center p-2">
+              <div className="aspect-[2/3] overflow-hidden bg-[#111827]">
                 {book.cover_image ? (
                    <img
                      src={supabaseImageUrl(book.cover_image, { width: 500, quality: 70 })}
                      srcSet={`${supabaseImageUrl(book.cover_image, { width: 300, quality: 65 })} 300w, ${supabaseImageUrl(book.cover_image, { width: 500, quality: 70 })} 500w, ${supabaseImageUrl(book.cover_image, { width: 800, quality: 72 })} 800w`}
                      sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 30vw"
                      alt={book.title}
-                     className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
+                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                      loading="lazy"
                      decoding="async"
                    />
