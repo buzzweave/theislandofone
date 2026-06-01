@@ -18,6 +18,22 @@ const AdminAuthContext = createContext<AdminAuthContextType | null>(null);
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_DURATION = 5 * 60 * 1000; // 5 minutes
 
+async function hasAdminRole(userId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .eq("role", "admin")
+    .maybeSingle();
+
+  if (error) {
+    console.warn("Admin role check failed", error);
+    return false;
+  }
+
+  return data?.role === "admin";
+}
+
 export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,17 +47,23 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     let mounted = true;
 
     const init = async () => {
-      if (!api.hasToken()) {
-        if (mounted) setIsLoading(false);
-        return;
-      }
+      let authenticated = false;
+
       try {
-        await api.get("/api/auth/me");
-        if (mounted) setIsAuthenticated(true);
+        if (api.hasToken()) {
+          await api.get("/api/auth/me");
+          authenticated = true;
+        }
       } catch {
         api.clearToken();
-        if (mounted) setIsAuthenticated(false);
       }
+
+      if (!authenticated) {
+        const { data } = await supabase.auth.getUser();
+        if (data.user) authenticated = await hasAdminRole(data.user.id);
+      }
+
+      if (mounted) setIsAuthenticated(authenticated);
       if (mounted) setIsLoading(false);
     };
 
@@ -77,21 +99,29 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     async (email: string, password: string): Promise<boolean> => {
       if (isLocked) return false;
       try {
-        const data = await api.post<{ token: string }>("/api/auth/login", { email, password });
-        if (!data?.token) throw new Error("No token returned");
-        api.setToken(data.token);
+        let authenticated = false;
+
+        try {
+          const data = await api.post<{ token: string }>("/api/auth/login", { email, password });
+          if (data?.token) {
+            api.setToken(data.token);
+            authenticated = true;
+          }
+        } catch {
+          api.clearToken();
+        }
+
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+        if (!authError && authData.user) {
+          authenticated = await hasAdminRole(authData.user.id);
+          if (!authenticated) await supabase.auth.signOut();
+        }
+
+        if (!authenticated) throw new Error("Invalid admin credentials");
+
         setIsAuthenticated(true);
         setFailedAttempts(0);
         setLockoutEnd(null);
-
-        // Also sign into Supabase so RLS policies work for admin mutations
-        try {
-          await supabase.auth.signInWithPassword({ email, password });
-        } catch {
-          // Supabase auth is optional — VPS auth is the primary gate
-          console.warn("Supabase admin sign-in failed — admin DB mutations may be limited");
-        }
-
         return true;
       } catch {
         const next = failedAttempts + 1;
