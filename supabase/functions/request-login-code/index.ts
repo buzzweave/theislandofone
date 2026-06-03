@@ -137,36 +137,59 @@ serve(async (req) => {
 
     // --- Send email via Resend ---
     const resendKey = Deno.env.get("RESEND_API_KEY");
-    if (resendKey) {
-      await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${resendKey}`,
-        },
-        body: JSON.stringify({
-          from: "The Island of One <noreply@theislandofone.com>",
-          to: [normalizedEmail],
-          subject: "Your Island of One login code",
-          html: `
-            <div style="font-family: Georgia, serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
-              <h2 style="color: #1a1a1a; margin-bottom: 24px;">Your Login Code</h2>
-              <p style="color: #555; font-size: 16px; line-height: 1.6;">
-                Enter this code in the app to sign in:
-              </p>
-              <div style="background: #f5f0e8; border-radius: 8px; padding: 24px; text-align: center; margin: 24px 0;">
-                <span style="font-size: 36px; letter-spacing: 8px; font-weight: bold; color: #1a1a1a; font-family: monospace;">
-                  ${code}
-                </span>
-              </div>
-              <p style="color: #888; font-size: 14px;">
-                This code expires in 10 minutes. If you didn't request this, you can safely ignore this email.
-              </p>
-              <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 32px 0;" />
-              <p style="color: #aaa; font-size: 12px;">The Island of One Ministries</p>
+    if (!resendKey) {
+      console.error("RESEND_API_KEY is not set");
+      return new Response(JSON.stringify({
+        error: "email_not_configured",
+        message: "Email service is not configured. Please contact support.",
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
+    const resendRes = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${resendKey}`,
+      },
+      body: JSON.stringify({
+        from: "The Island of One <noreply@theislandofone.com>",
+        reply_to: "support@buzzweave.com",
+        to: [normalizedEmail],
+        subject: "Your Island of One login code",
+        html: `
+          <div style="font-family: Georgia, serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+            <h2 style="color: #1a1a1a; margin-bottom: 24px;">Your Login Code</h2>
+            <p style="color: #555; font-size: 16px; line-height: 1.6;">
+              Enter this code in the app to sign in:
+            </p>
+            <div style="background: #f5f0e8; border-radius: 8px; padding: 24px; text-align: center; margin: 24px 0;">
+              <span style="font-size: 36px; letter-spacing: 8px; font-weight: bold; color: #1a1a1a; font-family: monospace;">
+                ${code}
+              </span>
             </div>
-          `,
-        }),
+            <p style="color: #888; font-size: 14px;">
+              This code expires in 10 minutes. If you didn't request this, you can safely ignore this email.
+            </p>
+            <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 32px 0;" />
+            <p style="color: #aaa; font-size: 12px;">The Island of One Ministries</p>
+          </div>
+        `,
+      }),
+    });
+
+    if (!resendRes.ok) {
+      const errBody = await resendRes.text();
+      console.error("Resend send failed", resendRes.status, errBody);
+      return new Response(JSON.stringify({
+        error: "email_send_failed",
+        message: "Could not send login email. Please try again or contact support.",
+        details: errBody,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
       });
     }
 
