@@ -196,19 +196,22 @@ serve(async (req) => {
 
     let userId: string | null = null;
     let isAdmin = false;
-    if (token && token !== anonKey) {
-      const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
-      if (!authErr && user) {
-        userId = user.id;
-        const { data: roles } = await supabase
-          .from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin");
-        isAdmin = !!(roles?.length);
-      }
+    if (!token || token === anonKey) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
-
-    const needsAuth = action === "generate_draft" || action === "delete_conversation";
-    if (needsAuth && !isAdmin && token && token !== anonKey) {
-      console.log("Auth soft-pass: session may be expired, allowing action:", action);
+    const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
+    if (authErr || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    userId = user.id;
+    {
+      const { data: roles } = await supabase
+        .from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin");
+      isAdmin = !!(roles?.length);
     }
 
     // ═══════════════════════════════════════════════════════
