@@ -100,8 +100,8 @@ serve(async (req) => {
         {
           price_data: {
             currency: "usd",
-            product_data: { name: itemTitle || `${type} purchase` },
-            unit_amount: Math.round(priceAmount * 100),
+            product_data: { name: item.title || itemTitle || `${type} purchase` },
+            unit_amount: Math.round(safePrice * 100),
           },
           quantity: 1,
         },
