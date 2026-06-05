@@ -101,6 +101,15 @@ const CLOSING_RE = /^CLOSING(?:\s+(?:BUILD|DECLARATION|THOUGHTS?))?|^ALTAR\s+CAL
 const SCRIPTURE_RE = /^SCRIPTURE\s*(?:REFERENCE)?/i;
 const INTRO_RE = /^INTRODUCTION/i;
 const MAIN_POINT_LABEL_RE = /^MAIN\s+POINT\s+([IVXLCDM0-9]+)/i;
+const SUB_LABEL_RE = /^(KEY\s*POINT|REVELATION|QUOTABLE|TEXT|APPLICATION|TAKEAWAY)\s*:?\s*$/i;
+
+function detectSubLabel(line: string): "keyPoint" | "revelation" | "quotable" | null {
+  const t = line.trim().replace(/[:\.]+$/, "").toUpperCase();
+  if (t === "KEY POINT" || t === "KEYPOINT") return "keyPoint";
+  if (t === "REVELATION") return "revelation";
+  if (t === "QUOTABLE") return "quotable";
+  return null;
+}
 
 function detectSectionType(line: string): "illustration" | "closing" | "scripture" | "intro" | "mainpoint" | null {
   const t = line.trim();
