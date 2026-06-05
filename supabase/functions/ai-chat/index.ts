@@ -484,15 +484,22 @@ Use the bullet character for all bullet points. Write at least 1500 words.`
     // ── List conversations ──
     if (action === "list_conversations") {
       const { data, error } = await supabase
-        .from("ai_conversations").select("*").order("updated_at", { ascending: false }).limit(50);
+        .from("ai_conversations").select("*").eq("user_id", userId).order("updated_at", { ascending: false }).limit(50);
       if (error) throw error;
       return new Response(JSON.stringify({ conversations: data }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // ── Load messages ──
+    // ── Load messages — verify conversation ownership ──
     if (action === "load_messages") {
+      const { data: conv } = await supabase
+        .from("ai_conversations").select("user_id").eq("id", conversationId).maybeSingle();
+      if (!conv || (conv.user_id !== userId && !isAdmin)) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const { data, error } = await supabase
         .from("ai_messages").select("*").eq("conversation_id", conversationId).order("created_at", { ascending: true });
       if (error) throw error;
@@ -501,8 +508,15 @@ Use the bullet character for all bullet points. Write at least 1500 words.`
       });
     }
 
-    // ── Delete conversation ──
+    // ── Delete conversation — verify ownership ──
     if (action === "delete_conversation") {
+      const { data: conv } = await supabase
+        .from("ai_conversations").select("user_id").eq("id", conversationId).maybeSingle();
+      if (!conv || (conv.user_id !== userId && !isAdmin)) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       await supabase.from("ai_conversations").delete().eq("id", conversationId);
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
