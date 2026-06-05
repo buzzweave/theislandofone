@@ -35,17 +35,17 @@ export default function Blog() {
                 className="group rounded-xl border border-border bg-card overflow-hidden hover:shadow-lg transition-all"
               >
                 {post.image_url && (
-                <div className="relative aspect-[16/9] overflow-hidden bg-black/40 flex items-center justify-center">
+                <div className="relative aspect-square overflow-hidden bg-black/40 flex items-center justify-center">
                     <SmartImage
                       src={post.image_url}
                       alt={post.title}
                       width={640}
-                      height={360}
+                      height={640}
                       displayWidth={800}
                       widths={[400, 800, 1200]}
                       sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                       wrapperClassName="absolute inset-0 w-full h-full"
-                      className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
                       <span className="text-white/20 font-display text-2xl sm:text-3xl font-bold rotate-[-25deg] whitespace-nowrap">
