@@ -24,8 +24,14 @@ serve(async (req) => {
     const user = data.user;
     if (!user?.email) throw new Error("User not authenticated");
 
-    const { type, itemId, priceAmount, planSlug, itemTitle } = await req.json();
+    const { type, itemId, planSlug, itemTitle } = await req.json();
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { apiVersion: "2025-08-27.basil" });
+
+    // Server-side price lookup using service role to bypass RLS for trusted price read
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
 
     // Find or create customer
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
@@ -65,8 +71,21 @@ serve(async (req) => {
       });
     }
 
-    // One-time purchase (book, sermon, or graphic)
-    if (!priceAmount || !itemId) throw new Error("Missing price or item ID");
+    // One-time purchase (book, sermon, or graphic) — server-side price lookup
+    if (!itemId) throw new Error("Missing item ID");
+
+    const tableMap: Record<string, string> = { book: "books", sermon: "sermons", graphic: "graphics" };
+    const table = tableMap[type];
+    if (!table) throw new Error("Invalid item type");
+
+    const { data: item, error: itemErr } = await supabaseAdmin
+      .from(table)
+      .select("price, title")
+      .eq("id", itemId)
+      .maybeSingle();
+    if (itemErr || !item) throw new Error("Item not found");
+    const safePrice = Number(item.price);
+    if (!safePrice || safePrice <= 0) throw new Error("Item is not available for purchase");
 
     const cancelUrlMap: Record<string, string> = {
       book: `${origin}/books/${itemId}`,
@@ -81,8 +100,8 @@ serve(async (req) => {
         {
           price_data: {
             currency: "usd",
-            product_data: { name: itemTitle || `${type} purchase` },
-            unit_amount: Math.round(priceAmount * 100),
+            product_data: { name: item.title || itemTitle || `${type} purchase` },
+            unit_amount: Math.round(safePrice * 100),
           },
           quantity: 1,
         },

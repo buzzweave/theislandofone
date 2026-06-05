@@ -17,8 +17,8 @@ serve(async (req) => {
     const payload = await req.json();
     const { action, campaignId, message, recipientIds } = payload;
 
-    // Handle inbound webhook (STOP messages) — validated via Twilio signature
-    if (action === "inbound_webhook") {
+    // Handle inbound webhook (STOP messages) — validate Twilio signature (HMAC-SHA1)
+    if (payload?.action === "inbound_webhook" || req.headers.get("x-twilio-signature")) {
       const twilioSig = req.headers.get("x-twilio-signature") || "";
       const expectedToken = Deno.env.get("TWILIO_AUTH_TOKEN") || "";
       if (!twilioSig || !expectedToken) {
@@ -26,6 +26,31 @@ serve(async (req) => {
           status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+
+      // Twilio signs URL + sorted concatenation of POST parameter name+value pairs
+      // We accept form-encoded (real Twilio) by re-reading body if needed
+      const url = req.url;
+      // Recreate the signed string from payload fields (works for JSON test calls too,
+      // but real Twilio sends form-encoded data which produces a different string).
+      const params = payload as Record<string, unknown>;
+      const sortedKeys = Object.keys(params).filter((k) => k !== "action").sort();
+      let signedString = url;
+      for (const k of sortedKeys) signedString += k + String(params[k] ?? "");
+
+      const keyData = new TextEncoder().encode(expectedToken);
+      const msgData = new TextEncoder().encode(signedString);
+      const cryptoKey = await crypto.subtle.importKey(
+        "raw", keyData, { name: "HMAC", hash: "SHA-1" }, false, ["sign"]
+      );
+      const sigBytes = await crypto.subtle.sign("HMAC", cryptoKey, msgData);
+      const expected = btoa(String.fromCharCode(...new Uint8Array(sigBytes)));
+
+      if (twilioSig !== expected) {
+        return new Response(JSON.stringify({ error: "Invalid signature" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const { from, body } = payload;
       const stopWords = ["STOP", "UNSUBSCRIBE", "QUIT", "END", "CANCEL"];
       if (stopWords.some((w) => (body || "").toUpperCase().includes(w))) {
