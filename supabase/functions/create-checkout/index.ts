@@ -24,8 +24,14 @@ serve(async (req) => {
     const user = data.user;
     if (!user?.email) throw new Error("User not authenticated");
 
-    const { type, itemId, priceAmount, planSlug, itemTitle } = await req.json();
+    const { type, itemId, planSlug, itemTitle } = await req.json();
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { apiVersion: "2025-08-27.basil" });
+
+    // Server-side price lookup using service role to bypass RLS for trusted price read
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
 
     // Find or create customer
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
