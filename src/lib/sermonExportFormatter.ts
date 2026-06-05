@@ -23,27 +23,42 @@
 // ── Types ────────────────────────────────────────────────────────────
 
 export interface ExportMainPoint {
-  heading: string;          // e.g. "MAIN POINT I"
-  summary: string;          // one short paragraph
-  bullets: string[];        // exactly 6 bullet points
+  heading: string;          // title text only, e.g. "THE PROBLEM IS NOT THE WALL"
+  summary: string;          // optional opening paragraph (rarely used)
+  bullets: string[];        // up to 6 bullet points
+  keyPoint: string[];       // KEY POINT paragraphs
+  revelation: string[];     // REVELATION paragraphs
+  quotable: string[];       // QUOTABLE italic lines
 }
 
 export interface ExportStructure {
   title: string;
+  subtitle: string;         // optional subtitle (after ":" or "—")
   scriptureReference: string;
-  scriptureText: string;    // full scripture body if available
-  illustration: string[];   // paragraphs
+  scriptureText: string;
+  illustration: string[];
   mainPoints: ExportMainPoint[];
-  closing: string[];        // paragraphs
+  closing: string[];
 }
 
 // ── Roman numeral helper ────────────────────────────────────────────
 
-const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X",
+export const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X",
   "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX"];
 
-function toRoman(n: number): string {
+export function toRoman(n: number): string {
   return ROMAN[n - 1] || String(n);
+}
+
+// Strip a leading roman/arabic numeral prefix like "I.", "II.", "1." from a heading
+function stripNumeralPrefix(s: string): string {
+  return s.replace(/^\s*(?:[IVXLCDM]+|\d+)[\.\)]\s+/i, "").trim();
+}
+
+function splitTitleSubtitle(full: string): { title: string; subtitle: string } {
+  const m = full.split(/\s*[:\u2014\u2013\-]\s+/);
+  if (m.length >= 2) return { title: m[0].trim(), subtitle: m.slice(1).join(" - ").trim() };
+  return { title: full.trim(), subtitle: "" };
 }
 
 // ── HTML helpers ────────────────────────────────────────────────────
@@ -86,6 +101,15 @@ const CLOSING_RE = /^CLOSING(?:\s+(?:BUILD|DECLARATION|THOUGHTS?))?|^ALTAR\s+CAL
 const SCRIPTURE_RE = /^SCRIPTURE\s*(?:REFERENCE)?/i;
 const INTRO_RE = /^INTRODUCTION/i;
 const MAIN_POINT_LABEL_RE = /^MAIN\s+POINT\s+([IVXLCDM0-9]+)/i;
+const SUB_LABEL_RE = /^(KEY\s*POINT|REVELATION|QUOTABLE|TEXT|APPLICATION|TAKEAWAY)\s*:?\s*$/i;
+
+function detectSubLabel(line: string): "keyPoint" | "revelation" | "quotable" | null {
+  const t = line.trim().replace(/[:\.]+$/, "").toUpperCase();
+  if (t === "KEY POINT" || t === "KEYPOINT") return "keyPoint";
+  if (t === "REVELATION") return "revelation";
+  if (t === "QUOTABLE") return "quotable";
+  return null;
+}
 
 function detectSectionType(line: string): "illustration" | "closing" | "scripture" | "intro" | "mainpoint" | null {
   const t = line.trim();
@@ -134,8 +158,9 @@ export function parseExportStructure(
       continue;
     }
 
-    // Check for bold heading (main point)
-    const isBoldHeading = [...boldSegments].some(
+    // Check for bold heading (main point) — but NOT sub-labels
+    const isSubLabel = SUB_LABEL_RE.test(line.trim());
+    const isBoldHeading = !isSubLabel && [...boldSegments].some(
       b => b.toLowerCase() === lineNorm || lineNorm.startsWith(b.toLowerCase())
     );
 
@@ -161,8 +186,10 @@ export function parseExportStructure(
   }
 
   // Build ExportStructure
+  const ts = splitTitleSubtitle(title);
   const result: ExportStructure = {
-    title,
+    title: ts.title,
+    subtitle: ts.subtitle,
     scriptureReference,
     scriptureText: "",
     illustration: [],
@@ -181,24 +208,17 @@ export function parseExportStructure(
   const illustrationLines = illustrationSections.flatMap(s => s.lines).filter(l => l.length > 0);
 
   // ── Pull scripture text OUT of illustration lines if parser missed it ──
-  // If scriptureText is still empty, scan illustration lines for the scripture
-  // reference followed by verse text and move that content to the scripture page.
   if (!result.scriptureText && scriptureNorm) {
     const refIdx = illustrationLines.findIndex(l =>
       l.toLowerCase().includes(scriptureNorm) ||
       l.toLowerCase().replace(/[–—-]/g, "-").includes(scriptureNorm.replace(/[–—-]/g, "-"))
     );
     if (refIdx !== -1) {
-      // Gather the reference line + consecutive verse-like lines that follow
       const extracted: string[] = [];
       extracted.push(illustrationLines[refIdx]);
       let endIdx = refIdx + 1;
-      // Heuristic: verse text usually starts with a quote mark or continues
-      // the passage. Stop when we hit a short standalone sentence that looks
-      // like the start of the actual illustration narrative.
       while (endIdx < illustrationLines.length) {
         const nextLine = illustrationLines[endIdx];
-        // If it looks like quoted scripture or a continuation verse, keep it
         const looksLikeVerse = /^[""\u201C]/.test(nextLine) ||
           nextLine.toLowerCase().startsWith("but ") ||
           nextLine.toLowerCase().startsWith("and ") ||
@@ -206,7 +226,6 @@ export function parseExportStructure(
           nextLine.toLowerCase().startsWith("then ") ||
           nextLine.endsWith('"') || nextLine.endsWith('\u201D') ||
           nextLine.endsWith('.\"') || nextLine.endsWith('."');
-        // If the previous extracted line ends mid-sentence (no period) keep going
         const prevEndsOpen = extracted.length > 0 &&
           !extracted[extracted.length - 1].endsWith('.') &&
           !extracted[extracted.length - 1].endsWith('"') &&
@@ -219,7 +238,6 @@ export function parseExportStructure(
         }
       }
       result.scriptureText = extracted.join("\n\n");
-      // Remove those lines from illustration
       illustrationLines.splice(refIdx, extracted.length);
     }
   }
@@ -230,21 +248,46 @@ export function parseExportStructure(
   const closingSections = rawSections.filter(s => s.type === "closing");
   result.closing = closingSections.flatMap(s => s.lines).filter(l => l.length > 0);
 
-  // Extract main points
+  // ── Build main points with KEY POINT / REVELATION / QUOTABLE sub-blocks ──
   const mainPointSections = rawSections.filter(s => s.type === "mainpoint");
 
+  const buildMainPoint = (heading: string, allLines: string[]): ExportMainPoint => {
+    const bullets: string[] = [];
+    const keyPoint: string[] = [];
+    const revelation: string[] = [];
+    const quotable: string[] = [];
+    let bucket: "bullets" | "keyPoint" | "revelation" | "quotable" = "bullets";
+
+    for (const raw of allLines) {
+      const line = raw.trim();
+      if (!line) continue;
+      const sub = detectSubLabel(line);
+      if (sub) { bucket = sub; continue; }
+
+      if (bucket === "bullets") {
+        // bullet item — strip prefix markers
+        bullets.push(line.replace(/^[•●\-*]\s+/, "").trim());
+      } else if (bucket === "keyPoint") {
+        keyPoint.push(line);
+      } else if (bucket === "revelation") {
+        revelation.push(line);
+      } else if (bucket === "quotable") {
+        quotable.push(line.replace(/^[*_]+|[*_]+$/g, "").trim());
+      }
+    }
+
+    return {
+      heading: stripNumeralPrefix(heading),
+      summary: "",
+      bullets: bullets.slice(0, 6),
+      keyPoint,
+      revelation,
+      quotable,
+    };
+  };
+
   if (mainPointSections.length > 0) {
-    result.mainPoints = mainPointSections.map((mp, idx) => {
-      const allLines = mp.lines;
-      const summary = allLines[0] || mp.heading;
-      const bulletSource = allLines.slice(summary === mp.heading ? 0 : 1);
-      const bullets = ensureSixBullets(bulletSource);
-      return {
-        heading: `MAIN POINT ${toRoman(idx + 1)}`,
-        summary: summary === mp.heading ? "" : summary,
-        bullets,
-      };
-    });
+    result.mainPoints = mainPointSections.map(mp => buildMainPoint(mp.heading, mp.lines));
   } else {
     const bodyLines = rawSections
       .filter(s => s.type === "body")
@@ -257,14 +300,7 @@ export function parseExportStructure(
 
       for (let i = 0; i < numPoints; i++) {
         const chunk = bodyLines.slice(i * chunkSize, (i + 1) * chunkSize);
-        const summary = chunk[0] || "";
-        const bulletSource = chunk.slice(1);
-
-        result.mainPoints.push({
-          heading: `MAIN POINT ${toRoman(i + 1)}`,
-          summary,
-          bullets: ensureSixBullets(bulletSource),
-        });
+        result.mainPoints.push(buildMainPoint(`MAIN POINT ${toRoman(i + 1)}`, chunk));
       }
     }
   }
@@ -272,34 +308,8 @@ export function parseExportStructure(
   return result;
 }
 
-/** Ensure exactly 6 bullet points. Pad with empty or trim excess. */
-function ensureSixBullets(source: string[]): string[] {
-  // Clean bullet prefixes
-  const cleaned = source.map(l => l.replace(/^[•●\-*]\s+/, "").trim()).filter(l => l.length > 0);
-
-  if (cleaned.length >= 6) {
-    return cleaned.slice(0, 6);
-  }
-
-  // If fewer than 6, try splitting longer sentences
-  const expanded: string[] = [];
-  for (const line of cleaned) {
-    if (expanded.length >= 6) break;
-    const sentences = line.match(/[^.!?]+[.!?]+/g);
-    if (sentences && sentences.length > 1 && expanded.length + sentences.length <= 8) {
-      for (const s of sentences) {
-        if (expanded.length >= 6) break;
-        expanded.push(s.trim());
-      }
-    } else {
-      expanded.push(line);
-    }
-  }
-
-  // Pad remaining with empty strings
-  while (expanded.length < 6) {
-    expanded.push("");
-  }
-
-  return expanded.slice(0, 6);
+/** @deprecated kept for backwards compatibility */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _ensureSixBullets(source: string[]): string[] {
+  return source.slice(0, 6);
 }

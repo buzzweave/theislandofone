@@ -2,7 +2,7 @@ import { jsPDF } from "jspdf";
 import { buildEpubZip } from "@/lib/bookExport";
 import { triggerDownload } from "@/lib/downloadHelper";
 import { COPYRIGHT } from "@/lib/pulpitFormat";
-import { parseExportStructure, type ExportStructure } from "@/lib/sermonExportFormatter";
+import { parseExportStructure, toRoman, type ExportStructure, type ExportMainPoint } from "@/lib/sermonExportFormatter";
 import type { Sermon } from "@/hooks/useSermons";
 
 const safeTitle = (title: string) => title.replace(/[^a-zA-Z0-9]/g, "_");
@@ -33,14 +33,49 @@ function escapeXml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-// ─── A4 constants ──────────────────────────────────────────────────
+// ─── A4 + brand palette ─────────────────────────────────────────────
 
 const A4W = 595;
 const A4H = 842;
 const MARGIN = 56;
 const CONTENT_W = A4W - MARGIN * 2;
 
-// ─── PDF Export — Preach-Ready Pulpit Format ────────────────────────
+const COLOR_BURGUNDY: [number, number, number] = [139, 26, 43];
+const COLOR_GOLD: [number, number, number] = [201, 162, 74];
+const COLOR_SUBTITLE: [number, number, number] = [40, 50, 70];
+const COLOR_BODY: [number, number, number] = [25, 25, 25];
+const COLOR_FOOTER: [number, number, number] = [150, 150, 150];
+
+// ─── PDF page chrome ────────────────────────────────────────────────
+
+function drawTopRule(doc: jsPDF) {
+  doc.setDrawColor(...COLOR_GOLD);
+  doc.setLineWidth(1.1);
+  doc.line(MARGIN, MARGIN - 22, A4W - MARGIN, MARGIN - 22);
+}
+
+function drawPageLabel(doc: jsPDF, pageNum: number) {
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(...COLOR_FOOTER);
+  doc.text(`PAGE ${pageNum}`, A4W / 2, MARGIN - 6, { align: "center" });
+}
+
+function drawFooter(doc: jsPDF, title: string, pageNum: number) {
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...COLOR_FOOTER);
+  doc.text(`${title.toUpperCase()} - Page ${pageNum}`, A4W / 2, A4H - 30, { align: "center" });
+}
+
+function newPage(doc: jsPDF, title: string, pageNum: number, withLabel = true) {
+  doc.addPage([A4W, A4H]);
+  drawTopRule(doc);
+  if (withLabel) drawPageLabel(doc, pageNum);
+  drawFooter(doc, title, pageNum + 1); // footer page counter starts at 1 for title
+}
+
+// ─── PDF Export — GoodNotes Pulpit Format ───────────────────────────
 
 export function exportSermonToPdf(sermon: Sermon) {
   const doc = new jsPDF({ unit: "pt", format: [A4W, A4H], orientation: "portrait" });
@@ -58,143 +93,225 @@ export function exportSermonToPdf(sermon: Sermon) {
 }
 
 function renderPdfFromStructure(doc: jsPDF, s: ExportStructure) {
-  // ─── PAGE 1: Title Only ──────────────────────────────────────
+  // ─── PAGE 1: Title + Scripture + label ───────────────────────
+  drawTopRule(doc);
+  drawFooter(doc, s.title, 1);
+
+  let y = 160;
+
+  // Title — burgundy serif bold
   doc.setFont("times", "bold");
-  doc.setFontSize(42);
-  const titleLines: string[] = doc.splitTextToSize(s.title, CONTENT_W);
-  const titleBlockH = titleLines.length * 50;
-  let y = (A4H / 2) - (titleBlockH / 2);
-  if (y < MARGIN) y = MARGIN;
+  doc.setFontSize(40);
+  doc.setTextColor(...COLOR_BURGUNDY);
+  const titleLines: string[] = doc.splitTextToSize(s.title.toUpperCase(), CONTENT_W);
   for (const line of titleLines) {
     doc.text(line, A4W / 2, y, { align: "center" });
-    y += 50;
+    y += 46;
   }
 
-  // ─── PAGE 2: Scripture ───────────────────────────────────────
-  if (s.scriptureReference || s.scriptureText) {
-    doc.addPage([A4W, A4H]);
-    y = MARGIN;
-
-    doc.setFont("times", "bold");
-    doc.setFontSize(28);
-    doc.text("SCRIPTURE", A4W / 2, y, { align: "center" });
-    y += 44;
-
-    if (s.scriptureReference) {
-      doc.setFont("times", "italic");
-      doc.setFontSize(18);
-      const refLines: string[] = doc.splitTextToSize(s.scriptureReference, CONTENT_W);
-      for (const line of refLines) {
-        doc.text(line, A4W / 2, y, { align: "center" });
-        y += 24;
-      }
-      y += 16;
-    }
-
-    if (s.scriptureText) {
-      doc.setFont("times", "normal");
-      doc.setFontSize(16);
-      const textLines: string[] = doc.splitTextToSize(s.scriptureText, CONTENT_W);
-      for (const line of textLines) {
-        if (y + 22 > A4H - MARGIN) { doc.addPage([A4W, A4H]); y = MARGIN; }
-        doc.text(line, MARGIN, y);
-        y += 22;
-      }
+  // Subtitle
+  if (s.subtitle) {
+    y += 6;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(18);
+    doc.setTextColor(...COLOR_SUBTITLE);
+    const subLines: string[] = doc.splitTextToSize(s.subtitle, CONTENT_W - 60);
+    for (const line of subLines) {
+      doc.text(line, A4W / 2, y, { align: "center" });
+      y += 24;
     }
   }
 
-  // ─── PAGE 3: Illustration ────────────────────────────────────
-  if (s.illustration.length > 0) {
-    doc.addPage([A4W, A4H]);
-    y = MARGIN;
+  y += 50;
 
+  // "TEXT" gold label
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(...COLOR_GOLD);
+  doc.text("TEXT", A4W / 2, y, { align: "center" });
+  y += 26;
+
+  // Scripture reference — bold serif
+  if (s.scriptureReference) {
     doc.setFont("times", "bold");
-    doc.setFontSize(28);
-    doc.text("ILLUSTRATION", A4W / 2, y, { align: "center" });
-    y += 44;
+    doc.setFontSize(18);
+    doc.setTextColor(...COLOR_BODY);
+    const refLines: string[] = doc.splitTextToSize(s.scriptureReference, CONTENT_W);
+    for (const line of refLines) {
+      doc.text(line, A4W / 2, y, { align: "center" });
+      y += 24;
+    }
+    y += 6;
+  }
 
+  // Scripture text — serif quoted
+  if (s.scriptureText) {
     doc.setFont("times", "normal");
-    doc.setFontSize(14);
-    for (const para of s.illustration) {
-      const wrapped: string[] = doc.splitTextToSize(para, CONTENT_W);
-      for (const line of wrapped) {
-        if (y + 22 > A4H - MARGIN) { doc.addPage([A4W, A4H]); y = MARGIN; }
-        doc.text(line, MARGIN, y);
-        y += 22;
-      }
-      y += 12; // generous spacing
+    doc.setFontSize(15);
+    doc.setTextColor(...COLOR_BODY);
+    const textLines: string[] = doc.splitTextToSize(s.scriptureText, CONTENT_W - 40);
+    for (const line of textLines) {
+      doc.text(line, A4W / 2, y, { align: "center" });
+      y += 22;
     }
+  }
+
+  y += 50;
+
+  // "GOODNOTES SERMON NOTES" gold label
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(...COLOR_GOLD);
+  doc.text("GOODNOTES SERMON NOTES", A4W / 2, y, { align: "center" });
+
+  // Track logical page counter for footer/page-label (matches PDF "Page N" footer)
+  let pageNum = 1;
+
+  // ─── Optional Illustration page ──────────────────────────────
+  if (s.illustration.length > 0) {
+    pageNum++;
+    newPage(doc, s.title, pageNum - 1);
+
+    let py = MARGIN + 4;
+    doc.setFont("times", "bold");
+    doc.setFontSize(28);
+    doc.setTextColor(...COLOR_BURGUNDY);
+    doc.text("ILLUSTRATION", MARGIN, py);
+    py += 40;
+
+    py = renderParagraphs(doc, s.illustration, py, { italic: false, page: pageNum, title: s.title });
   }
 
   // ─── MAIN POINTS — each on its own page ──────────────────────
-  for (const mp of s.mainPoints) {
-    doc.addPage([A4W, A4H]);
-    y = MARGIN;
+  s.mainPoints.forEach((mp, idx) => {
+    pageNum++;
+    newPage(doc, s.title, pageNum - 1);
+    renderMainPointPage(doc, mp, idx + 1, pageNum, s.title);
+  });
 
-    // Heading
-    doc.setFont("times", "bold");
-    doc.setFontSize(26);
-    const headingLines: string[] = doc.splitTextToSize(mp.heading, CONTENT_W);
-    for (const hl of headingLines) {
-      doc.text(hl, MARGIN, y);
-      y += 34;
-    }
-    y += 8;
-
-    // Summary paragraph
-    if (mp.summary) {
-      doc.setFont("times", "normal");
-      doc.setFontSize(15);
-      const summaryLines: string[] = doc.splitTextToSize(mp.summary, CONTENT_W);
-      for (const sl of summaryLines) {
-        doc.text(sl, MARGIN, y);
-        y += 22;
-      }
-      y += 14;
-    }
-
-    // 6 bullet points with generous spacing
-    doc.setFont("times", "normal");
-    doc.setFontSize(14);
-    for (const bullet of mp.bullets) {
-      if (!bullet) continue;
-      const bulletText = `•  ${bullet}`;
-      const bulletLines: string[] = doc.splitTextToSize(bulletText, CONTENT_W - 30);
-      for (const bl of bulletLines) {
-        doc.text(bl, MARGIN + 20, y);
-        y += 22;
-      }
-      y += 10; // even spacing between bullets
-    }
-  }
-
-  // ─── CLOSING PAGE ───────────────────────────────────────────
+  // ─── Optional Closing page ───────────────────────────────────
   if (s.closing.length > 0) {
-    doc.addPage([A4W, A4H]);
-    y = MARGIN;
+    pageNum++;
+    newPage(doc, s.title, pageNum - 1);
 
+    let py = MARGIN + 4;
     doc.setFont("times", "bold");
     doc.setFontSize(28);
-    doc.text("CLOSING", A4W / 2, y, { align: "center" });
-    y += 44;
+    doc.setTextColor(...COLOR_BURGUNDY);
+    doc.text("CLOSING", MARGIN, py);
+    py += 40;
 
-    doc.setFont("times", "normal");
-    doc.setFontSize(14);
-    for (const para of s.closing) {
-      const wrapped: string[] = doc.splitTextToSize(para, CONTENT_W);
-      for (const line of wrapped) {
-        if (y + 22 > A4H - MARGIN) { doc.addPage([A4W, A4H]); y = MARGIN; }
-        doc.text(line, MARGIN, y);
-        y += 22;
-      }
-      y += 12;
-    }
+    py = renderParagraphs(doc, s.closing, py, { italic: false, page: pageNum, title: s.title });
   }
 
-  // Copyright on last page
+  // Copyright on last page footer
   doc.setFont("helvetica", "italic");
-  doc.setFontSize(9);
-  doc.text(COPYRIGHT(), A4W / 2, A4H - 30, { align: "center" });
+  doc.setFontSize(8);
+  doc.setTextColor(...COLOR_FOOTER);
+  doc.text(COPYRIGHT(), A4W / 2, A4H - 18, { align: "center" });
+}
+
+function renderMainPointPage(
+  doc: jsPDF,
+  mp: ExportMainPoint,
+  index: number,
+  pageNum: number,
+  title: string,
+) {
+  let y = MARGIN + 4;
+
+  // Heading: "I. THE PROBLEM IS NOT THE WALL" — burgundy serif bold uppercase
+  doc.setFont("times", "bold");
+  doc.setFontSize(24);
+  doc.setTextColor(...COLOR_BURGUNDY);
+  const heading = `${toRoman(index)}. ${mp.heading.toUpperCase()}`;
+  const headingLines: string[] = doc.splitTextToSize(heading, CONTENT_W);
+  for (const hl of headingLines) {
+    doc.text(hl, MARGIN, y);
+    y += 30;
+  }
+  y += 10;
+
+  // Bullets — sans-serif, dark
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(13);
+  doc.setTextColor(...COLOR_BODY);
+  for (const bullet of mp.bullets) {
+    if (!bullet) continue;
+    const bulletLines: string[] = doc.splitTextToSize(bullet, CONTENT_W - 28);
+    let first = true;
+    for (const bl of bulletLines) {
+      if (y > A4H - MARGIN - 30) { doc.addPage([A4W, A4H]); drawTopRule(doc); drawFooter(doc, title, pageNum); y = MARGIN + 4; }
+      if (first) {
+        doc.text("•", MARGIN + 10, y);
+        doc.text(bl, MARGIN + 26, y);
+        first = false;
+      } else {
+        doc.text(bl, MARGIN + 26, y);
+      }
+      y += 19;
+    }
+    y += 4;
+  }
+
+  // KEY POINT
+  if (mp.keyPoint.length) {
+    y += 8;
+    y = renderSubLabel(doc, "KEY POINT", y);
+    y = renderParagraphs(doc, mp.keyPoint, y, { italic: false, page: pageNum, title });
+  }
+
+  // REVELATION
+  if (mp.revelation.length) {
+    y += 6;
+    y = renderSubLabel(doc, "REVELATION", y);
+    y = renderParagraphs(doc, mp.revelation, y, { italic: false, page: pageNum, title });
+  }
+
+  // QUOTABLE — italic
+  if (mp.quotable.length) {
+    y += 6;
+    y = renderSubLabel(doc, "QUOTABLE", y);
+    y = renderParagraphs(doc, mp.quotable, y, { italic: true, page: pageNum, title });
+  }
+}
+
+function renderSubLabel(doc: jsPDF, label: string, y: number): number {
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.setTextColor(...COLOR_GOLD);
+  doc.text(label, MARGIN, y);
+  return y + 18;
+}
+
+function renderParagraphs(
+  doc: jsPDF,
+  paras: string[],
+  y: number,
+  opts: { italic: boolean; page: number; title: string },
+): number {
+  doc.setFont("times", opts.italic ? "italic" : "normal");
+  doc.setFontSize(13);
+  doc.setTextColor(...COLOR_BODY);
+
+  for (const para of paras) {
+    const lines: string[] = doc.splitTextToSize(para, CONTENT_W - 12);
+    for (const line of lines) {
+      if (y > A4H - MARGIN - 30) {
+        doc.addPage([A4W, A4H]);
+        drawTopRule(doc);
+        drawFooter(doc, opts.title, opts.page);
+        y = MARGIN + 4;
+        doc.setFont("times", opts.italic ? "italic" : "normal");
+        doc.setFontSize(13);
+        doc.setTextColor(...COLOR_BODY);
+      }
+      doc.text(line, MARGIN + 6, y);
+      y += 20;
+    }
+    y += 4;
+  }
+  return y;
 }
 
 // ─── EPUB (unchanged — e-reader format) ─────────────────────────────
@@ -319,7 +436,6 @@ export async function exportSermonToGoodNotesPdf(sermon: Sermon) {
     return;
   }
 
-  // Desktop
   try {
     const resp = await fetch(functionUrl, {
       method: "POST",
@@ -342,85 +458,96 @@ export async function exportSermonToGoodNotesPdf(sermon: Sermon) {
   }
 }
 
-// ─── Word (.doc) — Preach-Ready Pulpit Format with Playfair Display ─
+// ─── Word (.doc) — GoodNotes Pulpit Format ──────────────────────────
 
 export function exportSermonToWord(sermon: Sermon) {
-  const structure = parseExportStructure(
+  const s = parseExportStructure(
     sermon.manuscript || "",
     sermon.title || "",
     sermon.scripture || "",
   );
 
+  const BURGUNDY = "#8B1A2B";
+  const GOLD = "#C9A24A";
+  const SUB = "#28324F";
+  const BODY = "#191919";
+  const FOOT = "#969696";
+
   const sections: string[] = [];
 
-  // Title page
-  sections.push(`
-    <div style="page-break-after: always; display: flex; align-items: center; justify-content: center; min-height: 90vh; text-align: center;">
-      <h1 style="font-family: 'Playfair Display', Georgia, serif; font-size: 38pt; font-weight: 800; text-align: center; margin: 0;">${escapeXml(structure.title)}</h1>
-    </div>
-  `);
+  // ── Title page ──
+  let titlePage = `<div style="page-break-after: always; padding: 80pt 40pt 0 40pt; text-align: center;">`;
+  titlePage += `<div style="border-top: 1.5pt solid ${GOLD}; margin-bottom: 60pt;"></div>`;
+  titlePage += `<h1 style="font-family: 'Playfair Display', 'Times New Roman', Georgia, serif; color: ${BURGUNDY}; font-size: 40pt; font-weight: 800; letter-spacing: 1px; margin: 0 0 12pt 0;">${escapeXml(s.title.toUpperCase())}</h1>`;
+  if (s.subtitle) {
+    titlePage += `<p style="font-family: 'Inter', Arial, sans-serif; color: ${SUB}; font-size: 16pt; margin: 0 0 50pt 0;">${escapeXml(s.subtitle)}</p>`;
+  }
+  titlePage += `<p style="font-family: 'Inter', Arial, sans-serif; color: ${GOLD}; font-size: 12pt; font-weight: 700; letter-spacing: 2px; margin: 40pt 0 12pt 0;">TEXT</p>`;
+  if (s.scriptureReference) {
+    titlePage += `<p style="font-family: 'Times New Roman', Georgia, serif; color: ${BODY}; font-size: 17pt; font-weight: 700; margin: 0 0 8pt 0;">${escapeXml(s.scriptureReference)}</p>`;
+  }
+  if (s.scriptureText) {
+    titlePage += `<p style="font-family: 'Times New Roman', Georgia, serif; color: ${BODY}; font-size: 14pt; line-height: 1.55; margin: 0 60pt 50pt 60pt;">${escapeXml(s.scriptureText)}</p>`;
+  }
+  titlePage += `<p style="font-family: 'Inter', Arial, sans-serif; color: ${GOLD}; font-size: 12pt; font-weight: 700; letter-spacing: 2px; margin: 50pt 0 0 0;">GOODNOTES SERMON NOTES</p>`;
+  titlePage += `</div>`;
+  sections.push(titlePage);
 
-  // Scripture page
-  if (structure.scriptureReference || structure.scriptureText) {
-    let scriptureHtml = `<div style="page-break-before: always; page-break-after: always;">`;
-    scriptureHtml += `<h2 style="font-family: 'Playfair Display', Georgia, serif; font-size: 26pt; font-weight: 800; text-align: center; text-transform: uppercase; margin-bottom: 0.8em;">SCRIPTURE</h2>`;
-    if (structure.scriptureReference) {
-      scriptureHtml += `<p style="font-family: 'Playfair Display', Georgia, serif; font-size: 16pt; font-style: italic; text-align: center; margin-bottom: 1.2em;">${escapeXml(structure.scriptureReference)}</p>`;
-    }
-    if (structure.scriptureText) {
-      scriptureHtml += `<p style="font-family: Georgia, serif; font-size: 14pt; line-height: 1.8;">${escapeXml(structure.scriptureText)}</p>`;
-    }
-    scriptureHtml += `</div>`;
-    sections.push(scriptureHtml);
+  const renderParas = (paras: string[], italic: boolean) =>
+    paras.map(p =>
+      `<p style="font-family: 'Times New Roman', Georgia, serif; color: ${BODY}; font-size: 13pt; line-height: 1.7; ${italic ? "font-style: italic;" : ""} margin: 0 0 0.6em 0.2in;">${escapeXml(p)}</p>`
+    ).join("");
+
+  const subLabel = (label: string) =>
+    `<p style="font-family: 'Inter', Arial, sans-serif; color: ${GOLD}; font-size: 12pt; font-weight: 700; letter-spacing: 1.5px; margin: 1em 0 0.4em 0;">${label}</p>`;
+
+  // Illustration
+  if (s.illustration.length) {
+    let html = `<div style="page-break-before: always;">`;
+    html += `<div style="border-top: 1.5pt solid ${GOLD}; margin-bottom: 24pt;"></div>`;
+    html += `<h2 style="font-family: 'Playfair Display', 'Times New Roman', serif; color: ${BURGUNDY}; font-size: 24pt; font-weight: 800; text-transform: uppercase; margin: 0 0 0.8em 0;">ILLUSTRATION</h2>`;
+    html += renderParas(s.illustration, false);
+    html += `</div>`;
+    sections.push(html);
   }
 
-  // Illustration page
-  if (structure.illustration.length > 0) {
-    let illHtml = `<div style="page-break-before: always; page-break-after: always;">`;
-    illHtml += `<h2 style="font-family: 'Playfair Display', Georgia, serif; font-size: 26pt; font-weight: 800; text-align: center; text-transform: uppercase; margin-bottom: 0.8em;">ILLUSTRATION</h2>`;
-    for (const para of structure.illustration) {
-      illHtml += `<p style="font-family: Georgia, serif; font-size: 14pt; line-height: 2; margin-bottom: 1.2em;">${escapeXml(para)}</p>`;
-    }
-    illHtml += `</div>`;
-    sections.push(illHtml);
-  }
-
-  // Main Points — each on its own page
-  for (const mp of structure.mainPoints) {
-    let mpHtml = `<div style="page-break-before: always; page-break-after: always; page-break-inside: avoid;">`;
-    mpHtml += `<h2 style="font-family: 'Playfair Display', Georgia, serif; font-size: 24pt; font-weight: 800; text-transform: uppercase; margin-bottom: 0.6em;">${escapeXml(mp.heading)}</h2>`;
-    if (mp.summary) {
-      mpHtml += `<p style="font-family: Georgia, serif; font-size: 14pt; line-height: 1.8; margin-bottom: 1em;">${escapeXml(mp.summary)}</p>`;
-    }
-    mpHtml += `<ul style="font-family: Georgia, serif; font-size: 13pt; line-height: 1.7; margin-left: 0.4in; margin-top: 0.8em;">`;
-    for (const bullet of mp.bullets) {
-      if (bullet) {
-        mpHtml += `<li style="margin-bottom: 0.7em;">${escapeXml(bullet)}</li>`;
+  // Main points
+  s.mainPoints.forEach((mp, idx) => {
+    let html = `<div style="page-break-before: always; page-break-inside: avoid;">`;
+    html += `<div style="border-top: 1.5pt solid ${GOLD}; margin-bottom: 24pt;"></div>`;
+    html += `<h2 style="font-family: 'Playfair Display', 'Times New Roman', serif; color: ${BURGUNDY}; font-size: 22pt; font-weight: 800; text-transform: uppercase; margin: 0 0 0.8em 0;">${toRoman(idx + 1)}. ${escapeXml(mp.heading.toUpperCase())}</h2>`;
+    if (mp.bullets.length) {
+      html += `<ul style="font-family: 'Inter', Arial, sans-serif; color: ${BODY}; font-size: 13pt; line-height: 1.55; margin: 0 0 0 0.3in; padding: 0;">`;
+      for (const b of mp.bullets) {
+        if (b) html += `<li style="margin-bottom: 0.4em;">${escapeXml(b)}</li>`;
       }
+      html += `</ul>`;
     }
-    mpHtml += `</ul></div>`;
-    sections.push(mpHtml);
-  }
+    if (mp.keyPoint.length) { html += subLabel("KEY POINT"); html += renderParas(mp.keyPoint, false); }
+    if (mp.revelation.length) { html += subLabel("REVELATION"); html += renderParas(mp.revelation, false); }
+    if (mp.quotable.length) { html += subLabel("QUOTABLE"); html += renderParas(mp.quotable, true); }
+    html += `</div>`;
+    sections.push(html);
+  });
 
-  // Closing page
-  if (structure.closing.length > 0) {
-    let closeHtml = `<div style="page-break-before: always;">`;
-    closeHtml += `<h2 style="font-family: 'Playfair Display', Georgia, serif; font-size: 26pt; font-weight: 800; text-align: center; text-transform: uppercase; margin-bottom: 0.8em;">CLOSING</h2>`;
-    for (const para of structure.closing) {
-      closeHtml += `<p style="font-family: Georgia, serif; font-size: 14pt; line-height: 2; margin-bottom: 1.2em;">${escapeXml(para)}</p>`;
-    }
-    closeHtml += `</div>`;
-    sections.push(closeHtml);
+  // Closing
+  if (s.closing.length) {
+    let html = `<div style="page-break-before: always;">`;
+    html += `<div style="border-top: 1.5pt solid ${GOLD}; margin-bottom: 24pt;"></div>`;
+    html += `<h2 style="font-family: 'Playfair Display', 'Times New Roman', serif; color: ${BURGUNDY}; font-size: 24pt; font-weight: 800; text-transform: uppercase; margin: 0 0 0.8em 0;">CLOSING</h2>`;
+    html += renderParas(s.closing, false);
+    html += `</div>`;
+    sections.push(html);
   }
 
   const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
 <head><meta charset="utf-8"><title>${escapeXml(sermon.title)}</title>
 <!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800;900&display=swap');
-  @page { size: A4 portrait; margin: 1in; }
-  body { font-family: Georgia, "Times New Roman", serif; margin: 1in; color: #000; line-height: 1.7; font-size: 13pt; }
-  .copyright { font-size: 9pt; font-style: italic; color: #999; text-align: center; margin-top: 2in; border-top: 1px solid #ddd; padding-top: 0.5in; }
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&family=Inter:wght@400;600;700&display=swap');
+  @page { size: A4 portrait; margin: 0.85in; }
+  body { font-family: 'Times New Roman', Georgia, serif; margin: 0.85in; color: ${BODY}; line-height: 1.6; font-size: 13pt; }
+  .copyright { font-family: 'Inter', Arial, sans-serif; font-size: 9pt; font-style: italic; color: ${FOOT}; text-align: center; margin-top: 2in; padding-top: 0.5in; }
 </style></head>
 <body>
 ${sections.join("\n")}
