@@ -23,27 +23,42 @@
 // ── Types ────────────────────────────────────────────────────────────
 
 export interface ExportMainPoint {
-  heading: string;          // e.g. "MAIN POINT I"
-  summary: string;          // one short paragraph
-  bullets: string[];        // exactly 6 bullet points
+  heading: string;          // title text only, e.g. "THE PROBLEM IS NOT THE WALL"
+  summary: string;          // optional opening paragraph (rarely used)
+  bullets: string[];        // up to 6 bullet points
+  keyPoint: string[];       // KEY POINT paragraphs
+  revelation: string[];     // REVELATION paragraphs
+  quotable: string[];       // QUOTABLE italic lines
 }
 
 export interface ExportStructure {
   title: string;
+  subtitle: string;         // optional subtitle (after ":" or "—")
   scriptureReference: string;
-  scriptureText: string;    // full scripture body if available
-  illustration: string[];   // paragraphs
+  scriptureText: string;
+  illustration: string[];
   mainPoints: ExportMainPoint[];
-  closing: string[];        // paragraphs
+  closing: string[];
 }
 
 // ── Roman numeral helper ────────────────────────────────────────────
 
-const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X",
+export const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X",
   "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX"];
 
-function toRoman(n: number): string {
+export function toRoman(n: number): string {
   return ROMAN[n - 1] || String(n);
+}
+
+// Strip a leading roman/arabic numeral prefix like "I.", "II.", "1." from a heading
+function stripNumeralPrefix(s: string): string {
+  return s.replace(/^\s*(?:[IVXLCDM]+|\d+)[\.\)]\s+/i, "").trim();
+}
+
+function splitTitleSubtitle(full: string): { title: string; subtitle: string } {
+  const m = full.split(/\s*[:\u2014\u2013\-]\s+/);
+  if (m.length >= 2) return { title: m[0].trim(), subtitle: m.slice(1).join(" - ").trim() };
+  return { title: full.trim(), subtitle: "" };
 }
 
 // ── HTML helpers ────────────────────────────────────────────────────
