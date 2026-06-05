@@ -149,8 +149,9 @@ export function parseExportStructure(
       continue;
     }
 
-    // Check for bold heading (main point)
-    const isBoldHeading = [...boldSegments].some(
+    // Check for bold heading (main point) — but NOT sub-labels
+    const isSubLabel = SUB_LABEL_RE.test(line.trim());
+    const isBoldHeading = !isSubLabel && [...boldSegments].some(
       b => b.toLowerCase() === lineNorm || lineNorm.startsWith(b.toLowerCase())
     );
 
