@@ -547,9 +547,8 @@ Deno.serve(async (req) => {
     }
 
     const pdfBuffer = generatePdf(data);
-    const slug = data.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-    const dateStr = new Date().toISOString().slice(0, 10);
-    const filename = `${slug}-${dateStr}.pdf`;
+    const safe = data.title.replace(/[^a-zA-Z0-9]/g, "_");
+    const filename = `${safe}_GoodNotes.pdf`;
 
     return new Response(pdfBuffer, {
       headers: {
