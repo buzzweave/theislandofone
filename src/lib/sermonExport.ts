@@ -458,7 +458,7 @@ export async function exportSermonToGoodNotesPdf(sermon: Sermon) {
       if (!resp.ok) throw new Error("Server error");
       const blob = await resp.blob();
       const slug = sermon.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-      await triggerDownload(blob, `${slug}-goodnotes.pdf`);
+      await triggerDownload(blob, `${safeTitle(sermon.title)}_GoodNotes.pdf`);
     } catch {
       window.location.href = functionUrl;
     }
@@ -477,7 +477,7 @@ export async function exportSermonToGoodNotesPdf(sermon: Sermon) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${slug}-goodnotes.pdf`;
+    a.download = `${safeTitle(sermon.title)}_GoodNotes.pdf`;
     document.body.appendChild(a);
     a.click();
     a.remove();
