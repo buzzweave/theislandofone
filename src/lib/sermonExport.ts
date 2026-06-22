@@ -442,6 +442,7 @@ export async function exportSermonToGoodNotesPdf(sermon: Sermon) {
     title: sermon.title,
     scriptureReference: sermon.scripture,
     manuscript: sermon.manuscript,
+    date: sermon.date,
   };
 
   const isIOS =
