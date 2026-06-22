@@ -37,7 +37,7 @@ function escapeXml(s: string): string {
 
 const A4W = 595;
 const A4H = 842;
-const MARGIN = 56;
+const MARGIN = 64;
 const CONTENT_W = A4W - MARGIN * 2;
 
 const COLOR_BURGUNDY: [number, number, number] = [139, 26, 43];
@@ -46,36 +46,37 @@ const COLOR_SUBTITLE: [number, number, number] = [40, 50, 70];
 const COLOR_BODY: [number, number, number] = [25, 25, 25];
 const COLOR_FOOTER: [number, number, number] = [150, 150, 150];
 
+const CHURCH_NAME = "THE ISLAND OF ONE";
+const SPEAKER_NAME = "BRYANT CLARK";
+
+function formatSermonDate(d?: string): string {
+  if (!d) return "";
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return d;
+  return dt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }).toUpperCase();
+}
+
 // ─── PDF page chrome ────────────────────────────────────────────────
 
 function drawTopRule(doc: jsPDF) {
   doc.setDrawColor(...COLOR_GOLD);
   doc.setLineWidth(1.1);
-  doc.line(MARGIN, MARGIN - 22, A4W - MARGIN, MARGIN - 22);
-}
-
-function drawPageLabel(doc: jsPDF, pageNum: number) {
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(...COLOR_FOOTER);
-  doc.text(`PAGE ${pageNum}`, A4W / 2, MARGIN - 6, { align: "center" });
+  doc.line(MARGIN, MARGIN - 26, A4W - MARGIN, MARGIN - 26);
 }
 
 function drawFooter(doc: jsPDF, title: string, pageNum: number) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(...COLOR_FOOTER);
-  doc.text(`${title.toUpperCase()} - Page ${pageNum}`, A4W / 2, A4H - 30, { align: "center" });
+  doc.text(`${title.toUpperCase()} — PAGE ${pageNum}`, A4W / 2, A4H - 30, { align: "center" });
 }
 
-function newPage(doc: jsPDF, title: string, pageNum: number, withLabel = true) {
+function newPage(doc: jsPDF) {
   doc.addPage([A4W, A4H]);
   drawTopRule(doc);
-  if (withLabel) drawPageLabel(doc, pageNum);
-  drawFooter(doc, title, pageNum + 1); // footer page counter starts at 1 for title
 }
 
-// ─── PDF Export — GoodNotes Pulpit Format ───────────────────────────
+// ─── PDF Export — Locked Pulpit Format ──────────────────────────────
 
 export function exportSermonToPdf(sermon: Sermon) {
   const doc = new jsPDF({ unit: "pt", format: [A4W, A4H], orientation: "portrait" });
@@ -86,129 +87,166 @@ export function exportSermonToPdf(sermon: Sermon) {
     sermon.scripture || "",
   );
 
-  renderPdfFromStructure(doc, structure);
+  renderPdfFromStructure(doc, structure, formatSermonDate(sermon.date));
 
   const pdfBlob = doc.output("blob");
-  triggerDownload(pdfBlob, `${safeTitle(sermon.title)}.pdf`);
+  triggerDownload(pdfBlob, `${safeTitle(sermon.title)}_Print.pdf`);
 }
 
-function renderPdfFromStructure(doc: jsPDF, s: ExportStructure) {
-  // ─── PAGE 1: Title + Scripture + label ───────────────────────
+function renderPdfFromStructure(doc: jsPDF, s: ExportStructure, dateLabel: string) {
+  let pageNum = 1;
+
+  // ─── PAGE 1: COVER ─────────────────────────────────────────────
   drawTopRule(doc);
-  drawFooter(doc, s.title, 1);
 
-  let y = 160;
-
-  // Title — burgundy serif bold
+  let y = 220;
   doc.setFont("times", "bold");
-  doc.setFontSize(40);
+  doc.setFontSize(42);
   doc.setTextColor(...COLOR_BURGUNDY);
   const titleLines: string[] = doc.splitTextToSize(s.title.toUpperCase(), CONTENT_W);
   for (const line of titleLines) {
     doc.text(line, A4W / 2, y, { align: "center" });
-    y += 46;
+    y += 50;
   }
 
-  // Subtitle
   if (s.subtitle) {
-    y += 6;
+    y += 10;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(18);
     doc.setTextColor(...COLOR_SUBTITLE);
     const subLines: string[] = doc.splitTextToSize(s.subtitle, CONTENT_W - 60);
     for (const line of subLines) {
       doc.text(line, A4W / 2, y, { align: "center" });
-      y += 24;
+      y += 26;
     }
   }
 
-  y += 50;
-
-  // "TEXT" gold label
+  const cy = A4H - 200;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
   doc.setTextColor(...COLOR_GOLD);
-  doc.text("TEXT", A4W / 2, y, { align: "center" });
-  y += 26;
+  doc.text(CHURCH_NAME, A4W / 2, cy, { align: "center" });
 
-  // Scripture reference — bold serif
+  doc.setFont("times", "italic");
+  doc.setFontSize(14);
+  doc.setTextColor(...COLOR_BODY);
+  doc.text(SPEAKER_NAME, A4W / 2, cy + 26, { align: "center" });
+
+  if (dateLabel) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(11);
+    doc.setTextColor(...COLOR_FOOTER);
+    doc.text(dateLabel, A4W / 2, cy + 48, { align: "center" });
+  }
+  drawFooter(doc, s.title, pageNum);
+
+  // ─── PAGE 2: SCRIPTURE ─────────────────────────────────────────
+  pageNum++;
+  newPage(doc);
+  let py = 180;
+  doc.setFont("times", "bold");
+  doc.setFontSize(32);
+  doc.setTextColor(...COLOR_BURGUNDY);
+  doc.text("SCRIPTURE", A4W / 2, py, { align: "center" });
+  py += 50;
+
   if (s.scriptureReference) {
     doc.setFont("times", "bold");
-    doc.setFontSize(18);
+    doc.setFontSize(20);
     doc.setTextColor(...COLOR_BODY);
     const refLines: string[] = doc.splitTextToSize(s.scriptureReference, CONTENT_W);
     for (const line of refLines) {
-      doc.text(line, A4W / 2, y, { align: "center" });
-      y += 24;
+      doc.text(line, A4W / 2, py, { align: "center" });
+      py += 28;
     }
-    y += 6;
+    py += 16;
   }
 
-  // Scripture text — serif quoted
   if (s.scriptureText) {
     doc.setFont("times", "normal");
     doc.setFontSize(15);
     doc.setTextColor(...COLOR_BODY);
-    const textLines: string[] = doc.splitTextToSize(s.scriptureText, CONTENT_W - 40);
+    const textLines: string[] = doc.splitTextToSize(s.scriptureText, CONTENT_W - 30);
     for (const line of textLines) {
-      doc.text(line, A4W / 2, y, { align: "center" });
-      y += 22;
+      if (py > A4H - MARGIN - 60) break;
+      doc.text(line, A4W / 2, py, { align: "center" });
+      py += 22;
     }
   }
+  drawFooter(doc, s.title, pageNum);
 
-  y += 50;
-
-  // "GOODNOTES SERMON NOTES" gold label
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.setTextColor(...COLOR_GOLD);
-  doc.text("GOODNOTES SERMON NOTES", A4W / 2, y, { align: "center" });
-
-  // Track logical page counter for footer/page-label (matches PDF "Page N" footer)
-  let pageNum = 1;
-
-  // ─── Optional Illustration page ──────────────────────────────
+  // ─── PAGE 3: ILLUSTRATION ─────────────────────────────────────
   if (s.illustration.length > 0) {
     pageNum++;
-    newPage(doc, s.title, pageNum - 1);
-
-    let py = MARGIN + 4;
+    newPage(doc);
+    let iy = MARGIN + 10;
     doc.setFont("times", "bold");
-    doc.setFontSize(28);
+    doc.setFontSize(30);
     doc.setTextColor(...COLOR_BURGUNDY);
-    doc.text("ILLUSTRATION", MARGIN, py);
-    py += 40;
+    doc.text("ILLUSTRATION", A4W / 2, iy, { align: "center" });
+    iy += 48;
 
-    py = renderParagraphs(doc, s.illustration, py, { italic: false, page: pageNum, title: s.title });
+    doc.setFont("times", "normal");
+    doc.setFontSize(14);
+    doc.setTextColor(...COLOR_BODY);
+    for (const para of s.illustration) {
+      const lines: string[] = doc.splitTextToSize(para, CONTENT_W - 10);
+      for (const line of lines) {
+        if (iy > A4H - MARGIN - 60) break;
+        doc.text(line, MARGIN + 5, iy);
+        iy += 21;
+      }
+      if (iy > A4H - MARGIN - 60) break;
+      iy += 6;
+    }
+    drawFooter(doc, s.title, pageNum);
   }
 
-  // ─── MAIN POINTS — each on its own page ──────────────────────
+  // ─── MAIN POINTS ──────────────────────────────────────────────
   s.mainPoints.forEach((mp, idx) => {
     pageNum++;
-    newPage(doc, s.title, pageNum - 1);
-    renderMainPointPage(doc, mp, idx + 1, pageNum, s.title);
+    newPage(doc);
+    pageNum = renderMainPointPage(doc, mp, idx + 1, pageNum, s.title);
   });
 
-  // ─── Optional Closing page ───────────────────────────────────
+  // ─── ALTAR CALL ───────────────────────────────────────────────
   if (s.closing.length > 0) {
     pageNum++;
-    newPage(doc, s.title, pageNum - 1);
-
-    let py = MARGIN + 4;
+    newPage(doc);
+    let cy2 = MARGIN + 10;
     doc.setFont("times", "bold");
-    doc.setFontSize(28);
+    doc.setFontSize(30);
     doc.setTextColor(...COLOR_BURGUNDY);
-    doc.text("CLOSING", MARGIN, py);
-    py += 40;
+    doc.text("ALTAR CALL", A4W / 2, cy2, { align: "center" });
+    cy2 += 48;
 
-    py = renderParagraphs(doc, s.closing, py, { italic: false, page: pageNum, title: s.title });
+    doc.setFont("times", "normal");
+    doc.setFontSize(14);
+    doc.setTextColor(...COLOR_BODY);
+    for (const para of s.closing) {
+      const lines: string[] = doc.splitTextToSize(para, CONTENT_W - 10);
+      for (const line of lines) {
+        if (cy2 > A4H - MARGIN - 60) {
+          drawFooter(doc, s.title, pageNum);
+          pageNum++;
+          newPage(doc);
+          cy2 = MARGIN + 10;
+          doc.setFont("times", "normal");
+          doc.setFontSize(14);
+          doc.setTextColor(...COLOR_BODY);
+        }
+        doc.text(line, MARGIN + 5, cy2);
+        cy2 += 21;
+      }
+      cy2 += 8;
+    }
+    drawFooter(doc, s.title, pageNum);
   }
 
-  // Copyright on last page footer
   doc.setFont("helvetica", "italic");
   doc.setFontSize(8);
   doc.setTextColor(...COLOR_FOOTER);
-  doc.text(COPYRIGHT(), A4W / 2, A4H - 18, { align: "center" });
+  doc.text(COPYRIGHT(), A4W / 2, A4H - 16, { align: "center" });
 }
 
 function renderMainPointPage(
@@ -217,101 +255,92 @@ function renderMainPointPage(
   index: number,
   pageNum: number,
   title: string,
-) {
+): number {
   let y = MARGIN + 4;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(...COLOR_GOLD);
+  doc.text(`MAIN POINT ${toRoman(index)}`, A4W / 2, y, { align: "center" });
+  y += 38;
 
-  // Heading: "I. THE PROBLEM IS NOT THE WALL" — burgundy serif bold uppercase
   doc.setFont("times", "bold");
   doc.setFontSize(24);
   doc.setTextColor(...COLOR_BURGUNDY);
-  const heading = `${toRoman(index)}. ${mp.heading.toUpperCase()}`;
-  const headingLines: string[] = doc.splitTextToSize(heading, CONTENT_W);
+  const headingLines: string[] = doc.splitTextToSize(mp.heading.toUpperCase(), CONTENT_W);
   for (const hl of headingLines) {
-    doc.text(hl, MARGIN, y);
+    doc.text(hl, A4W / 2, y, { align: "center" });
     y += 30;
   }
-  y += 10;
+  y += 16;
 
-  // Bullets — sans-serif, dark
+  const ensurePageRoom = (needed: number) => {
+    if (y + needed > A4H - MARGIN - 50) {
+      drawFooter(doc, title, pageNum);
+      pageNum++;
+      doc.addPage([A4W, A4H]);
+      drawTopRule(doc);
+      y = MARGIN + 4;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(...COLOR_GOLD);
+      doc.text(`MAIN POINT ${toRoman(index)} (cont.)`, A4W / 2, y, { align: "center" });
+      y += 38;
+    }
+  };
+
   doc.setFont("helvetica", "normal");
   doc.setFontSize(13);
   doc.setTextColor(...COLOR_BODY);
   for (const bullet of mp.bullets) {
     if (!bullet) continue;
-    const bulletLines: string[] = doc.splitTextToSize(bullet, CONTENT_W - 28);
+    const bulletLines: string[] = doc.splitTextToSize(bullet, CONTENT_W - 30);
     let first = true;
     for (const bl of bulletLines) {
-      if (y > A4H - MARGIN - 30) { doc.addPage([A4W, A4H]); drawTopRule(doc); drawFooter(doc, title, pageNum); y = MARGIN + 4; }
+      ensurePageRoom(22);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(13);
+      doc.setTextColor(...COLOR_BODY);
       if (first) {
-        doc.text("•", MARGIN + 10, y);
+        doc.text("•", MARGIN + 8, y);
         doc.text(bl, MARGIN + 26, y);
         first = false;
       } else {
         doc.text(bl, MARGIN + 26, y);
       }
-      y += 19;
-    }
-    y += 4;
-  }
-
-  // KEY POINT
-  if (mp.keyPoint.length) {
-    y += 8;
-    y = renderSubLabel(doc, "KEY POINT", y);
-    y = renderParagraphs(doc, mp.keyPoint, y, { italic: false, page: pageNum, title });
-  }
-
-  // REVELATION
-  if (mp.revelation.length) {
-    y += 6;
-    y = renderSubLabel(doc, "REVELATION", y);
-    y = renderParagraphs(doc, mp.revelation, y, { italic: false, page: pageNum, title });
-  }
-
-  // QUOTABLE — italic
-  if (mp.quotable.length) {
-    y += 6;
-    y = renderSubLabel(doc, "QUOTABLE", y);
-    y = renderParagraphs(doc, mp.quotable, y, { italic: true, page: pageNum, title });
-  }
-}
-
-function renderSubLabel(doc: jsPDF, label: string, y: number): number {
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.setTextColor(...COLOR_GOLD);
-  doc.text(label, MARGIN, y);
-  return y + 18;
-}
-
-function renderParagraphs(
-  doc: jsPDF,
-  paras: string[],
-  y: number,
-  opts: { italic: boolean; page: number; title: string },
-): number {
-  doc.setFont("times", opts.italic ? "italic" : "normal");
-  doc.setFontSize(13);
-  doc.setTextColor(...COLOR_BODY);
-
-  for (const para of paras) {
-    const lines: string[] = doc.splitTextToSize(para, CONTENT_W - 12);
-    for (const line of lines) {
-      if (y > A4H - MARGIN - 30) {
-        doc.addPage([A4W, A4H]);
-        drawTopRule(doc);
-        drawFooter(doc, opts.title, opts.page);
-        y = MARGIN + 4;
-        doc.setFont("times", opts.italic ? "italic" : "normal");
-        doc.setFontSize(13);
-        doc.setTextColor(...COLOR_BODY);
-      }
-      doc.text(line, MARGIN + 6, y);
       y += 20;
     }
-    y += 4;
+    y += 6;
   }
-  return y;
+
+  const renderSection = (label: string, paras: string[], italic = false) => {
+    if (!paras.length) return;
+    ensurePageRoom(60);
+    y += 6;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(...COLOR_GOLD);
+    doc.text(label, MARGIN, y);
+    y += 20;
+    for (const para of paras) {
+      const lines: string[] = doc.splitTextToSize(para, CONTENT_W - 10);
+      for (const line of lines) {
+        ensurePageRoom(22);
+        doc.setFont("times", italic ? "italic" : "normal");
+        doc.setFontSize(13);
+        doc.setTextColor(...COLOR_BODY);
+        doc.text(line, MARGIN + 6, y);
+        y += 20;
+      }
+      y += 4;
+    }
+  };
+
+  renderSection("KEY POINT", mp.keyPoint);
+  renderSection("REVELATION", mp.revelation);
+  if (mp.quotable.length) renderSection("QUOTABLE", mp.quotable, true);
+
+  drawFooter(doc, title, pageNum);
+  return pageNum;
 }
 
 // ─── EPUB (unchanged — e-reader format) ─────────────────────────────
