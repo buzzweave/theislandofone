@@ -11,6 +11,7 @@ interface SermonPayload {
   scriptureReference?: string;
   scripture?: string;
   manuscript?: string;
+  date?: string;
 }
 
 /* ── Types ────────────────────────────────────────────────────────── */
@@ -37,14 +38,16 @@ interface ExportStructure {
 
 const A4_W = 595;
 const A4_H = 842;
-const MARGIN = 56;
+const MARGIN = 72; // Generous GoodNotes margins
 const CONTENT_W = A4_W - MARGIN * 2;
 
-const C_BURGUNDY: [number, number, number] = [139, 26, 43];
-const C_GOLD: [number, number, number] = [201, 162, 74];
-const C_SUB: [number, number, number] = [40, 50, 70];
-const C_BODY: [number, number, number] = [25, 25, 25];
-const C_FOOT: [number, number, number] = [150, 150, 150];
+// GoodNotes spec: white bg, black text, no decorative graphics
+const C_BLACK: [number, number, number] = [0, 0, 0];
+const C_DARK: [number, number, number] = [20, 20, 20];
+const C_MUTED: [number, number, number] = [110, 110, 110];
+
+const CHURCH_NAME = "THE ISLAND OF ONE";
+const SPEAKER_NAME = "BRYANT CLARK";
 
 const ROMAN = ["I","II","III","IV","V","VI","VII","VIII","IX","X",
   "XI","XII","XIII","XIV","XV","XVI","XVII","XVIII","XIX","XX"];
@@ -59,6 +62,13 @@ function splitTitleSubtitle(full: string): { title: string; subtitle: string } {
   const parts = full.split(/\s*[:\u2014\u2013\-]\s+/);
   if (parts.length >= 2) return { title: parts[0].trim(), subtitle: parts.slice(1).join(" - ").trim() };
   return { title: full.trim(), subtitle: "" };
+}
+
+function formatDate(d?: string): string {
+  if (!d) return "";
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return d;
+  return dt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }).toUpperCase();
 }
 
 /* ── HTML helpers ────────────────────────────────────────────────── */
@@ -242,247 +252,263 @@ function parseExportStructure(manuscript: string, title: string, scriptureRefere
   return result;
 }
 
-/* ── PDF page chrome ─────────────────────────────────────────────── */
-
-function topRule(doc: jsPDF) {
-  doc.setDrawColor(...C_GOLD);
-  doc.setLineWidth(1.1);
-  doc.line(MARGIN, MARGIN - 22, A4_W - MARGIN, MARGIN - 22);
-}
-
-function pageLabel(doc: jsPDF, n: number) {
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(...C_FOOT);
-  doc.text(`PAGE ${n}`, A4_W / 2, MARGIN - 6, { align: "center" });
-}
+/* ── PDF rendering — GoodNotes locked template ───────────────────── */
 
 function footer(doc: jsPDF, title: string, n: number) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.setTextColor(...C_FOOT);
-  doc.text(`${title.toUpperCase()} - Page ${n}`, A4_W / 2, A4_H - 30, { align: "center" });
-}
-
-/* ── PDF rendering ───────────────────────────────────────────────── */
-
-function renderParagraphs(
-  doc: jsPDF,
-  paras: string[],
-  y: number,
-  italic: boolean,
-  title: string,
-  footerPage: number,
-): number {
-  doc.setFont("times", italic ? "italic" : "normal");
-  doc.setFontSize(13);
-  doc.setTextColor(...C_BODY);
-
-  for (const para of paras) {
-    const lines: string[] = doc.splitTextToSize(para, CONTENT_W - 12);
-    for (const line of lines) {
-      if (y > A4_H - MARGIN - 30) {
-        doc.addPage([A4_W, A4_H]);
-        topRule(doc);
-        footer(doc, title, footerPage);
-        y = MARGIN + 4;
-        doc.setFont("times", italic ? "italic" : "normal");
-        doc.setFontSize(13);
-        doc.setTextColor(...C_BODY);
-      }
-      doc.text(line, MARGIN + 6, y);
-      y += 20;
-    }
-    y += 4;
-  }
-  return y;
-}
-
-function subLabel(doc: jsPDF, label: string, y: number): number {
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.setTextColor(...C_GOLD);
-  doc.text(label, MARGIN, y);
-  return y + 18;
-}
-
-function renderMainPointPage(
-  doc: jsPDF,
-  mp: ExportMainPoint,
-  idx: number,
-  title: string,
-  footerPage: number,
-) {
-  let y = MARGIN + 4;
-
-  doc.setFont("times", "bold");
-  doc.setFontSize(24);
-  doc.setTextColor(...C_BURGUNDY);
-  const heading = `${toRoman(idx)}. ${mp.heading.toUpperCase()}`;
-  const headingLines: string[] = doc.splitTextToSize(heading, CONTENT_W);
-  for (const hl of headingLines) {
-    doc.text(hl, MARGIN, y);
-    y += 30;
-  }
-  y += 10;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(13);
-  doc.setTextColor(...C_BODY);
-  for (const bullet of mp.bullets) {
-    if (!bullet) continue;
-    const bulletLines: string[] = doc.splitTextToSize(bullet, CONTENT_W - 28);
-    let first = true;
-    for (const bl of bulletLines) {
-      if (y > A4_H - MARGIN - 30) { doc.addPage([A4_W, A4_H]); topRule(doc); footer(doc, title, footerPage); y = MARGIN + 4; }
-      if (first) { doc.text("•", MARGIN + 10, y); doc.text(bl, MARGIN + 26, y); first = false; }
-      else { doc.text(bl, MARGIN + 26, y); }
-      y += 19;
-    }
-    y += 4;
-  }
-
-  if (mp.keyPoint.length) {
-    y += 8; y = subLabel(doc, "KEY POINT", y);
-    y = renderParagraphs(doc, mp.keyPoint, y, false, title, footerPage);
-  }
-  if (mp.revelation.length) {
-    y += 6; y = subLabel(doc, "REVELATION", y);
-    y = renderParagraphs(doc, mp.revelation, y, false, title, footerPage);
-  }
-  if (mp.quotable.length) {
-    y += 6; y = subLabel(doc, "QUOTABLE", y);
-    y = renderParagraphs(doc, mp.quotable, y, true, title, footerPage);
-  }
+  doc.setTextColor(...C_MUTED);
+  doc.text(`${title.toUpperCase()} — PAGE ${n}`, A4_W / 2, A4_H - 36, { align: "center" });
 }
 
 function generatePdf(data: SermonPayload): ArrayBuffer {
   const doc = new jsPDF({ unit: "pt", format: [A4_W, A4_H], orientation: "portrait" });
-
   const s = parseExportStructure(
     data.manuscript || "",
     data.title || "",
     data.scriptureReference || data.scripture || "",
   );
-
-  // ─── PAGE 1: Title + Scripture ───────────────────────────────
-  topRule(doc);
-  footer(doc, s.title, 1);
-
-  let y = 160;
-  doc.setFont("times", "bold");
-  doc.setFontSize(40);
-  doc.setTextColor(...C_BURGUNDY);
-  const titleLines: string[] = doc.splitTextToSize(s.title.toUpperCase(), CONTENT_W);
-  for (const line of titleLines) {
-    doc.text(line, A4_W / 2, y, { align: "center" });
-    y += 46;
-  }
-
-  if (s.subtitle) {
-    y += 6;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(18);
-    doc.setTextColor(...C_SUB);
-    const subLines: string[] = doc.splitTextToSize(s.subtitle, CONTENT_W - 60);
-    for (const line of subLines) {
-      doc.text(line, A4_W / 2, y, { align: "center" });
-      y += 24;
-    }
-  }
-
-  y += 50;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.setTextColor(...C_GOLD);
-  doc.text("TEXT", A4_W / 2, y, { align: "center" });
-  y += 26;
-
-  if (s.scriptureReference) {
-    doc.setFont("times", "bold");
-    doc.setFontSize(18);
-    doc.setTextColor(...C_BODY);
-    const refLines: string[] = doc.splitTextToSize(s.scriptureReference, CONTENT_W);
-    for (const line of refLines) {
-      doc.text(line, A4_W / 2, y, { align: "center" });
-      y += 24;
-    }
-    y += 6;
-  }
-
-  if (s.scriptureText) {
-    doc.setFont("times", "normal");
-    doc.setFontSize(15);
-    doc.setTextColor(...C_BODY);
-    const textLines: string[] = doc.splitTextToSize(s.scriptureText, CONTENT_W - 40);
-    for (const line of textLines) {
-      doc.text(line, A4_W / 2, y, { align: "center" });
-      y += 22;
-    }
-  }
-
-  y += 50;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.setTextColor(...C_GOLD);
-  doc.text("GOODNOTES SERMON NOTES", A4_W / 2, y, { align: "center" });
+  const dateLabel = formatDate(data.date);
 
   let pageNum = 1;
 
-  // ─── Illustration ────────────────────────────────────────────
+  /* ── PAGE 1: COVER ────────────────────────────────────────── */
+  let y = 240;
+  doc.setFont("times", "bold");
+  doc.setFontSize(42);
+  doc.setTextColor(...C_BLACK);
+  const titleLines: string[] = doc.splitTextToSize(s.title.toUpperCase(), CONTENT_W);
+  for (const line of titleLines) {
+    doc.text(line, A4_W / 2, y, { align: "center" });
+    y += 50;
+  }
+  if (s.subtitle) {
+    y += 12;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(18);
+    doc.setTextColor(...C_DARK);
+    const subLines: string[] = doc.splitTextToSize(s.subtitle, CONTENT_W - 40);
+    for (const line of subLines) {
+      doc.text(line, A4_W / 2, y, { align: "center" });
+      y += 26;
+    }
+  }
+  const cy = A4_H - 210;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(...C_BLACK);
+  doc.text(CHURCH_NAME, A4_W / 2, cy, { align: "center" });
+  doc.setFont("times", "italic");
+  doc.setFontSize(14);
+  doc.setTextColor(...C_DARK);
+  doc.text(SPEAKER_NAME, A4_W / 2, cy + 28, { align: "center" });
+  if (dateLabel) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(11);
+    doc.setTextColor(...C_MUTED);
+    doc.text(dateLabel, A4_W / 2, cy + 50, { align: "center" });
+  }
+  footer(doc, s.title, pageNum);
+
+  /* ── PAGE 2: SCRIPTURE ────────────────────────────────────── */
+  pageNum++;
+  doc.addPage([A4_W, A4_H]);
+  let py = 200;
+  doc.setFont("times", "bold");
+  doc.setFontSize(32);
+  doc.setTextColor(...C_BLACK);
+  doc.text("SCRIPTURE", A4_W / 2, py, { align: "center" });
+  py += 56;
+  if (s.scriptureReference) {
+    doc.setFont("times", "bold");
+    doc.setFontSize(20);
+    doc.setTextColor(...C_BLACK);
+    const refLines: string[] = doc.splitTextToSize(s.scriptureReference, CONTENT_W);
+    for (const line of refLines) {
+      doc.text(line, A4_W / 2, py, { align: "center" });
+      py += 28;
+    }
+    py += 16;
+  }
+  if (s.scriptureText) {
+    doc.setFont("times", "normal");
+    doc.setFontSize(15);
+    doc.setTextColor(...C_DARK);
+    const textLines: string[] = doc.splitTextToSize(s.scriptureText, CONTENT_W - 20);
+    for (const line of textLines) {
+      if (py > A4_H - MARGIN - 60) break;
+      doc.text(line, A4_W / 2, py, { align: "center" });
+      py += 22;
+    }
+  }
+  footer(doc, s.title, pageNum);
+
+  /* ── PAGE 3: ILLUSTRATION ─────────────────────────────────── */
   if (s.illustration.length > 0) {
     pageNum++;
     doc.addPage([A4_W, A4_H]);
-    topRule(doc);
-    footer(doc, s.title, pageNum);
-
-    let py = MARGIN + 4;
+    let iy = MARGIN + 20;
     doc.setFont("times", "bold");
-    doc.setFontSize(28);
-    doc.setTextColor(...C_BURGUNDY);
-    doc.text("ILLUSTRATION", MARGIN, py);
-    py += 40;
-    renderParagraphs(doc, s.illustration, py, false, s.title, pageNum);
+    doc.setFontSize(30);
+    doc.setTextColor(...C_BLACK);
+    doc.text("ILLUSTRATION", A4_W / 2, iy, { align: "center" });
+    iy += 56;
+    doc.setFont("times", "normal");
+    doc.setFontSize(14);
+    doc.setTextColor(...C_DARK);
+    for (const para of s.illustration) {
+      const lines: string[] = doc.splitTextToSize(para, CONTENT_W - 10);
+      for (const line of lines) {
+        if (iy > A4_H - MARGIN - 60) break;
+        doc.text(line, MARGIN + 5, iy);
+        iy += 22;
+      }
+      if (iy > A4_H - MARGIN - 60) break;
+      iy += 8;
+    }
+    footer(doc, s.title, pageNum);
   }
 
-  // ─── Main points ─────────────────────────────────────────────
+  /* ── MAIN POINTS ──────────────────────────────────────────── */
   s.mainPoints.forEach((mp, idx) => {
     pageNum++;
     doc.addPage([A4_W, A4_H]);
-    topRule(doc);
-    footer(doc, s.title, pageNum);
-    renderMainPointPage(doc, mp, idx + 1, s.title, pageNum);
+    pageNum = renderMainPointPage(doc, mp, idx + 1, pageNum, s.title);
   });
 
-  // ─── Closing ─────────────────────────────────────────────────
+  /* ── ALTAR CALL ───────────────────────────────────────────── */
   if (s.closing.length > 0) {
     pageNum++;
     doc.addPage([A4_W, A4_H]);
-    topRule(doc);
-    footer(doc, s.title, pageNum);
-
-    let py = MARGIN + 4;
+    let ay = MARGIN + 20;
     doc.setFont("times", "bold");
-    doc.setFontSize(28);
-    doc.setTextColor(...C_BURGUNDY);
-    doc.text("CLOSING", MARGIN, py);
-    py += 40;
-    renderParagraphs(doc, s.closing, py, false, s.title, pageNum);
+    doc.setFontSize(30);
+    doc.setTextColor(...C_BLACK);
+    doc.text("ALTAR CALL", A4_W / 2, ay, { align: "center" });
+    ay += 56;
+    doc.setFont("times", "normal");
+    doc.setFontSize(14);
+    doc.setTextColor(...C_DARK);
+    for (const para of s.closing) {
+      const lines: string[] = doc.splitTextToSize(para, CONTENT_W - 10);
+      for (const line of lines) {
+        if (ay > A4_H - MARGIN - 60) {
+          footer(doc, s.title, pageNum);
+          pageNum++;
+          doc.addPage([A4_W, A4_H]);
+          ay = MARGIN + 20;
+          doc.setFont("times", "normal");
+          doc.setFontSize(14);
+          doc.setTextColor(...C_DARK);
+        }
+        doc.text(line, MARGIN + 5, ay);
+        ay += 22;
+      }
+      ay += 8;
+    }
+    footer(doc, s.title, pageNum);
   }
 
-  // Copyright micro footer
+  // Copyright on last page
   doc.setFont("helvetica", "italic");
   doc.setFontSize(8);
-  doc.setTextColor(...C_FOOT);
+  doc.setTextColor(...C_MUTED);
   doc.text(
     `\u00A9 ${new Date().getFullYear()} The Island of One. All rights reserved.`,
-    A4_W / 2,
-    A4_H - 18,
-    { align: "center" },
+    A4_W / 2, A4_H - 22, { align: "center" },
   );
 
   return doc.output("arraybuffer");
 }
+
+function renderMainPointPage(
+  doc: jsPDF,
+  mp: ExportMainPoint,
+  index: number,
+  pageNum: number,
+  title: string,
+): number {
+  let y = MARGIN + 10;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(...C_MUTED);
+  doc.text(`MAIN POINT ${toRoman(index)}`, A4_W / 2, y, { align: "center" });
+  y += 40;
+
+  doc.setFont("times", "bold");
+  doc.setFontSize(24);
+  doc.setTextColor(...C_BLACK);
+  const headingLines: string[] = doc.splitTextToSize(mp.heading.toUpperCase(), CONTENT_W);
+  for (const hl of headingLines) {
+    doc.text(hl, A4_W / 2, y, { align: "center" });
+    y += 30;
+  }
+  y += 18;
+
+  const ensure = (needed: number) => {
+    if (y + needed > A4_H - MARGIN - 50) {
+      footer(doc, title, pageNum);
+      pageNum++;
+      doc.addPage([A4_W, A4_H]);
+      y = MARGIN + 10;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(...C_MUTED);
+      doc.text(`MAIN POINT ${toRoman(index)} (cont.)`, A4_W / 2, y, { align: "center" });
+      y += 40;
+    }
+  };
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(13);
+  doc.setTextColor(...C_DARK);
+  for (const bullet of mp.bullets) {
+    if (!bullet) continue;
+    const bulletLines: string[] = doc.splitTextToSize(bullet, CONTENT_W - 30);
+    let first = true;
+    for (const bl of bulletLines) {
+      ensure(22);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(13);
+      doc.setTextColor(...C_DARK);
+      if (first) { doc.text("•", MARGIN + 8, y); doc.text(bl, MARGIN + 26, y); first = false; }
+      else { doc.text(bl, MARGIN + 26, y); }
+      y += 20;
+    }
+    y += 6;
+  }
+
+  const renderSection = (label: string, paras: string[], italic = false) => {
+    if (!paras.length) return;
+    ensure(60);
+    y += 8;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(...C_BLACK);
+    doc.text(label, MARGIN, y);
+    y += 20;
+    for (const para of paras) {
+      const lines: string[] = doc.splitTextToSize(para, CONTENT_W - 10);
+      for (const line of lines) {
+        ensure(22);
+        doc.setFont("times", italic ? "italic" : "normal");
+        doc.setFontSize(13);
+        doc.setTextColor(...C_DARK);
+        doc.text(line, MARGIN + 6, y);
+        y += 20;
+      }
+      y += 4;
+    }
+  };
+
+  renderSection("KEY POINT", mp.keyPoint);
+  renderSection("REVELATION", mp.revelation);
+  if (mp.quotable.length) renderSection("QUOTABLE", mp.quotable, true);
+
+  footer(doc, title, pageNum);
+  return pageNum;
+}
+
 
 /* ── Handler ─────────────────────────────────────────────────────── */
 
@@ -521,9 +547,8 @@ Deno.serve(async (req) => {
     }
 
     const pdfBuffer = generatePdf(data);
-    const slug = data.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-    const dateStr = new Date().toISOString().slice(0, 10);
-    const filename = `${slug}-${dateStr}.pdf`;
+    const safe = data.title.replace(/[^a-zA-Z0-9]/g, "_");
+    const filename = `${safe}_GoodNotes.pdf`;
 
     return new Response(pdfBuffer, {
       headers: {
