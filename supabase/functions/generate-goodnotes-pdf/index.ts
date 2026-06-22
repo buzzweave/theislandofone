@@ -11,6 +11,7 @@ interface SermonPayload {
   scriptureReference?: string;
   scripture?: string;
   manuscript?: string;
+  date?: string;
 }
 
 /* ── Types ────────────────────────────────────────────────────────── */
