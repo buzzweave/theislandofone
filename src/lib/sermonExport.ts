@@ -503,52 +503,63 @@ export function exportSermonToWord(sermon: Sermon) {
   const FOOT = "#969696";
 
   const sections: string[] = [];
+  const dateLabel = formatSermonDate(sermon.date);
 
-  // ── Title page ──
-  let titlePage = `<div style="page-break-after: always; padding: 80pt 40pt 0 40pt; text-align: center;">`;
-  titlePage += `<div style="border-top: 1.5pt solid ${GOLD}; margin-bottom: 60pt;"></div>`;
-  titlePage += `<h1 style="font-family: 'Playfair Display', 'Times New Roman', Georgia, serif; color: ${BURGUNDY}; font-size: 40pt; font-weight: 800; letter-spacing: 1px; margin: 0 0 12pt 0;">${escapeXml(s.title.toUpperCase())}</h1>`;
+  // ── PAGE 1: COVER ──
+  let cover = `<div style="page-break-after: always; padding: 140pt 40pt 0 40pt; text-align: center; min-height: 9in;">`;
+  cover += `<h1 style="font-family: 'Playfair Display', 'Times New Roman', Georgia, serif; color: ${BURGUNDY}; font-size: 42pt; font-weight: 800; letter-spacing: 1px; margin: 0 0 18pt 0;">${escapeXml(s.title.toUpperCase())}</h1>`;
   if (s.subtitle) {
-    titlePage += `<p style="font-family: 'Inter', Arial, sans-serif; color: ${SUB}; font-size: 16pt; margin: 0 0 50pt 0;">${escapeXml(s.subtitle)}</p>`;
+    cover += `<p style="font-family: 'Inter', Arial, sans-serif; color: ${SUB}; font-size: 18pt; margin: 0 0 80pt 0;">${escapeXml(s.subtitle)}</p>`;
+  } else {
+    cover += `<div style="height: 80pt;"></div>`;
   }
-  titlePage += `<p style="font-family: 'Inter', Arial, sans-serif; color: ${GOLD}; font-size: 12pt; font-weight: 700; letter-spacing: 2px; margin: 40pt 0 12pt 0;">TEXT</p>`;
-  if (s.scriptureReference) {
-    titlePage += `<p style="font-family: 'Times New Roman', Georgia, serif; color: ${BODY}; font-size: 17pt; font-weight: 700; margin: 0 0 8pt 0;">${escapeXml(s.scriptureReference)}</p>`;
+  cover += `<div style="margin-top: 220pt;">`;
+  cover += `<p style="font-family: 'Inter', Arial, sans-serif; color: ${GOLD}; font-size: 13pt; font-weight: 700; letter-spacing: 2px; margin: 0 0 14pt 0;">${CHURCH_NAME}</p>`;
+  cover += `<p style="font-family: 'Times New Roman', Georgia, serif; font-style: italic; color: ${BODY}; font-size: 14pt; margin: 0 0 10pt 0;">${SPEAKER_NAME}</p>`;
+  if (dateLabel) {
+    cover += `<p style="font-family: 'Inter', Arial, sans-serif; color: ${FOOT}; font-size: 11pt; margin: 0;">${escapeXml(dateLabel)}</p>`;
   }
-  if (s.scriptureText) {
-    titlePage += `<p style="font-family: 'Times New Roman', Georgia, serif; color: ${BODY}; font-size: 14pt; line-height: 1.55; margin: 0 60pt 50pt 60pt;">${escapeXml(s.scriptureText)}</p>`;
-  }
-  titlePage += `<p style="font-family: 'Inter', Arial, sans-serif; color: ${GOLD}; font-size: 12pt; font-weight: 700; letter-spacing: 2px; margin: 50pt 0 0 0;">GOODNOTES SERMON NOTES</p>`;
-  titlePage += `</div>`;
-  sections.push(titlePage);
+  cover += `</div></div>`;
+  sections.push(cover);
 
   const renderParas = (paras: string[], italic: boolean) =>
     paras.map(p =>
-      `<p style="font-family: 'Times New Roman', Georgia, serif; color: ${BODY}; font-size: 13pt; line-height: 1.7; ${italic ? "font-style: italic;" : ""} margin: 0 0 0.6em 0.2in;">${escapeXml(p)}</p>`
+      `<p style="font-family: 'Times New Roman', Georgia, serif; color: ${BODY}; font-size: 13pt; line-height: 1.7; ${italic ? "font-style: italic;" : ""} margin: 0 0 0.6em 0;">${escapeXml(p)}</p>`
     ).join("");
 
   const subLabel = (label: string) =>
-    `<p style="font-family: 'Inter', Arial, sans-serif; color: ${GOLD}; font-size: 12pt; font-weight: 700; letter-spacing: 1.5px; margin: 1em 0 0.4em 0;">${label}</p>`;
+    `<p style="font-family: 'Inter', Arial, sans-serif; color: ${GOLD}; font-size: 12pt; font-weight: 700; letter-spacing: 1.5px; margin: 1.2em 0 0.4em 0;">${label}</p>`;
 
-  // Illustration
+  // ── PAGE 2: SCRIPTURE ──
+  let scripturePage = `<div style="page-break-before: always; page-break-after: always; text-align: center; padding-top: 120pt;">`;
+  scripturePage += `<h2 style="font-family: 'Playfair Display', 'Times New Roman', serif; color: ${BURGUNDY}; font-size: 32pt; font-weight: 800; margin: 0 0 36pt 0;">SCRIPTURE</h2>`;
+  if (s.scriptureReference) {
+    scripturePage += `<p style="font-family: 'Times New Roman', Georgia, serif; color: ${BODY}; font-size: 20pt; font-weight: 700; margin: 0 0 18pt 0;">${escapeXml(s.scriptureReference)}</p>`;
+  }
+  if (s.scriptureText) {
+    scripturePage += `<p style="font-family: 'Times New Roman', Georgia, serif; color: ${BODY}; font-size: 15pt; line-height: 1.7; margin: 0 40pt 0 40pt;">${escapeXml(s.scriptureText)}</p>`;
+  }
+  scripturePage += `</div>`;
+  sections.push(scripturePage);
+
+  // ── PAGE 3: ILLUSTRATION ──
   if (s.illustration.length) {
-    let html = `<div style="page-break-before: always;">`;
-    html += `<div style="border-top: 1.5pt solid ${GOLD}; margin-bottom: 24pt;"></div>`;
-    html += `<h2 style="font-family: 'Playfair Display', 'Times New Roman', serif; color: ${BURGUNDY}; font-size: 24pt; font-weight: 800; text-transform: uppercase; margin: 0 0 0.8em 0;">ILLUSTRATION</h2>`;
+    let html = `<div style="page-break-before: always; page-break-after: always;">`;
+    html += `<h2 style="font-family: 'Playfair Display', 'Times New Roman', serif; color: ${BURGUNDY}; font-size: 30pt; font-weight: 800; text-align: center; margin: 40pt 0 36pt 0;">ILLUSTRATION</h2>`;
     html += renderParas(s.illustration, false);
     html += `</div>`;
     sections.push(html);
   }
 
-  // Main points
+  // ── MAIN POINTS — each on its own page ──
   s.mainPoints.forEach((mp, idx) => {
-    let html = `<div style="page-break-before: always; page-break-inside: avoid;">`;
-    html += `<div style="border-top: 1.5pt solid ${GOLD}; margin-bottom: 24pt;"></div>`;
-    html += `<h2 style="font-family: 'Playfair Display', 'Times New Roman', serif; color: ${BURGUNDY}; font-size: 22pt; font-weight: 800; text-transform: uppercase; margin: 0 0 0.8em 0;">${toRoman(idx + 1)}. ${escapeXml(mp.heading.toUpperCase())}</h2>`;
+    let html = `<div style="page-break-before: always;">`;
+    html += `<p style="font-family: 'Inter', Arial, sans-serif; color: ${GOLD}; font-size: 11pt; font-weight: 700; letter-spacing: 2.5px; text-align: center; margin: 0 0 24pt 0;">MAIN POINT ${toRoman(idx + 1)}</p>`;
+    html += `<h2 style="font-family: 'Playfair Display', 'Times New Roman', serif; color: ${BURGUNDY}; font-size: 24pt; font-weight: 800; text-transform: uppercase; text-align: center; margin: 0 0 30pt 0;">${escapeXml(mp.heading.toUpperCase())}</h2>`;
     if (mp.bullets.length) {
-      html += `<ul style="font-family: 'Inter', Arial, sans-serif; color: ${BODY}; font-size: 13pt; line-height: 1.55; margin: 0 0 0 0.3in; padding: 0;">`;
+      html += `<ul style="font-family: 'Inter', Arial, sans-serif; color: ${BODY}; font-size: 13pt; line-height: 1.7; margin: 0 0 0 0.3in; padding: 0;">`;
       for (const b of mp.bullets) {
-        if (b) html += `<li style="margin-bottom: 0.4em;">${escapeXml(b)}</li>`;
+        if (b) html += `<li style="margin-bottom: 0.5em;">${escapeXml(b)}</li>`;
       }
       html += `</ul>`;
     }
@@ -559,11 +570,10 @@ export function exportSermonToWord(sermon: Sermon) {
     sections.push(html);
   });
 
-  // Closing
+  // ── ALTAR CALL ──
   if (s.closing.length) {
     let html = `<div style="page-break-before: always;">`;
-    html += `<div style="border-top: 1.5pt solid ${GOLD}; margin-bottom: 24pt;"></div>`;
-    html += `<h2 style="font-family: 'Playfair Display', 'Times New Roman', serif; color: ${BURGUNDY}; font-size: 24pt; font-weight: 800; text-transform: uppercase; margin: 0 0 0.8em 0;">CLOSING</h2>`;
+    html += `<h2 style="font-family: 'Playfair Display', 'Times New Roman', serif; color: ${BURGUNDY}; font-size: 30pt; font-weight: 800; text-align: center; margin: 40pt 0 36pt 0;">ALTAR CALL</h2>`;
     html += renderParas(s.closing, false);
     html += `</div>`;
     sections.push(html);
@@ -574,8 +584,8 @@ export function exportSermonToWord(sermon: Sermon) {
 <!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&family=Inter:wght@400;600;700&display=swap');
-  @page { size: A4 portrait; margin: 0.85in; }
-  body { font-family: 'Times New Roman', Georgia, serif; margin: 0.85in; color: ${BODY}; line-height: 1.6; font-size: 13pt; }
+  @page { size: A4 portrait; margin: 0.9in; }
+  body { font-family: 'Times New Roman', Georgia, serif; margin: 0.9in; color: ${BODY}; line-height: 1.65; font-size: 13pt; }
   .copyright { font-family: 'Inter', Arial, sans-serif; font-size: 9pt; font-style: italic; color: ${FOOT}; text-align: center; margin-top: 2in; padding-top: 0.5in; }
 </style></head>
 <body>
@@ -583,6 +593,6 @@ ${sections.join("\n")}
   <p class="copyright">${escapeXml(COPYRIGHT())}</p>
 </body></html>`;
 
-  const blob = new Blob([html], { type: "application/msword" });
-  triggerDownload(blob, `${safeTitle(sermon.title)}.doc`);
+  const blob = new Blob([html], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+  triggerDownload(blob, `${safeTitle(sermon.title)}.docx`);
 }
