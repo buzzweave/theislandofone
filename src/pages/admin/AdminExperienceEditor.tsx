@@ -92,6 +92,10 @@ function EditorInner({ experience }: { experience: ImmersiveExperience }) {
           <TabsTrigger value="preview"><Eye className="h-4 w-4 mr-1" />Preview</TabsTrigger>
           <TabsTrigger value="analytics"><BarChart3 className="h-4 w-4 mr-1" />Analytics</TabsTrigger>
         </TabsList>
+          <TabsTrigger value="responses"><MessageCircle className="h-4 w-4 mr-1" />Responses</TabsTrigger>
+          <TabsTrigger value="prayer"><HeartHandshake className="h-4 w-4 mr-1" />Prayer Wall</TabsTrigger>
+          <TabsTrigger value="analytics"><BarChart3 className="h-4 w-4 mr-1" />Analytics</TabsTrigger>
+        </TabsList>
         <TabsContent value="details" className="mt-4"><DetailsPanel experience={experience} /></TabsContent>
         <TabsContent value="video" className="mt-4"><VideoPanel experience={experience} /></TabsContent>
         <TabsContent value="media" className="mt-4"><MediaPanel experienceId={experience.id} /></TabsContent>
@@ -101,6 +105,8 @@ function EditorInner({ experience }: { experience: ImmersiveExperience }) {
         </TabsContent>
         <TabsContent value="interactions" className="mt-4"><InteractionsPanel experienceId={experience.id} /></TabsContent>
         <TabsContent value="preview" className="mt-4"><PreviewPanel experience={experience} /></TabsContent>
+        <TabsContent value="responses" className="mt-4"><ResponsesPanel experienceId={experience.id} /></TabsContent>
+        <TabsContent value="prayer" className="mt-4"><PrayerWallPanel experienceId={experience.id} /></TabsContent>
         <TabsContent value="analytics" className="mt-4"><AnalyticsPanel experienceId={experience.id} /></TabsContent>
       </Tabs>
     </div>
