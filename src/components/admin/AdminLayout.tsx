@@ -36,6 +36,7 @@ import {
   UserCheck,
   CreditCard,
   KeyRound,
+  Sparkles,
 } from "lucide-react";
 import AISidebar from "./AISidebar";
 import NotificationBell from "./NotificationBell";
@@ -62,6 +63,7 @@ const navItems = [
   { to: "/admin/publisher", label: "Publisher", icon: BookUp },
   { to: "/admin/crm", label: "Email CRM", icon: Mail },
   { to: "/admin/video-studio", label: "Video Studio", icon: Video },
+  { to: "/admin/experiences", label: "Immersive Experiences", icon: Sparkles },
   { to: "/admin/notifications", label: "Notifications", icon: BellIcon },
   { to: "/admin/access-codes", label: "Access Codes", icon: KeyRound },
   { to: "/admin/user-access", label: "User Access", icon: UserCheck },

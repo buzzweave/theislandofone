@@ -66,6 +66,8 @@ const AdminAccessCodes = lazy(() => import("./pages/admin/AdminAccessCodes"));
 const AdminUserAccess = lazy(() => import("./pages/admin/AdminUserAccess"));
 const AdminCRM = lazy(() => import("./pages/admin/AdminCRM"));
 const AdminPlaceholder = lazy(() => import("./pages/admin/AdminPlaceholder"));
+const AdminExperiences = lazy(() => import("./pages/admin/AdminExperiences"));
+const AdminExperienceEditor = lazy(() => import("./pages/admin/AdminExperienceEditor"));
 
 const VideoStudio = lazy(() => import("./pages/admin/VideoStudio"));
 const VideoLibrary = lazy(() => import("./pages/admin/VideoLibrary"));
@@ -232,6 +234,8 @@ const App = () => (
                     <Route path="crm" element={<AdminCRM />} />
                     <Route path="video-studio" element={<VideoStudio />} />
                     <Route path="video-library" element={<VideoLibrary />} />
+                    <Route path="experiences" element={<AdminExperiences />} />
+                    <Route path="experiences/:id" element={<AdminExperienceEditor />} />
                     <Route path="ai-developer" element={<AIDevDashboard />} />
                     <Route path="ai-developer/console" element={<AIDevConsole />} />
                     <Route path="ai-developer/scan" element={<AIDevSiteScan />} />
