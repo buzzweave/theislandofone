@@ -3,9 +3,12 @@ import { useParams, Link } from "react-router-dom";
 import {
   ArrowLeft, Loader2, Save, Upload, Trash2, Plus, ChevronUp, ChevronDown,
   Film, Layers, Sparkles, Eye, MousePointerClick, Image as ImageIcon, Clock, BarChart3, ExternalLink,
+  HeartHandshake, MessageCircle,
 } from "lucide-react";
 import TimelinePanel from "./experience/TimelinePanel";
 import AnalyticsPanel from "./experience/AnalyticsPanel";
+import PrayerWallPanel from "./experience/PrayerWallPanel";
+import ResponsesPanel from "./experience/ResponsesPanel";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -87,6 +90,8 @@ function EditorInner({ experience }: { experience: ImmersiveExperience }) {
           <TabsTrigger value="timeline"><Clock className="h-4 w-4 mr-1" />Timeline</TabsTrigger>
           <TabsTrigger value="interactions"><MousePointerClick className="h-4 w-4 mr-1" />Interactions</TabsTrigger>
           <TabsTrigger value="preview"><Eye className="h-4 w-4 mr-1" />Preview</TabsTrigger>
+          <TabsTrigger value="responses"><MessageCircle className="h-4 w-4 mr-1" />Responses</TabsTrigger>
+          <TabsTrigger value="prayer"><HeartHandshake className="h-4 w-4 mr-1" />Prayer Wall</TabsTrigger>
           <TabsTrigger value="analytics"><BarChart3 className="h-4 w-4 mr-1" />Analytics</TabsTrigger>
         </TabsList>
         <TabsContent value="details" className="mt-4"><DetailsPanel experience={experience} /></TabsContent>
@@ -98,6 +103,8 @@ function EditorInner({ experience }: { experience: ImmersiveExperience }) {
         </TabsContent>
         <TabsContent value="interactions" className="mt-4"><InteractionsPanel experienceId={experience.id} /></TabsContent>
         <TabsContent value="preview" className="mt-4"><PreviewPanel experience={experience} /></TabsContent>
+        <TabsContent value="responses" className="mt-4"><ResponsesPanel experienceId={experience.id} /></TabsContent>
+        <TabsContent value="prayer" className="mt-4"><PrayerWallPanel experienceId={experience.id} /></TabsContent>
         <TabsContent value="analytics" className="mt-4"><AnalyticsPanel experienceId={experience.id} /></TabsContent>
       </Tabs>
     </div>

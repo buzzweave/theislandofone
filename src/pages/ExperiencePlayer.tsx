@@ -1,11 +1,17 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { Loader2, ChevronLeft, ChevronRight, Volume2, VolumeX, X, Play, Pause } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, Volume2, VolumeX, X, Play, Pause, HeartHandshake } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 // document title handled via effect below
 import { useExperienceBySlug } from "@/hooks/useExperiences";
 import { useScenes } from "@/hooks/useExperienceScenes";
-import { useInteractions } from "@/hooks/useExperienceInteractions";
+import { useInteractions, type ExperienceInteraction } from "@/hooks/useExperienceInteractions";
+import { useCreatePrayerRequest } from "@/hooks/usePrayerRequests";
 import { logExperienceEvent, upsertViewProgress } from "@/lib/experienceAnalytics";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -124,29 +130,75 @@ export default function ExperiencePlayer() {
     [interactions, scene?.id]
   );
 
-  const handleInteraction = async (interactionId: string, kind: string, destination?: string | null) => {
+  const [prayerFor, setPrayerFor] = useState<ExperienceInteraction | null>(null);
+  const [prayerName, setPrayerName] = useState("");
+  const [prayerContact, setPrayerContact] = useState("");
+  const [prayerMsg, setPrayerMsg] = useState("");
+  const [prayerShare, setPrayerShare] = useState(false);
+  const createPrayer = useCreatePrayerRequest();
+
+  const logResponse = async (interactionId: string, kind: string, payload: Record<string, unknown> = {}) => {
     if (!experience) return;
-    await logExperienceEvent({
-      experienceId: experience.id,
-      kind: "interaction_click",
-      payload: { interaction_id: interactionId, kind },
-    });
     try {
       const { data: sess } = await supabase.auth.getSession();
-      await (supabase as any).from("experience_responses").insert({
+      const inserted = await (supabase as any).from("experience_responses").insert({
         experience_id: experience.id,
         interaction_id: interactionId,
         user_id: sess.session?.user?.id ?? null,
         anon_id: sess.session?.user?.id ? null : (await import("@/lib/experienceAnalytics")).getAnonId(),
         kind,
-        payload: {},
-      });
+        payload,
+      }).select("*").single();
+      // Notify staff for decision-style responses
+      if (["decision", "salvation", "commitment", "response"].includes(kind)) {
+        try {
+          await (supabase as any).functions.invoke("notify-response", {
+            body: { type: "response", record: inserted.data },
+          });
+        } catch {}
+      }
     } catch {}
-    if (destination) {
-      if (destination.startsWith("http")) window.open(destination, "_blank");
-      else navigate(destination);
+  };
+
+  const handleInteraction = async (i: ExperienceInteraction) => {
+    if (!experience) return;
+    await logExperienceEvent({
+      experienceId: experience.id,
+      kind: "interaction_click",
+      payload: { interaction_id: i.id, kind: i.kind },
+    });
+    // Prayer opens a dialog instead of instantly logging
+    if (i.kind === "prayer") {
+      setPrayerName(""); setPrayerContact(""); setPrayerMsg(""); setPrayerShare(false);
+      setPrayerFor(i);
+      return;
+    }
+    await logResponse(i.id, i.kind, {});
+    if (i.destination) {
+      if (i.destination.startsWith("http")) window.open(i.destination, "_blank");
+      else navigate(i.destination);
     } else {
-      toast.success("Thank you");
+      toast.success(i.confirmation || "Thank you");
+    }
+  };
+
+  const submitPrayer = async () => {
+    if (!prayerFor || !experience) return;
+    if (!prayerMsg.trim()) { toast.error("Please share your request"); return; }
+    try {
+      await createPrayer.mutateAsync({
+        experience_id: experience.id,
+        name: prayerName.trim() || null,
+        contact: prayerContact.trim() || null,
+        message: prayerMsg.trim(),
+        visibility: prayerShare ? "public" : "private",
+        urgency: "normal",
+      });
+      await logResponse(prayerFor.id, "prayer", { shared: prayerShare });
+      toast.success(prayerFor.confirmation || "We're praying with you.");
+      setPrayerFor(null);
+    } catch (e: any) {
+      toast.error(e.message || "Could not submit");
     }
   };
 
@@ -250,7 +302,7 @@ export default function ExperiencePlayer() {
                       key={i.id}
                       variant="secondary"
                       className="bg-white/15 hover:bg-white/25 text-white border border-white/20 backdrop-blur"
-                      onClick={() => handleInteraction(i.id, i.kind, i.destination)}
+                      onClick={() => handleInteraction(i)}
                     >
                       {i.button_label || i.heading || "Continue"}
                     </Button>
@@ -302,6 +354,48 @@ export default function ExperiencePlayer() {
           {Math.floor(elapsed / 60)}:{(elapsed % 60).toString().padStart(2, "0")}
         </div>
       </div>
+
+      <Dialog open={!!prayerFor} onOpenChange={(o) => !o && setPrayerFor(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <HeartHandshake className="h-5 w-5 text-primary" />
+              {prayerFor?.heading || "Share Your Prayer Request"}
+            </DialogTitle>
+            <DialogDescription>
+              {prayerFor?.body || "Our team will pray over your request."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Name (optional)</Label>
+                <Input value={prayerName} onChange={(e) => setPrayerName(e.target.value)} placeholder="Anonymous" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Contact (optional)</Label>
+                <Input value={prayerContact} onChange={(e) => setPrayerContact(e.target.value)} placeholder="email or phone" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Your prayer request</Label>
+              <Textarea rows={4} value={prayerMsg} onChange={(e) => setPrayerMsg(e.target.value)}
+                placeholder="Share what's on your heart…" maxLength={2000} />
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <Switch checked={prayerShare} onCheckedChange={setPrayerShare} />
+              Share anonymously on the Prayer Wall
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPrayerFor(null)}>Cancel</Button>
+            <Button onClick={submitPrayer} disabled={createPrayer.isPending}>
+              {createPrayer.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Submit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

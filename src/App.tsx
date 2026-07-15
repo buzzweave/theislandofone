@@ -72,6 +72,7 @@ const ExperiencePlayer = lazy(() => import("./pages/ExperiencePlayer"));
 const ExperiencesDiscovery = lazy(() => import("./pages/ExperiencesDiscovery"));
 const ExperienceSeriesPage = lazy(() => import("./pages/ExperienceSeriesPage"));
 const AdminSeries = lazy(() => import("./pages/admin/AdminSeries"));
+const PrayerWall = lazy(() => import("./pages/PrayerWall"));
 
 const VideoStudio = lazy(() => import("./pages/admin/VideoStudio"));
 const VideoLibrary = lazy(() => import("./pages/admin/VideoLibrary"));
@@ -205,6 +206,7 @@ const App = () => (
                   <Route path="/experiences" element={<LazyLayout><ExperiencesDiscovery /></LazyLayout>} />
                   <Route path="/experiences/series/:slug" element={<LazyLayout><ExperienceSeriesPage /></LazyLayout>} />
                   <Route path="/experiences/:slug" element={<Suspense fallback={<PageFallback />}><ExperiencePlayer /></Suspense>} />
+                  <Route path="/prayer-wall" element={<LazyLayout><PrayerWall /></LazyLayout>} />
 
                   {/* Admin */}
                   <Route path="/admin/login" element={<Suspense fallback={<PageFallback />}><AdminLogin /></Suspense>} />
