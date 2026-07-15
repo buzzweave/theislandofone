@@ -130,29 +130,75 @@ export default function ExperiencePlayer() {
     [interactions, scene?.id]
   );
 
-  const handleInteraction = async (interactionId: string, kind: string, destination?: string | null) => {
+  const [prayerFor, setPrayerFor] = useState<ExperienceInteraction | null>(null);
+  const [prayerName, setPrayerName] = useState("");
+  const [prayerContact, setPrayerContact] = useState("");
+  const [prayerMsg, setPrayerMsg] = useState("");
+  const [prayerShare, setPrayerShare] = useState(false);
+  const createPrayer = useCreatePrayerRequest();
+
+  const logResponse = async (interactionId: string, kind: string, payload: Record<string, unknown> = {}) => {
     if (!experience) return;
-    await logExperienceEvent({
-      experienceId: experience.id,
-      kind: "interaction_click",
-      payload: { interaction_id: interactionId, kind },
-    });
     try {
       const { data: sess } = await supabase.auth.getSession();
-      await (supabase as any).from("experience_responses").insert({
+      const inserted = await (supabase as any).from("experience_responses").insert({
         experience_id: experience.id,
         interaction_id: interactionId,
         user_id: sess.session?.user?.id ?? null,
         anon_id: sess.session?.user?.id ? null : (await import("@/lib/experienceAnalytics")).getAnonId(),
         kind,
-        payload: {},
-      });
+        payload,
+      }).select("*").single();
+      // Notify staff for decision-style responses
+      if (["decision", "salvation", "commitment", "response"].includes(kind)) {
+        try {
+          await (supabase as any).functions.invoke("notify-response", {
+            body: { type: "response", record: inserted.data },
+          });
+        } catch {}
+      }
     } catch {}
-    if (destination) {
-      if (destination.startsWith("http")) window.open(destination, "_blank");
-      else navigate(destination);
+  };
+
+  const handleInteraction = async (i: ExperienceInteraction) => {
+    if (!experience) return;
+    await logExperienceEvent({
+      experienceId: experience.id,
+      kind: "interaction_click",
+      payload: { interaction_id: i.id, kind: i.kind },
+    });
+    // Prayer opens a dialog instead of instantly logging
+    if (i.kind === "prayer") {
+      setPrayerName(""); setPrayerContact(""); setPrayerMsg(""); setPrayerShare(false);
+      setPrayerFor(i);
+      return;
+    }
+    await logResponse(i.id, i.kind, {});
+    if (i.destination) {
+      if (i.destination.startsWith("http")) window.open(i.destination, "_blank");
+      else navigate(i.destination);
     } else {
-      toast.success("Thank you");
+      toast.success(i.confirmation || "Thank you");
+    }
+  };
+
+  const submitPrayer = async () => {
+    if (!prayerFor || !experience) return;
+    if (!prayerMsg.trim()) { toast.error("Please share your request"); return; }
+    try {
+      await createPrayer.mutateAsync({
+        experience_id: experience.id,
+        name: prayerName.trim() || null,
+        contact: prayerContact.trim() || null,
+        message: prayerMsg.trim(),
+        visibility: prayerShare ? "public" : "private",
+        urgency: "normal",
+      });
+      await logResponse(prayerFor.id, "prayer", { shared: prayerShare });
+      toast.success(prayerFor.confirmation || "We're praying with you.");
+      setPrayerFor(null);
+    } catch (e: any) {
+      toast.error(e.message || "Could not submit");
     }
   };
 
