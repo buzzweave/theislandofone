@@ -354,6 +354,48 @@ export default function ExperiencePlayer() {
           {Math.floor(elapsed / 60)}:{(elapsed % 60).toString().padStart(2, "0")}
         </div>
       </div>
+
+      <Dialog open={!!prayerFor} onOpenChange={(o) => !o && setPrayerFor(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <HeartHandshake className="h-5 w-5 text-primary" />
+              {prayerFor?.heading || "Share Your Prayer Request"}
+            </DialogTitle>
+            <DialogDescription>
+              {prayerFor?.body || "Our team will pray over your request."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Name (optional)</Label>
+                <Input value={prayerName} onChange={(e) => setPrayerName(e.target.value)} placeholder="Anonymous" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Contact (optional)</Label>
+                <Input value={prayerContact} onChange={(e) => setPrayerContact(e.target.value)} placeholder="email or phone" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Your prayer request</Label>
+              <Textarea rows={4} value={prayerMsg} onChange={(e) => setPrayerMsg(e.target.value)}
+                placeholder="Share what's on your heart…" maxLength={2000} />
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <Switch checked={prayerShare} onCheckedChange={setPrayerShare} />
+              Share anonymously on the Prayer Wall
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPrayerFor(null)}>Cancel</Button>
+            <Button onClick={submitPrayer} disabled={createPrayer.isPending}>
+              {createPrayer.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Submit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
