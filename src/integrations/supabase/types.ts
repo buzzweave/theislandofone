@@ -1085,8 +1085,23 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string | null
+          display_end_at: string | null
+          display_start_at: string | null
+          featured_experience_id: string | null
+          featured_priority: number
+          homepage_artwork_url: string | null
+          homepage_description: string | null
+          homepage_headline: string | null
+          homepage_mobile_artwork_url: string | null
+          homepage_preview_video_url: string | null
+          homepage_visible: boolean
           id: string
+          is_current_series: boolean
+          is_featured: boolean
           order_index: number
+          primary_watch_label: string | null
+          secondary_watch_label: string | null
+          show_on_watch: boolean
           slug: string
           status: string
           title: string
@@ -1098,8 +1113,23 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          display_end_at?: string | null
+          display_start_at?: string | null
+          featured_experience_id?: string | null
+          featured_priority?: number
+          homepage_artwork_url?: string | null
+          homepage_description?: string | null
+          homepage_headline?: string | null
+          homepage_mobile_artwork_url?: string | null
+          homepage_preview_video_url?: string | null
+          homepage_visible?: boolean
           id?: string
+          is_current_series?: boolean
+          is_featured?: boolean
           order_index?: number
+          primary_watch_label?: string | null
+          secondary_watch_label?: string | null
+          show_on_watch?: boolean
           slug: string
           status?: string
           title: string
@@ -1111,15 +1141,38 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          display_end_at?: string | null
+          display_start_at?: string | null
+          featured_experience_id?: string | null
+          featured_priority?: number
+          homepage_artwork_url?: string | null
+          homepage_description?: string | null
+          homepage_headline?: string | null
+          homepage_mobile_artwork_url?: string | null
+          homepage_preview_video_url?: string | null
+          homepage_visible?: boolean
           id?: string
+          is_current_series?: boolean
+          is_featured?: boolean
           order_index?: number
+          primary_watch_label?: string | null
+          secondary_watch_label?: string | null
+          show_on_watch?: boolean
           slug?: string
           status?: string
           title?: string
           trailer_url?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "experience_series_featured_experience_id_fkey"
+            columns: ["featured_experience_id"]
+            isOneToOne: false
+            referencedRelation: "immersive_experiences"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       experience_team_members: {
         Row: {

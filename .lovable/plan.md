@@ -1,77 +1,158 @@
-# Immersive Series Builder — Staged Implementation Plan
 
-## Guardrails (apply to every stage)
-- Do NOT modify existing routes, layout, navigation, branding, auth, or any admin section other than adding a new one.
-- Reuse: `AdminLayout`, `AdminGuard`, `useAdminAuth`, `user_roles` (`has_role`), `profiles`, existing storage buckets (`site-assets`, `audio-files`, `video-thumbnails`), `SmartImage`, `supabaseImageUrl`, existing sermon/series/media conventions.
-- All new admin routes live under `/admin/experiences/*` and register in `AdminLayout` nav as **"Immersive Experiences"** — a single new entry, nothing else touched.
-- All new public routes under `/experience/:slug` and `/series/:slug` — no conflict with `/sermons`, `/books`, `/blog`.
-- External video only (Vimeo / Mux / Cloudflare Stream / Bunny / YouTube). Store provider + playback ID; never upload masters to Supabase.
-- Every new `public.` table ships with GRANTs + RLS + policies in the same migration.
-- After each stage: build passes, existing pages verified, short changelog reported. Wait for approval before the next stage.
+# Watch Hub + Current-Series Homepage Feature
+
+Extends the existing Immersive Experiences system. No new tables where existing ones suffice; no redesign of the site or bottom bar shell.
 
 ---
 
-## Stage 1 — Database, roles, RLS
+## 1. Bottom navigation swap (in place)
 
-New tables (all with `created_at`, `updated_at`, `created_by uuid references auth.users`, `status` where relevant, proper indexes):
+File: `src/components/BottomNav.tsx`
 
-- `experience_series` — title, slug, description, artwork, trailer_url, order_index, status
-- `immersive_experiences` — series_id (nullable), title, slug (unique), short/long description, primary_scripture, supporting_scriptures (jsonb), speaker, release_date, premiere_at, runtime_seconds, category, audience, featured_image, mobile_image, cinematic_bg, trailer_url, video_provider, video_playback_id, video_url, poster, captions_url, transcript, ambient_audio_url, theme (jsonb), social_image, visibility (`public|members|private|scheduled`), status (`draft|scheduled|published|archived`), members_only bool, allow_download bool, view_count, published_at
-- `experience_scenes` — experience_id, order_index, scene_type (enum via check), title, internal_label, start_ts, end_ts, background_url, background_kind, ambient_audio_url, heading, body, scripture, scripture_ref, quote, animation, transition, overlay_opacity, text_align, cta (jsonb), mobile (jsonb), enabled bool
-- `experience_interactions` — experience_id, scene_id (nullable), kind, name, heading, body, appear_ts, expire_ts, duration_ms, required bool, button_label, destination, confirmation, follow_up (jsonb), audience, mobile (jsonb), anonymous_allowed bool, order_index
-- `experience_media` — experience_id (nullable), kind, url, storage_path, mime, width, height, duration, tags (text[]), title, notes
-- `experience_view_progress` — experience_id, user_id (nullable), anon_id, position_seconds, completed bool, last_seen_at, unique(experience_id, user_id) / (experience_id, anon_id)
-- `experience_events` — experience_id, user_id (nullable), anon_id, kind, ts, payload jsonb (analytics: start, drop, interaction_click, scripture_open, share, complete)
-- `experience_responses` — experience_id, interaction_id (nullable), user_id (nullable), anon_id, kind (`reflection|poll|amen|next_step|testimony|salvation|rededication|group|contact`), payload jsonb, is_private bool
-- `prayer_requests` — experience_id (nullable), user_id (nullable), anon_id, name, contact, message, urgency, status (`new|claimed|contacted|resolved`), claimed_by, private_notes, visibility (`private` default)
-- `prayer_assignments` — request_id, team_member_id, assigned_by, assigned_at, status
-- `experience_chat_messages` — experience_id, user_id, display_name, body, is_moderated, created_at
-- `experience_premieres` — experience_id, starts_at, ends_at, host_message, viewer_count_cached
-- `experience_team_members` — experience_id, user_id, role (`editor|prayer|host`)
+- Replace the `Sermons` tab with `Watch`, icon `PlayCircle`, route `/watch`.
+- Active state highlights on: `/watch`, `/watch/*`, `/experiences`, `/experiences/*`, `/series/*`.
+- Keep the existing fixed positioning, `env(safe-area-inset-bottom)` padding, `lg:hidden` scoping, and current styling.
+- Add optional small notification dot on the Watch icon when the signed-in viewer has unfinished experiences (reuses `experience_view_progress`) or when a new experience was published in the last 7 days. Cleared on visit to `/watch`.
+- Hide the bar when the immersive player is in browser fullscreen (listen to `fullscreenchange`); restore on exit. Implemented via a small `useIsFullscreen()` hook plus `hidden` class — no layout change.
 
-Roles: extend `app_role` enum with `content_editor` and `prayer_team` (if not present). All privileged writes gated by `has_role(auth.uid(), 'admin')` OR appropriate role. Prayer notes readable only by admin + prayer_team.
-
-Public read policy: only rows where `immersive_experiences.status = 'published'` AND visibility in (`public`,`scheduled`). Members-only rows filtered via existing `user_has_book_access`-style helper adapted to experiences (new `user_has_experience_access` security-definer function).
-
-Anonymous participation: `anon_id` (client-generated uuid stored in localStorage) accepted on progress/events/responses/prayer inserts with strict column allowlist; no reads back except own row via matching header (or just write-only insert policy).
-
-## Stage 2 — Admin Experiences Dashboard
-Route: `/admin/experiences`. Card + table view, search/filter/sort/duplicate/preview/edit/archive/delete. Add single sidebar entry "Immersive Experiences" to `AdminLayout` nav.
-
-## Stage 3 — Experience Editor + Media
-Route: `/admin/experiences/:id`. Tabbed editor (Details, Video, Media, Scenes, Timeline, Interactions, Response Room, Preview, Settings). Media library tab reads/writes `experience_media`, backed by `site-assets` bucket under `experiences/{id}/`. Autosave with debounce, draft indicator.
-
-## Stage 4 — Scene Builder + Timeline
-Drag-and-drop scene list (reuse `SortableChapterList` pattern). Timeline component maps scenes + interactions onto video duration; edit exact `appear_ts`. All scene types from spec available as templates.
-
-## Stage 5 — Public Cinematic Player
-Routes: `/experience/:slug`, `/series/:slug`. Fullscreen dark shell, cinematic entrance card → player. External-provider adapters (Vimeo / Mux / Cloudflare Stream / Bunny / YouTube / direct MP4). Timed overlays driven by `experience_interactions`. Progress save (auth or anon). Captions, keyboard, reduced-motion. Isolated from site chrome (no global `Layout`).
-
-## Stage 6 — Prayer, Response, Next-Step
-Response Room scene at end of experience. Private prayer flow → `prayer_requests`. Admin `/admin/experiences/prayer` dashboard for prayer_team + admin: claim, assign, notes, resolve.
-
-## Stage 7 — Premiere Lobby + Optional Chat
-Countdown + ambient lobby before `premiere_at`. Realtime chat via Supabase Realtime on `experience_chat_messages` (opt-in, collapsible). Enable publication only for that table.
-
-## Stage 8 — Analytics
-Admin analytics tab per experience: starts, unique viewers, avg watch, completion, drop-off, interaction clicks, responses, prayer count, region (from IP header hash, no PII), device. Backed by `experience_events`.
-
-## Stage 9 — "The Service Elevator" demo
-Seed one series + one experience with 11 scenes and placeholder media using the migration/insert tool. All content editable from admin.
-
-## Stage 10 — QA
-Responsive + a11y pass, `code--exec` build check, run `security--run_security_scan`, fix criticals, update security memory.
-
-## New routes summary
-Admin: `/admin/experiences`, `/admin/experiences/new`, `/admin/experiences/:id`, `/admin/experiences/prayer`, `/admin/experiences/series`
-Public: `/experience/:slug`, `/series/:slug`
-
-## Existing things reused (not modified)
-`AdminLayout`, `AdminGuard`, `AdminErrorBoundary`, `useAdminAuth`, `user_roles`+`has_role`, `profiles`, `SmartImage`, `supabaseImage.ts`, `supabaseUpload.ts`, existing buckets, existing toast/UI kit.
-
-## Nothing else changes
-No edits to Books, Sermons, Blog, Audiobooks, Graphics, Videos, CRM, Publisher, Auth, Login, Home, or any current admin page beyond adding the single nav entry.
+The old `useSermonsEnabled` kill-switch is preserved and now controls whether the Watch tab is visible (kept behavior consistent with the existing admin toggle).
 
 ---
 
-Reply "go" (or "start stage 1") and I'll ship Stage 1 (migration only) for approval, then proceed stage-by-stage.
+## 2. Database — extend existing tables
+
+Single migration. No new tables.
+
+`immersive_experiences` — add nullable columns:
+- `runtime_seconds int`
+- `trailer_url text`
+- `primary_scripture text`
+
+`experience_series` — add nullable columns:
+- `is_current_series boolean default false`
+- `is_featured boolean default false`
+- `featured_experience_id uuid` (FK → `immersive_experiences.id`, on delete set null)
+- `homepage_visible boolean default false`
+- `homepage_headline text`
+- `homepage_description text`
+- `homepage_artwork_url text`
+- `homepage_mobile_artwork_url text`
+- `homepage_preview_video_url text`
+- `trailer_url text`
+- `primary_watch_label text`
+- `secondary_watch_label text`
+- `display_start_at timestamptz`
+- `display_end_at timestamptz`
+- `featured_priority int default 0`
+
+A partial unique index enforces "only one primary current series at a time":
+```
+create unique index one_current_series
+  on public.experience_series ((true)) where is_current_series = true;
+```
+
+A `before update` trigger clears `is_current_series` on all other rows when one row is set to `true` (safety net for the UI).
+
+RLS/GRANTs on `experience_series` already exist; no change needed.
+
+---
+
+## 3. `/watch` — streaming-style landing
+
+New page `src/pages/Watch.tsx`. Sections, each hidden when empty:
+
+- **Current Featured Series** — hero from the series flagged `is_current_series` (Watch Now → `/experiences/:slug` of `featured_experience_id`; Explore Series → `/series/:slug`).
+- **Continue Watching** — signed-in only, from `experience_view_progress` where `completed = false`.
+- **Latest Experiences** — newest published.
+- **Upcoming Premiere** — nearest `experience_premieres.scheduled_at` in the future.
+- **Popular Experiences** — sorted by `view_count` on `immersive_experiences` (fallback: recent).
+- **Browse by Series** — grid from `experience_series` published.
+- **Browse by Topic** / **Browse by Scripture** — grouped chips using `topic_tags` / `primary_scripture` fields already present or added above.
+- **Recently Added** — last 30 days.
+
+Route: `/watch`. Sub-route `/watch/series/:slug` mirrors existing `/experiences/series/:slug` (kept working via alias, see §6). Card cover images use existing `SmartImage` component for performance.
+
+---
+
+## 4. Homepage current-series preview
+
+Component `src/components/home/CurrentSeriesFeature.tsx`, inserted in `src/pages/Index.tsx` directly under the hero (no other homepage changes).
+
+Data source: single query for the row where `is_current_series = true AND homepage_visible = true AND now() between coalesce(display_start_at,'-infinity') and coalesce(display_end_at,'infinity')`. If none: component returns null.
+
+Renders:
+- Desktop: wide cinematic band with artwork/preview video left, copy stack right.
+- Mobile: vertical card using `homepage_mobile_artwork_url` when present. Uses mobile artwork variable via CSS `<picture>` breakpoint.
+- Fields: headline, description, primary scripture, current message title, runtime, premiere info.
+- Buttons: **Watch Now** → `/experiences/:featured_experience_slug`; **View Series** → `/series/:series_slug`; **Watch Trailer** (only if `trailer_url` present, opens dialog); **Continue Watching** (only when signed-in and prior progress exists — deep-links to the experience).
+- Whole card is clickable (`<Link>` wrapping) but inner buttons stop event propagation.
+
+Video preview behavior:
+- Muted, loop, `playsInline`, `preload="metadata"` — only mounted on desktop (`matchMedia('(min-width: 1024px) and (prefers-reduced-motion: no-preference)')`) via `IntersectionObserver`; pauses off-viewport.
+- Otherwise poster image only. Never loads the full sermon video.
+
+---
+
+## 5. Admin controls
+
+Two touch points, in the existing admin surface — no new admin route trees.
+
+**`src/pages/admin/AdminSeries.tsx`** (existing) gains a "Homepage / Featured" section per row with:
+- Toggle: Primary current series (radio-like: setting one clears others, via trigger).
+- Toggle: Featured (non-primary spotlight).
+- Toggle: Show on homepage.
+- Toggle: Show on Watch page.
+- Select: Current featured experience (dropdown of series' published experiences).
+- Fields: Homepage headline, description, artwork URL (with existing upload), mobile artwork URL, preview video URL, trailer URL, primary/secondary button labels, display start/end, sort priority.
+
+**`src/pages/admin/AdminExperienceEditor.tsx`** Details tab gains: runtime (mm:ss), trailer URL, primary scripture.
+
+`useExperienceSeries.ts` hook extended with the new fields.
+
+---
+
+## 6. Route compatibility
+
+`src/App.tsx`:
+- Add `/watch` → `Watch.tsx`.
+- Add `/series/:slug` as an alias that renders the existing `ExperienceSeriesPage`.
+- Keep `/sermons` and `/sermons/:id` fully working (no deletion).
+- Add a small redirect: when the public `/sermons` list is opened, if the site setting `redirect_sermons_to_watch` is on (new site_settings key, default off unless admin opts in), it navigates to `/watch`. Individual sermon detail pages stay put so social/SEO links keep resolving.
+- Preserve old sermon content — no data changes.
+
+---
+
+## 7. Fullscreen bar behavior
+
+Small utility hook `src/hooks/useIsFullscreen.ts`. `BottomNav` reads it and applies `translate-y-full` transition when in fullscreen so it slides out cleanly and restores on exit.
+
+---
+
+## Technical notes
+
+- All new columns nullable / with safe defaults → no data migration.
+- One migration file; grants unchanged (columns added to existing tables).
+- No changes to auth, payments, or unrelated pages.
+- `Watch` page uses existing React Query hooks (`useExperiences`, `useExperienceSeriesList`, `useMyProgress`); adds one thin hook `useCurrentSeries()`.
+- Homepage feature lazy-loads video via `IntersectionObserver`; poster is `homepage_artwork_url`.
+- Sermons kill-switch (`useSermonsEnabled`) continues to gate Watch tab visibility, since Watch supersedes Sermons.
+
+---
+
+## Files touched
+
+```text
+supabase migration           (extend 2 tables, 1 trigger, 1 partial index)
+src/components/BottomNav.tsx
+src/hooks/useIsFullscreen.ts               (new)
+src/hooks/useCurrentSeries.ts              (new)
+src/hooks/useExperienceSeries.ts           (extend types)
+src/pages/Watch.tsx                        (new)
+src/components/home/CurrentSeriesFeature.tsx (new)
+src/pages/Index.tsx                        (insert feature under hero)
+src/pages/admin/AdminSeries.tsx            (extend form)
+src/pages/admin/AdminExperienceEditor.tsx  (3 fields)
+src/App.tsx                                (add /watch, /series/:slug)
+```
+
+Reply "go" and I will implement in this order: migration → bottom nav + hook → hooks/data → Watch page → homepage feature → admin controls → route aliases.

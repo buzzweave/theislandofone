@@ -16,6 +16,7 @@ import Index from "./pages/Index";
 const Books = lazy(() => import("./pages/Books"));
 const BookDetail = lazy(() => import("./pages/BookDetail"));
 const Sermons = lazy(() => import("./pages/Sermons"));
+const Watch = lazy(() => import("./pages/Watch"));
 const SermonDetail = lazy(() => import("./pages/SermonDetail"));
 const Videos = lazy(() => import("./pages/Videos"));
 const Graphics = lazy(() => import("./pages/Graphics"));
@@ -204,8 +205,10 @@ const App = () => (
                   <Route path="/login" element={<LazyLayout><Login /></LazyLayout>} />
                   <Route path="/redeem" element={<LazyLayout><RedeemCode /></LazyLayout>} />
                   <Route path="/donate" element={<LazyLayout><Donate /></LazyLayout>} />
+                  <Route path="/watch" element={<LazyLayout><Watch /></LazyLayout>} />
                   <Route path="/experiences" element={<LazyLayout><ExperiencesDiscovery /></LazyLayout>} />
                   <Route path="/experiences/series/:slug" element={<LazyLayout><ExperienceSeriesPage /></LazyLayout>} />
+                  <Route path="/series/:slug" element={<LazyLayout><ExperienceSeriesPage /></LazyLayout>} />
                   <Route path="/my/experiences" element={<LazyLayout><MyExperiences /></LazyLayout>} />
                   <Route path="/experiences/:slug" element={<Suspense fallback={<PageFallback />}><ExperiencePlayer /></Suspense>} />
                   <Route path="/prayer-wall" element={<LazyLayout><PrayerWall /></LazyLayout>} />

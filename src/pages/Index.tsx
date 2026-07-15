@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useSermonsEnabled } from "@/hooks/useSermonsEnabled";
 import { supabaseImageUrl, supabaseImageSrcSet } from "@/lib/supabaseImage";
+import CurrentSeriesFeature from "@/components/home/CurrentSeriesFeature";
 
 const SubscribeForm = lazy(() => import("@/components/SubscribeForm"));
 
@@ -522,6 +523,9 @@ export default function Index() {
     <div>
       {/* HERO — eagerly loaded, above fold */}
       <HeroCarousel />
+
+      {/* CURRENT IMMERSIVE SERIES — admin-controlled, hides itself when unset */}
+      <CurrentSeriesFeature />
 
       {/* FEATURED BOOKS — eagerly loaded, first content section */}
       <FeaturedBooksSection />
