@@ -102,10 +102,15 @@ export default function AdminExperiences() {
             Cinematic services, teachings, and interactive moments. Publish to <code>/experience/[slug]</code>.
           </p>
         </div>
-        <Button onClick={handleCreate} disabled={createMut.isPending}>
-          {createMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />}
-          New Experience
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link to="/admin/experiences/series">Manage Series</Link>
+          </Button>
+          <Button onClick={handleCreate} disabled={createMut.isPending}>
+            {createMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />}
+            New Experience
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-2">
