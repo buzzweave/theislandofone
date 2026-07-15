@@ -232,14 +232,27 @@ export default function ExperiencePlayer() {
   }
 
   const bg = scene?.background_url || experience.cinematic_bg || experience.featured_image;
-  const bgKind = scene?.background_kind ?? (bg && /\.(mp4|webm|mov)$/i.test(bg) ? "video" : "image");
+  const ytEmbed = toYouTubeEmbed(bg, { autoplay: true, muted: true, loop: true, controls: false });
+  const bgKind = ytEmbed
+    ? "youtube"
+    : (scene?.background_kind ?? (bg && /\.(mp4|webm|mov)$/i.test(bg) ? "video" : "image"));
   const ambient = scene?.ambient_audio_url || experience.ambient_audio_url;
 
   return (
     <>
       <div className="fixed inset-0 bg-black text-white overflow-hidden">
         {/* Background */}
-        {bg && bgKind === "video" ? (
+        {bg && bgKind === "youtube" ? (
+          <iframe
+            key={bg}
+            src={ytEmbed!}
+            title="Background video"
+            allow="autoplay; encrypted-media; picture-in-picture"
+            allowFullScreen
+            className="absolute inset-0 h-full w-full pointer-events-none"
+            style={{ border: 0 }}
+          />
+        ) : bg && bgKind === "video" ? (
           <video key={bg} src={bg} autoPlay muted={muted} loop playsInline
             className="absolute inset-0 h-full w-full object-cover" />
         ) : bg ? (
