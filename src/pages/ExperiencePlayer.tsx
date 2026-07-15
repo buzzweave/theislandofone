@@ -302,7 +302,7 @@ export default function ExperiencePlayer() {
                       key={i.id}
                       variant="secondary"
                       className="bg-white/15 hover:bg-white/25 text-white border border-white/20 backdrop-blur"
-                      onClick={() => handleInteraction(i.id, i.kind, i.destination)}
+                      onClick={() => handleInteraction(i)}
                     >
                       {i.button_label || i.heading || "Continue"}
                     </Button>
