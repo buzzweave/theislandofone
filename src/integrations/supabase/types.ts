@@ -670,6 +670,533 @@ export type Database = {
         }
         Relationships: []
       }
+      experience_chat_messages: {
+        Row: {
+          body: string
+          created_at: string
+          display_name: string | null
+          experience_id: string
+          id: string
+          is_moderated: boolean
+          user_id: string | null
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          display_name?: string | null
+          experience_id: string
+          id?: string
+          is_moderated?: boolean
+          user_id?: string | null
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          display_name?: string | null
+          experience_id?: string
+          id?: string
+          is_moderated?: boolean
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experience_chat_messages_experience_id_fkey"
+            columns: ["experience_id"]
+            isOneToOne: false
+            referencedRelation: "immersive_experiences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      experience_events: {
+        Row: {
+          anon_id: string | null
+          experience_id: string
+          id: string
+          kind: string
+          payload: Json
+          ts: string
+          user_id: string | null
+        }
+        Insert: {
+          anon_id?: string | null
+          experience_id: string
+          id?: string
+          kind: string
+          payload?: Json
+          ts?: string
+          user_id?: string | null
+        }
+        Update: {
+          anon_id?: string | null
+          experience_id?: string
+          id?: string
+          kind?: string
+          payload?: Json
+          ts?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experience_events_experience_id_fkey"
+            columns: ["experience_id"]
+            isOneToOne: false
+            referencedRelation: "immersive_experiences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      experience_interactions: {
+        Row: {
+          anonymous_allowed: boolean
+          appear_ts: number | null
+          audience: string | null
+          body: string | null
+          button_label: string | null
+          confirmation: string | null
+          created_at: string
+          destination: string | null
+          duration_ms: number | null
+          experience_id: string
+          expire_ts: number | null
+          follow_up: Json
+          heading: string | null
+          id: string
+          kind: string
+          mobile: Json
+          name: string | null
+          order_index: number
+          required: boolean
+          scene_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          anonymous_allowed?: boolean
+          appear_ts?: number | null
+          audience?: string | null
+          body?: string | null
+          button_label?: string | null
+          confirmation?: string | null
+          created_at?: string
+          destination?: string | null
+          duration_ms?: number | null
+          experience_id: string
+          expire_ts?: number | null
+          follow_up?: Json
+          heading?: string | null
+          id?: string
+          kind: string
+          mobile?: Json
+          name?: string | null
+          order_index?: number
+          required?: boolean
+          scene_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          anonymous_allowed?: boolean
+          appear_ts?: number | null
+          audience?: string | null
+          body?: string | null
+          button_label?: string | null
+          confirmation?: string | null
+          created_at?: string
+          destination?: string | null
+          duration_ms?: number | null
+          experience_id?: string
+          expire_ts?: number | null
+          follow_up?: Json
+          heading?: string | null
+          id?: string
+          kind?: string
+          mobile?: Json
+          name?: string | null
+          order_index?: number
+          required?: boolean
+          scene_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experience_interactions_experience_id_fkey"
+            columns: ["experience_id"]
+            isOneToOne: false
+            referencedRelation: "immersive_experiences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experience_interactions_scene_id_fkey"
+            columns: ["scene_id"]
+            isOneToOne: false
+            referencedRelation: "experience_scenes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      experience_media: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          duration: number | null
+          experience_id: string | null
+          height: number | null
+          id: string
+          kind: string
+          mime: string | null
+          notes: string | null
+          storage_path: string | null
+          tags: string[]
+          title: string | null
+          updated_at: string
+          url: string
+          width: number | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          duration?: number | null
+          experience_id?: string | null
+          height?: number | null
+          id?: string
+          kind: string
+          mime?: string | null
+          notes?: string | null
+          storage_path?: string | null
+          tags?: string[]
+          title?: string | null
+          updated_at?: string
+          url: string
+          width?: number | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          duration?: number | null
+          experience_id?: string | null
+          height?: number | null
+          id?: string
+          kind?: string
+          mime?: string | null
+          notes?: string | null
+          storage_path?: string | null
+          tags?: string[]
+          title?: string | null
+          updated_at?: string
+          url?: string
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experience_media_experience_id_fkey"
+            columns: ["experience_id"]
+            isOneToOne: false
+            referencedRelation: "immersive_experiences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      experience_premieres: {
+        Row: {
+          created_at: string
+          ends_at: string | null
+          experience_id: string
+          host_message: string | null
+          id: string
+          starts_at: string
+          updated_at: string
+          viewer_count_cached: number
+        }
+        Insert: {
+          created_at?: string
+          ends_at?: string | null
+          experience_id: string
+          host_message?: string | null
+          id?: string
+          starts_at: string
+          updated_at?: string
+          viewer_count_cached?: number
+        }
+        Update: {
+          created_at?: string
+          ends_at?: string | null
+          experience_id?: string
+          host_message?: string | null
+          id?: string
+          starts_at?: string
+          updated_at?: string
+          viewer_count_cached?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experience_premieres_experience_id_fkey"
+            columns: ["experience_id"]
+            isOneToOne: false
+            referencedRelation: "immersive_experiences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      experience_responses: {
+        Row: {
+          anon_id: string | null
+          created_at: string
+          experience_id: string
+          id: string
+          interaction_id: string | null
+          is_private: boolean
+          kind: string
+          payload: Json
+          user_id: string | null
+        }
+        Insert: {
+          anon_id?: string | null
+          created_at?: string
+          experience_id: string
+          id?: string
+          interaction_id?: string | null
+          is_private?: boolean
+          kind: string
+          payload?: Json
+          user_id?: string | null
+        }
+        Update: {
+          anon_id?: string | null
+          created_at?: string
+          experience_id?: string
+          id?: string
+          interaction_id?: string | null
+          is_private?: boolean
+          kind?: string
+          payload?: Json
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experience_responses_experience_id_fkey"
+            columns: ["experience_id"]
+            isOneToOne: false
+            referencedRelation: "immersive_experiences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experience_responses_interaction_id_fkey"
+            columns: ["interaction_id"]
+            isOneToOne: false
+            referencedRelation: "experience_interactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      experience_scenes: {
+        Row: {
+          ambient_audio_url: string | null
+          animation: string | null
+          background_kind: string | null
+          background_url: string | null
+          body: string | null
+          created_at: string
+          cta: Json
+          enabled: boolean
+          end_ts: number | null
+          experience_id: string
+          heading: string | null
+          id: string
+          internal_label: string | null
+          mobile: Json
+          order_index: number
+          overlay_opacity: number | null
+          quote: string | null
+          scene_type: string
+          scripture: string | null
+          scripture_ref: string | null
+          start_ts: number | null
+          text_align: string | null
+          title: string | null
+          transition: string | null
+          updated_at: string
+        }
+        Insert: {
+          ambient_audio_url?: string | null
+          animation?: string | null
+          background_kind?: string | null
+          background_url?: string | null
+          body?: string | null
+          created_at?: string
+          cta?: Json
+          enabled?: boolean
+          end_ts?: number | null
+          experience_id: string
+          heading?: string | null
+          id?: string
+          internal_label?: string | null
+          mobile?: Json
+          order_index?: number
+          overlay_opacity?: number | null
+          quote?: string | null
+          scene_type?: string
+          scripture?: string | null
+          scripture_ref?: string | null
+          start_ts?: number | null
+          text_align?: string | null
+          title?: string | null
+          transition?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ambient_audio_url?: string | null
+          animation?: string | null
+          background_kind?: string | null
+          background_url?: string | null
+          body?: string | null
+          created_at?: string
+          cta?: Json
+          enabled?: boolean
+          end_ts?: number | null
+          experience_id?: string
+          heading?: string | null
+          id?: string
+          internal_label?: string | null
+          mobile?: Json
+          order_index?: number
+          overlay_opacity?: number | null
+          quote?: string | null
+          scene_type?: string
+          scripture?: string | null
+          scripture_ref?: string | null
+          start_ts?: number | null
+          text_align?: string | null
+          title?: string | null
+          transition?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experience_scenes_experience_id_fkey"
+            columns: ["experience_id"]
+            isOneToOne: false
+            referencedRelation: "immersive_experiences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      experience_series: {
+        Row: {
+          artwork_url: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          order_index: number
+          slug: string
+          status: string
+          title: string
+          trailer_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          artwork_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          order_index?: number
+          slug: string
+          status?: string
+          title: string
+          trailer_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          artwork_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          order_index?: number
+          slug?: string
+          status?: string
+          title?: string
+          trailer_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      experience_team_members: {
+        Row: {
+          created_at: string
+          experience_id: string
+          id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          experience_id: string
+          id?: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          experience_id?: string
+          id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experience_team_members_experience_id_fkey"
+            columns: ["experience_id"]
+            isOneToOne: false
+            referencedRelation: "immersive_experiences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      experience_view_progress: {
+        Row: {
+          anon_id: string | null
+          completed: boolean
+          created_at: string
+          experience_id: string
+          id: string
+          last_seen_at: string
+          position_seconds: number
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          anon_id?: string | null
+          completed?: boolean
+          created_at?: string
+          experience_id: string
+          id?: string
+          last_seen_at?: string
+          position_seconds?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          anon_id?: string | null
+          completed?: boolean
+          created_at?: string
+          experience_id?: string
+          id?: string
+          last_seen_at?: string
+          position_seconds?: number
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experience_view_progress_experience_id_fkey"
+            columns: ["experience_id"]
+            isOneToOne: false
+            referencedRelation: "immersive_experiences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       forum_categories: {
         Row: {
           created_at: string
@@ -939,6 +1466,134 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      immersive_experiences: {
+        Row: {
+          allow_download: boolean
+          ambient_audio_url: string | null
+          audience: string | null
+          captions_url: string | null
+          category: string | null
+          cinematic_bg: string | null
+          created_at: string
+          created_by: string | null
+          featured_image: string | null
+          id: string
+          long_description: string | null
+          members_only: boolean
+          mobile_image: string | null
+          order_index: number
+          poster_url: string | null
+          premiere_at: string | null
+          primary_scripture: string | null
+          published_at: string | null
+          release_date: string | null
+          runtime_seconds: number | null
+          series_id: string | null
+          short_description: string | null
+          slug: string
+          social_image: string | null
+          speaker: string | null
+          status: string
+          supporting_scriptures: Json
+          theme: Json
+          title: string
+          trailer_url: string | null
+          transcript: string | null
+          updated_at: string
+          video_playback_id: string | null
+          video_provider: string | null
+          video_url: string | null
+          view_count: number
+          visibility: string
+        }
+        Insert: {
+          allow_download?: boolean
+          ambient_audio_url?: string | null
+          audience?: string | null
+          captions_url?: string | null
+          category?: string | null
+          cinematic_bg?: string | null
+          created_at?: string
+          created_by?: string | null
+          featured_image?: string | null
+          id?: string
+          long_description?: string | null
+          members_only?: boolean
+          mobile_image?: string | null
+          order_index?: number
+          poster_url?: string | null
+          premiere_at?: string | null
+          primary_scripture?: string | null
+          published_at?: string | null
+          release_date?: string | null
+          runtime_seconds?: number | null
+          series_id?: string | null
+          short_description?: string | null
+          slug: string
+          social_image?: string | null
+          speaker?: string | null
+          status?: string
+          supporting_scriptures?: Json
+          theme?: Json
+          title: string
+          trailer_url?: string | null
+          transcript?: string | null
+          updated_at?: string
+          video_playback_id?: string | null
+          video_provider?: string | null
+          video_url?: string | null
+          view_count?: number
+          visibility?: string
+        }
+        Update: {
+          allow_download?: boolean
+          ambient_audio_url?: string | null
+          audience?: string | null
+          captions_url?: string | null
+          category?: string | null
+          cinematic_bg?: string | null
+          created_at?: string
+          created_by?: string | null
+          featured_image?: string | null
+          id?: string
+          long_description?: string | null
+          members_only?: boolean
+          mobile_image?: string | null
+          order_index?: number
+          poster_url?: string | null
+          premiere_at?: string | null
+          primary_scripture?: string | null
+          published_at?: string | null
+          release_date?: string | null
+          runtime_seconds?: number | null
+          series_id?: string | null
+          short_description?: string | null
+          slug?: string
+          social_image?: string | null
+          speaker?: string | null
+          status?: string
+          supporting_scriptures?: Json
+          theme?: Json
+          title?: string
+          trailer_url?: string | null
+          transcript?: string | null
+          updated_at?: string
+          video_playback_id?: string | null
+          video_provider?: string | null
+          video_url?: string | null
+          view_count?: number
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "immersive_experiences_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "experience_series"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       invitations: {
         Row: {
@@ -1281,6 +1936,106 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      prayer_assignments: {
+        Row: {
+          assigned_at: string
+          assigned_by: string | null
+          created_at: string
+          id: string
+          request_id: string
+          status: string
+          team_member_id: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by?: string | null
+          created_at?: string
+          id?: string
+          request_id: string
+          status?: string
+          team_member_id: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string | null
+          created_at?: string
+          id?: string
+          request_id?: string
+          status?: string
+          team_member_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prayer_assignments_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "prayer_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prayer_requests: {
+        Row: {
+          anon_id: string | null
+          claimed_by: string | null
+          contact: string | null
+          created_at: string
+          experience_id: string | null
+          id: string
+          message: string
+          name: string | null
+          private_notes: string | null
+          status: string
+          updated_at: string
+          urgency: string | null
+          user_id: string | null
+          visibility: string
+        }
+        Insert: {
+          anon_id?: string | null
+          claimed_by?: string | null
+          contact?: string | null
+          created_at?: string
+          experience_id?: string | null
+          id?: string
+          message: string
+          name?: string | null
+          private_notes?: string | null
+          status?: string
+          updated_at?: string
+          urgency?: string | null
+          user_id?: string | null
+          visibility?: string
+        }
+        Update: {
+          anon_id?: string | null
+          claimed_by?: string | null
+          contact?: string | null
+          created_at?: string
+          experience_id?: string | null
+          id?: string
+          message?: string
+          name?: string | null
+          private_notes?: string | null
+          status?: string
+          updated_at?: string
+          urgency?: string | null
+          user_id?: string | null
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prayer_requests_experience_id_fkey"
+            columns: ["experience_id"]
+            isOneToOne: false
+            referencedRelation: "immersive_experiences"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -2054,8 +2809,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_experience_editor: { Args: { _user_id: string }; Returns: boolean }
+      is_prayer_team: { Args: { _user_id: string }; Returns: boolean }
       user_has_book_access: {
         Args: { _book_access_tiers: string[]; _user_id: string }
+        Returns: boolean
+      }
+      user_has_experience_access: {
+        Args: { _experience_id: string; _user_id: string }
         Returns: boolean
       }
     }
