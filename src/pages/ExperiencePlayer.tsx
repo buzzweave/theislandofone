@@ -23,6 +23,8 @@ export default function ExperiencePlayer() {
   const { data: experience, isLoading } = useExperienceBySlug(slug);
   const { data: scenes = [] } = useScenes(experience?.id);
   const { data: interactions = [] } = useInteractions(experience?.id);
+  const { data: isSaved = false } = useIsSaved(experience?.id);
+  const toggleSaved = useToggleSavedExperience();
 
   const activeScenes = useMemo(() => scenes.filter((s) => s.enabled), [scenes]);
   const [idx, setIdx] = useState(0);
