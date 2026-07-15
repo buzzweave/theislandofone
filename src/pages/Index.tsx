@@ -523,6 +523,9 @@ export default function Index() {
       {/* HERO — eagerly loaded, above fold */}
       <HeroCarousel />
 
+      {/* CURRENT IMMERSIVE SERIES — admin-controlled, hides itself when unset */}
+      <CurrentSeriesFeature />
+
       {/* FEATURED BOOKS — eagerly loaded, first content section */}
       <FeaturedBooksSection />
 
