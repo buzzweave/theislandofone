@@ -68,6 +68,7 @@ const AdminCRM = lazy(() => import("./pages/admin/AdminCRM"));
 const AdminPlaceholder = lazy(() => import("./pages/admin/AdminPlaceholder"));
 const AdminExperiences = lazy(() => import("./pages/admin/AdminExperiences"));
 const AdminExperienceEditor = lazy(() => import("./pages/admin/AdminExperienceEditor"));
+const ExperiencePlayer = lazy(() => import("./pages/ExperiencePlayer"));
 
 const VideoStudio = lazy(() => import("./pages/admin/VideoStudio"));
 const VideoLibrary = lazy(() => import("./pages/admin/VideoLibrary"));
@@ -198,6 +199,7 @@ const App = () => (
                   <Route path="/login" element={<LazyLayout><Login /></LazyLayout>} />
                   <Route path="/redeem" element={<LazyLayout><RedeemCode /></LazyLayout>} />
                   <Route path="/donate" element={<LazyLayout><Donate /></LazyLayout>} />
+                  <Route path="/experiences/:slug" element={<Suspense fallback={<PageFallback />}><ExperiencePlayer /></Suspense>} />
 
                   {/* Admin */}
                   <Route path="/admin/login" element={<Suspense fallback={<PageFallback />}><AdminLogin /></Suspense>} />
