@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { Loader2, ChevronLeft, ChevronRight, Volume2, VolumeX, X, Play, Pause, HeartHandshake } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, Volume2, VolumeX, X, Play, Pause, HeartHandshake, Bookmark, BookmarkCheck } from "lucide-react";
+import { useIsSaved, useToggleSavedExperience } from "@/hooks/useSavedExperiences";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
