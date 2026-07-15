@@ -1,11 +1,17 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { Loader2, ChevronLeft, ChevronRight, Volume2, VolumeX, X, Play, Pause } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, Volume2, VolumeX, X, Play, Pause, HeartHandshake } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 // document title handled via effect below
 import { useExperienceBySlug } from "@/hooks/useExperiences";
 import { useScenes } from "@/hooks/useExperienceScenes";
-import { useInteractions } from "@/hooks/useExperienceInteractions";
+import { useInteractions, type ExperienceInteraction } from "@/hooks/useExperienceInteractions";
+import { useCreatePrayerRequest } from "@/hooks/usePrayerRequests";
 import { logExperienceEvent, upsertViewProgress } from "@/lib/experienceAnalytics";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
