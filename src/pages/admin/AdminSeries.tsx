@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Loader2, Edit, Trash2, Layers, ExternalLink } from "lucide-react";
+import { Plus, Loader2, Edit, Trash2, Layers, ExternalLink, Star, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger,
 } from "@/components/ui/dialog";
@@ -20,6 +22,7 @@ import {
   useDeleteSeries,
   type ExperienceSeries,
 } from "@/hooks/useExperienceSeries";
+import { useExperiences } from "@/hooks/useExperiences";
 
 function slugify(s: string) {
   return s.toLowerCase().replace(/[^a-z0-9\s-]/g, "").trim().replace(/\s+/g, "-").slice(0, 80)
@@ -29,6 +32,9 @@ function slugify(s: string) {
 const emptyForm: Partial<ExperienceSeries> = {
   title: "", slug: "", description: "", artwork_url: "", trailer_url: "",
   order_index: 0, status: "draft",
+  is_current_series: false, is_featured: false, homepage_visible: false, show_on_watch: true,
+  primary_watch_label: "Watch Experience", secondary_watch_label: "View Series",
+  featured_priority: 0,
 };
 
 export default function AdminSeries() {
