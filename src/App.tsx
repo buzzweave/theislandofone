@@ -69,6 +69,9 @@ const AdminPlaceholder = lazy(() => import("./pages/admin/AdminPlaceholder"));
 const AdminExperiences = lazy(() => import("./pages/admin/AdminExperiences"));
 const AdminExperienceEditor = lazy(() => import("./pages/admin/AdminExperienceEditor"));
 const ExperiencePlayer = lazy(() => import("./pages/ExperiencePlayer"));
+const ExperiencesDiscovery = lazy(() => import("./pages/ExperiencesDiscovery"));
+const ExperienceSeriesPage = lazy(() => import("./pages/ExperienceSeriesPage"));
+const AdminSeries = lazy(() => import("./pages/admin/AdminSeries"));
 
 const VideoStudio = lazy(() => import("./pages/admin/VideoStudio"));
 const VideoLibrary = lazy(() => import("./pages/admin/VideoLibrary"));
@@ -199,6 +202,8 @@ const App = () => (
                   <Route path="/login" element={<LazyLayout><Login /></LazyLayout>} />
                   <Route path="/redeem" element={<LazyLayout><RedeemCode /></LazyLayout>} />
                   <Route path="/donate" element={<LazyLayout><Donate /></LazyLayout>} />
+                  <Route path="/experiences" element={<LazyLayout><ExperiencesDiscovery /></LazyLayout>} />
+                  <Route path="/experiences/series/:slug" element={<LazyLayout><ExperienceSeriesPage /></LazyLayout>} />
                   <Route path="/experiences/:slug" element={<Suspense fallback={<PageFallback />}><ExperiencePlayer /></Suspense>} />
 
                   {/* Admin */}
@@ -237,6 +242,7 @@ const App = () => (
                     <Route path="video-studio" element={<VideoStudio />} />
                     <Route path="video-library" element={<VideoLibrary />} />
                     <Route path="experiences" element={<AdminExperiences />} />
+                    <Route path="experiences/series" element={<AdminSeries />} />
                     <Route path="experiences/:id" element={<AdminExperienceEditor />} />
                     <Route path="ai-developer" element={<AIDevDashboard />} />
                     <Route path="ai-developer/console" element={<AIDevConsole />} />

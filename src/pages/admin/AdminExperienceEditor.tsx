@@ -18,6 +18,7 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useExperience, useUpdateExperience, type ImmersiveExperience } from "@/hooks/useExperiences";
+import { useExperienceSeriesList } from "@/hooks/useExperienceSeries";
 import {
   useScenes, useCreateScene, useUpdateScene, useDeleteScene, type ExperienceScene,
 } from "@/hooks/useExperienceScenes";
@@ -107,6 +108,7 @@ function EditorInner({ experience }: { experience: ImmersiveExperience }) {
 function DetailsPanel({ experience }: { experience: ImmersiveExperience }) {
   const [form, setForm] = useState({ ...experience });
   const update = useUpdateExperience();
+  const { data: seriesList = [] } = useExperienceSeriesList();
   useEffect(() => setForm({ ...experience }), [experience.id]);
   const set = <K extends keyof ImmersiveExperience>(k: K, v: ImmersiveExperience[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -117,6 +119,7 @@ function DetailsPanel({ experience }: { experience: ImmersiveExperience }) {
         id: experience.id,
         title: form.title,
         slug: form.slug,
+        series_id: form.series_id,
         short_description: form.short_description,
         long_description: form.long_description,
         primary_scripture: form.primary_scripture,
@@ -141,6 +144,20 @@ function DetailsPanel({ experience }: { experience: ImmersiveExperience }) {
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Title"><Input value={form.title} onChange={(e) => set("title", e.target.value)} /></Field>
         <Field label="Slug"><Input value={form.slug} onChange={(e) => set("slug", e.target.value)} /></Field>
+        <Field label="Series">
+          <Select
+            value={form.series_id ?? "__none__"}
+            onValueChange={(v) => set("series_id", v === "__none__" ? null : (v as any))}
+          >
+            <SelectTrigger><SelectValue placeholder="No series" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">— No series —</SelectItem>
+              {seriesList.map((s) => (
+                <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
         <Field label="Speaker"><Input value={form.speaker ?? ""} onChange={(e) => set("speaker", e.target.value)} /></Field>
         <Field label="Category"><Input value={form.category ?? ""} onChange={(e) => set("category", e.target.value)} /></Field>
         <Field label="Audience"><Input value={form.audience ?? ""} onChange={(e) => set("audience", e.target.value)} /></Field>
