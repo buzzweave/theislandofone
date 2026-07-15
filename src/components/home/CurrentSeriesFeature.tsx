@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCurrentSeries } from "@/hooks/useCurrentSeries";
 import { supabase } from "@/integrations/supabase/client";
+import { isYouTubeUrl, toYouTubeEmbed } from "@/lib/youtube";
 
 function formatRuntime(seconds: number | null | undefined) {
   if (!seconds) return null;
@@ -105,7 +106,9 @@ export default function CurrentSeriesFeature() {
     fn?.();
   };
 
-  const showVideo = desktop && !reducedMotion && !!preview;
+  const previewIsYouTube = isYouTubeUrl(preview);
+  const showVideo = desktop && !reducedMotion && !!preview && !previewIsYouTube;
+  const showYouTubePreview = desktop && !reducedMotion && previewIsYouTube;
 
   return (
     <section className="relative bg-background border-b border-border/40" aria-label="Current series">
@@ -137,6 +140,15 @@ export default function CurrentSeriesFeature() {
               playsInline
               preload="metadata"
               className="absolute inset-0 h-full w-full object-cover opacity-90"
+            />
+          )}
+          {showYouTubePreview && (
+            <iframe
+              src={toYouTubeEmbed(preview, { autoplay: true, muted: true, loop: true, controls: false }) || undefined}
+              title="Preview"
+              className="absolute inset-0 h-full w-full pointer-events-none opacity-90"
+              allow="autoplay; encrypted-media"
+              tabIndex={-1}
             />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-background/10 md:bg-gradient-to-r md:from-background md:via-background/80 md:to-transparent" />
@@ -207,7 +219,7 @@ export default function CurrentSeriesFeature() {
                 <video src={trailer} controls autoPlay className="h-full w-full" />
               ) : (
                 <iframe
-                  src={trailer}
+                  src={toYouTubeEmbed(trailer, { autoplay: true, controls: true }) || trailer}
                   className="h-full w-full"
                   allow="autoplay; encrypted-media; fullscreen"
                   allowFullScreen
