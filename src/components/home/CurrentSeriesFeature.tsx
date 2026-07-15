@@ -106,7 +106,9 @@ export default function CurrentSeriesFeature() {
     fn?.();
   };
 
-  const showVideo = desktop && !reducedMotion && !!preview;
+  const previewIsYouTube = isYouTubeUrl(preview);
+  const showVideo = desktop && !reducedMotion && !!preview && !previewIsYouTube;
+  const showYouTubePreview = desktop && !reducedMotion && previewIsYouTube;
 
   return (
     <section className="relative bg-background border-b border-border/40" aria-label="Current series">
