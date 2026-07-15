@@ -33,6 +33,14 @@ export default function ExperiencePlayer() {
   const prev = useCallback(() => setIdx((i) => Math.max(0, i - 1)), []);
 
   // View start
+  // Document title
+  useEffect(() => {
+    if (!experience) return;
+    const prev = document.title;
+    document.title = `${experience.title} · Immersive`;
+    return () => { document.title = prev; };
+  }, [experience?.title]);
+
   useEffect(() => {
     if (!experience) return;
     startedAt.current = Date.now();
