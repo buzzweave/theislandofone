@@ -206,6 +206,7 @@ const App = () => (
                   <Route path="/donate" element={<LazyLayout><Donate /></LazyLayout>} />
                   <Route path="/experiences" element={<LazyLayout><ExperiencesDiscovery /></LazyLayout>} />
                   <Route path="/experiences/series/:slug" element={<LazyLayout><ExperienceSeriesPage /></LazyLayout>} />
+                  <Route path="/my/experiences" element={<LazyLayout><MyExperiences /></LazyLayout>} />
                   <Route path="/experiences/:slug" element={<Suspense fallback={<PageFallback />}><ExperiencePlayer /></Suspense>} />
                   <Route path="/prayer-wall" element={<LazyLayout><PrayerWall /></LazyLayout>} />
 
