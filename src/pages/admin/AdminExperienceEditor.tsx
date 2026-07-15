@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   ArrowLeft, Loader2, Save, Upload, Trash2, Plus, ChevronUp, ChevronDown,
-  Film, Layers, Sparkles, Eye, MousePointerClick, Image as ImageIcon, Clock,
+  Film, Layers, Sparkles, Eye, MousePointerClick, Image as ImageIcon, Clock, BarChart3, ExternalLink,
 } from "lucide-react";
 import TimelinePanel from "./experience/TimelinePanel";
+import AnalyticsPanel from "./experience/AnalyticsPanel";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
