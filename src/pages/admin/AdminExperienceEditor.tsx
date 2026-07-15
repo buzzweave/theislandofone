@@ -90,8 +90,6 @@ function EditorInner({ experience }: { experience: ImmersiveExperience }) {
           <TabsTrigger value="timeline"><Clock className="h-4 w-4 mr-1" />Timeline</TabsTrigger>
           <TabsTrigger value="interactions"><MousePointerClick className="h-4 w-4 mr-1" />Interactions</TabsTrigger>
           <TabsTrigger value="preview"><Eye className="h-4 w-4 mr-1" />Preview</TabsTrigger>
-          <TabsTrigger value="analytics"><BarChart3 className="h-4 w-4 mr-1" />Analytics</TabsTrigger>
-        </TabsList>
           <TabsTrigger value="responses"><MessageCircle className="h-4 w-4 mr-1" />Responses</TabsTrigger>
           <TabsTrigger value="prayer"><HeartHandshake className="h-4 w-4 mr-1" />Prayer Wall</TabsTrigger>
           <TabsTrigger value="analytics"><BarChart3 className="h-4 w-4 mr-1" />Analytics</TabsTrigger>
