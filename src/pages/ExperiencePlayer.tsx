@@ -15,6 +15,7 @@ import { useInteractions, type ExperienceInteraction } from "@/hooks/useExperien
 import { useCreatePrayerRequest } from "@/hooks/usePrayerRequests";
 import { logExperienceEvent, upsertViewProgress } from "@/lib/experienceAnalytics";
 import { supabase } from "@/integrations/supabase/client";
+import { toYouTubeEmbed } from "@/lib/youtube";
 import { toast } from "sonner";
 
 export default function ExperiencePlayer() {
