@@ -12,6 +12,22 @@ export interface ExperienceSeries {
   status: string;
   created_at: string;
   updated_at: string;
+  // Watch / homepage feature fields
+  is_current_series?: boolean;
+  is_featured?: boolean;
+  featured_experience_id?: string | null;
+  homepage_visible?: boolean;
+  show_on_watch?: boolean;
+  homepage_headline?: string | null;
+  homepage_description?: string | null;
+  homepage_artwork_url?: string | null;
+  homepage_mobile_artwork_url?: string | null;
+  homepage_preview_video_url?: string | null;
+  primary_watch_label?: string | null;
+  secondary_watch_label?: string | null;
+  display_start_at?: string | null;
+  display_end_at?: string | null;
+  featured_priority?: number;
 }
 
 export function useExperienceSeriesList(options?: { publishedOnly?: boolean }) {
