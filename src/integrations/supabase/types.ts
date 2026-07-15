@@ -2088,6 +2088,35 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_experiences: {
+        Row: {
+          created_at: string
+          experience_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          experience_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          experience_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_experiences_experience_id_fkey"
+            columns: ["experience_id"]
+            isOneToOne: false
+            referencedRelation: "immersive_experiences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sermons: {
         Row: {
           access_level: string
