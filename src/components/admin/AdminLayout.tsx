@@ -36,7 +36,7 @@ import {
   UserCheck,
   CreditCard,
   KeyRound,
-} from "lucide-react";
+  Sparkles,
 import AISidebar from "./AISidebar";
 import NotificationBell from "./NotificationBell";
 import { useIsMobile } from "@/hooks/use-mobile";
