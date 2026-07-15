@@ -158,6 +158,108 @@ export default function AdminSeries() {
                     </Select>
                   </div>
                 </div>
+
+                {/* Featured / Current Series controls */}
+                <div className="pt-3 border-t space-y-3">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                    <Star className="h-3.5 w-3.5" /> Featured & Current Series
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="s-current" className="text-sm">Primary current series</Label>
+                    <Switch id="s-current" checked={!!form.is_current_series}
+                      onCheckedChange={(v) => setForm((f) => ({ ...f, is_current_series: v, is_featured: v || f.is_featured }))} />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="s-feat" className="text-sm">Featured (Watch hub)</Label>
+                    <Switch id="s-feat" checked={!!form.is_featured}
+                      onCheckedChange={(v) => setForm((f) => ({ ...f, is_featured: v }))} />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="s-home" className="text-sm">Show on homepage</Label>
+                    <Switch id="s-home" checked={!!form.homepage_visible}
+                      onCheckedChange={(v) => setForm((f) => ({ ...f, homepage_visible: v }))} />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="s-watch" className="text-sm">Show on Watch page</Label>
+                    <Switch id="s-watch" checked={!!form.show_on_watch}
+                      onCheckedChange={(v) => setForm((f) => ({ ...f, show_on_watch: v }))} />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-muted-foreground">Current featured message</label>
+                    <Select
+                      value={form.featured_experience_id ?? "none"}
+                      onValueChange={(v) => setForm((f) => ({ ...f, featured_experience_id: v === "none" ? null : v }))}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Select an experience" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— None —</SelectItem>
+                        {allExperiences.map((e: any) => (
+                          <SelectItem key={e.id} value={e.id}>{e.title}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-muted-foreground">Homepage headline</label>
+                    <Input value={form.homepage_headline ?? ""}
+                      onChange={(e) => setForm((f) => ({ ...f, homepage_headline: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Homepage description</label>
+                    <Textarea rows={3} value={form.homepage_description ?? ""}
+                      onChange={(e) => setForm((f) => ({ ...f, homepage_description: e.target.value }))} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-muted-foreground">Featured artwork URL</label>
+                      <Input value={form.homepage_artwork_url ?? ""}
+                        onChange={(e) => setForm((f) => ({ ...f, homepage_artwork_url: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Mobile artwork URL</label>
+                      <Input value={form.homepage_mobile_artwork_url ?? ""}
+                        onChange={(e) => setForm((f) => ({ ...f, homepage_mobile_artwork_url: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Preview video URL (muted loop)</label>
+                    <Input value={form.homepage_preview_video_url ?? ""}
+                      onChange={(e) => setForm((f) => ({ ...f, homepage_preview_video_url: e.target.value }))} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-muted-foreground">Primary button label</label>
+                      <Input value={form.primary_watch_label ?? ""}
+                        onChange={(e) => setForm((f) => ({ ...f, primary_watch_label: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Secondary button label</label>
+                      <Input value={form.secondary_watch_label ?? ""}
+                        onChange={(e) => setForm((f) => ({ ...f, secondary_watch_label: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-muted-foreground">Display start</label>
+                      <Input type="datetime-local"
+                        value={form.display_start_at ? form.display_start_at.slice(0, 16) : ""}
+                        onChange={(e) => setForm((f) => ({ ...f, display_start_at: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Display end</label>
+                      <Input type="datetime-local"
+                        value={form.display_end_at ? form.display_end_at.slice(0, 16) : ""}
+                        onChange={(e) => setForm((f) => ({ ...f, display_end_at: e.target.value ? new Date(e.target.value).toISOString() : null }))} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Featured priority (higher = first)</label>
+                    <Input type="number" value={form.featured_priority ?? 0}
+                      onChange={(e) => setForm((f) => ({ ...f, featured_priority: Number(e.target.value) }))} />
+                  </div>
+                </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
