@@ -38,12 +38,15 @@ export default function PrayerWall() {
     }
   };
 
+  useEffect(() => {
+    const prev = document.title;
+    document.title = "Prayer Wall · The Island of One";
+    return () => { document.title = prev; };
+  }, []);
+
   return (
     <>
-      <Helmet>
-        <title>Prayer Wall · The Island of One</title>
-        <meta name="description" content="Share a prayer request or stand with others in prayer." />
-      </Helmet>
+      {/* metadata handled via effect */}
       <div className="container mx-auto max-w-4xl px-4 py-10 space-y-10">
         <header className="text-center space-y-3">
           <HeartHandshake className="h-10 w-10 mx-auto text-primary" />
