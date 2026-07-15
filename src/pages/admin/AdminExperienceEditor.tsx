@@ -86,6 +86,7 @@ function EditorInner({ experience }: { experience: ImmersiveExperience }) {
           <TabsTrigger value="timeline"><Clock className="h-4 w-4 mr-1" />Timeline</TabsTrigger>
           <TabsTrigger value="interactions"><MousePointerClick className="h-4 w-4 mr-1" />Interactions</TabsTrigger>
           <TabsTrigger value="preview"><Eye className="h-4 w-4 mr-1" />Preview</TabsTrigger>
+          <TabsTrigger value="analytics"><BarChart3 className="h-4 w-4 mr-1" />Analytics</TabsTrigger>
         </TabsList>
         <TabsContent value="details" className="mt-4"><DetailsPanel experience={experience} /></TabsContent>
         <TabsContent value="video" className="mt-4"><VideoPanel experience={experience} /></TabsContent>
@@ -96,6 +97,7 @@ function EditorInner({ experience }: { experience: ImmersiveExperience }) {
         </TabsContent>
         <TabsContent value="interactions" className="mt-4"><InteractionsPanel experienceId={experience.id} /></TabsContent>
         <TabsContent value="preview" className="mt-4"><PreviewPanel experience={experience} /></TabsContent>
+        <TabsContent value="analytics" className="mt-4"><AnalyticsPanel experienceId={experience.id} /></TabsContent>
       </Tabs>
     </div>
   );
