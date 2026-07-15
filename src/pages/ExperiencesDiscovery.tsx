@@ -49,6 +49,12 @@ export default function ExperiencesDiscovery() {
           <p className="text-muted-foreground max-w-2xl">
             Cinematic teachings, guided moments, and interactive encounters designed to bring scripture to life.
           </p>
+          <Link
+            to="/my/experiences"
+            className="inline-flex items-center gap-2 mt-5 text-sm px-4 py-2 rounded-full border border-primary/40 text-primary hover:bg-primary/10 transition-colors"
+          >
+            <Play className="h-4 w-4" /> My Library
+          </Link>
         </div>
       </section>
 

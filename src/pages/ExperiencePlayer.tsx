@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { Loader2, ChevronLeft, ChevronRight, Volume2, VolumeX, X, Play, Pause, HeartHandshake } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, Volume2, VolumeX, X, Play, Pause, HeartHandshake, Bookmark, BookmarkCheck } from "lucide-react";
+import { useIsSaved, useToggleSavedExperience } from "@/hooks/useSavedExperiences";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,8 @@ export default function ExperiencePlayer() {
   const { data: experience, isLoading } = useExperienceBySlug(slug);
   const { data: scenes = [] } = useScenes(experience?.id);
   const { data: interactions = [] } = useInteractions(experience?.id);
+  const { data: isSaved = false } = useIsSaved(experience?.id);
+  const toggleSaved = useToggleSavedExperience();
 
   const activeScenes = useMemo(() => scenes.filter((s) => s.enabled), [scenes]);
   const [idx, setIdx] = useState(0);
@@ -259,6 +262,16 @@ export default function ExperiencePlayer() {
             {total > 0 && `${idx + 1} / ${total}`}
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white hover:bg-white/10"
+              onClick={() => experience && toggleSaved.mutate({ experienceId: experience.id, saved: isSaved })}
+              aria-label={isSaved ? "Remove from library" : "Save to library"}
+              disabled={toggleSaved.isPending}
+            >
+              {isSaved ? <BookmarkCheck className="h-4 w-4 text-primary" /> : <Bookmark className="h-4 w-4" />}
+            </Button>
             <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={() => setMuted((m) => !m)}>
               {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
             </Button>
