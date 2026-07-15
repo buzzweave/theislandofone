@@ -107,6 +107,7 @@ function EditorInner({ experience }: { experience: ImmersiveExperience }) {
 function DetailsPanel({ experience }: { experience: ImmersiveExperience }) {
   const [form, setForm] = useState({ ...experience });
   const update = useUpdateExperience();
+  const { data: seriesList = [] } = useExperienceSeriesList();
   useEffect(() => setForm({ ...experience }), [experience.id]);
   const set = <K extends keyof ImmersiveExperience>(k: K, v: ImmersiveExperience[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -117,6 +118,7 @@ function DetailsPanel({ experience }: { experience: ImmersiveExperience }) {
         id: experience.id,
         title: form.title,
         slug: form.slug,
+        series_id: form.series_id,
         short_description: form.short_description,
         long_description: form.long_description,
         primary_scripture: form.primary_scripture,
