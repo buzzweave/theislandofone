@@ -174,10 +174,6 @@ export default function ExperiencePlayer() {
 
   return (
     <>
-      <Helmet>
-        <title>{experience.title} · Immersive</title>
-        <meta name="description" content={experience.short_description ?? experience.title} />
-      </Helmet>
       <div className="fixed inset-0 bg-black text-white overflow-hidden">
         {/* Background */}
         {bg && bgKind === "video" ? (
