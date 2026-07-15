@@ -190,7 +190,7 @@ export default function AdminExperiences() {
                   </Button>
                   {e.status === "published" && (
                     <Button size="sm" variant="outline" asChild>
-                      <a href={`/experience/${e.slug}`} target="_blank" rel="noreferrer">
+                      <a href={`/experiences/${e.slug}`} target="_blank" rel="noreferrer">
                         <ExternalLink className="h-3.5 w-3.5 mr-1" /> View
                       </a>
                     </Button>
