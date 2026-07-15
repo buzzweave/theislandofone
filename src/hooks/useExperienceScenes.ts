@@ -82,3 +82,32 @@ export function useDeleteScene() {
     onSuccess: (d) => qc.invalidateQueries({ queryKey: [TABLE, d.experience_id] }),
   });
 }
+
+export function useReorderScenes() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ experience_id, order }: { experience_id: string; order: string[] }) => {
+      // Update each scene's order_index in parallel
+      await Promise.all(
+        order.map((id, index) =>
+          (supabase as any).from(TABLE).update({ order_index: index }).eq("id", id)
+        )
+      );
+      return { experience_id };
+    },
+    onMutate: async ({ experience_id, order }) => {
+      await qc.cancelQueries({ queryKey: [TABLE, experience_id] });
+      const prev = qc.getQueryData<ExperienceScene[]>([TABLE, experience_id]);
+      if (prev) {
+        const map = new Map(prev.map((s) => [s.id, s]));
+        const reordered = order.map((id, i) => ({ ...(map.get(id) as ExperienceScene), order_index: i }));
+        qc.setQueryData([TABLE, experience_id], reordered);
+      }
+      return { prev };
+    },
+    onError: (_e, v, ctx) => {
+      if (ctx?.prev) qc.setQueryData([TABLE, v.experience_id], ctx.prev);
+    },
+    onSettled: (_d, _e, v) => qc.invalidateQueries({ queryKey: [TABLE, v.experience_id] }),
+  });
+}
