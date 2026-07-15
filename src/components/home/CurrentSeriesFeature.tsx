@@ -142,6 +142,15 @@ export default function CurrentSeriesFeature() {
               className="absolute inset-0 h-full w-full object-cover opacity-90"
             />
           )}
+          {showYouTubePreview && (
+            <iframe
+              src={toYouTubeEmbed(preview, { autoplay: true, muted: true, loop: true, controls: false }) || undefined}
+              title="Preview"
+              className="absolute inset-0 h-full w-full pointer-events-none opacity-90"
+              allow="autoplay; encrypted-media"
+              tabIndex={-1}
+            />
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-background/10 md:bg-gradient-to-r md:from-background md:via-background/80 md:to-transparent" />
 
           {/* Content */}
