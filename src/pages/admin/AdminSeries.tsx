@@ -105,7 +105,7 @@ export default function AdminSeries() {
             <DialogTrigger asChild>
               <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> New Series</Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editing ? "Edit Series" : "New Series"}</DialogTitle>
               </DialogHeader>
@@ -296,10 +296,16 @@ export default function AdminSeries() {
                     <Layers className="h-8 w-8" />
                   </div>
                 )}
-                <div className="absolute top-2 left-2">
+                <div className="absolute top-2 left-2 flex gap-1">
                   <Badge variant={s.status === "published" ? "default" : "secondary"} className="capitalize">
                     {s.status}
                   </Badge>
+                  {s.is_current_series && (
+                    <Badge className="bg-primary text-primary-foreground gap-1"><Star className="h-3 w-3" />Current</Badge>
+                  )}
+                  {s.homepage_visible && (
+                    <Badge variant="outline" className="gap-1"><Home className="h-3 w-3" />Home</Badge>
+                  )}
                 </div>
               </div>
               <div className="p-4 flex-1 flex flex-col">
