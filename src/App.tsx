@@ -242,6 +242,7 @@ const App = () => (
                     <Route path="video-studio" element={<VideoStudio />} />
                     <Route path="video-library" element={<VideoLibrary />} />
                     <Route path="experiences" element={<AdminExperiences />} />
+                    <Route path="experiences/series" element={<AdminSeries />} />
                     <Route path="experiences/:id" element={<AdminExperienceEditor />} />
                     <Route path="ai-developer" element={<AIDevDashboard />} />
                     <Route path="ai-developer/console" element={<AIDevConsole />} />
