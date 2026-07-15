@@ -18,6 +18,7 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useExperience, useUpdateExperience, type ImmersiveExperience } from "@/hooks/useExperiences";
+import { useExperienceSeriesList } from "@/hooks/useExperienceSeries";
 import {
   useScenes, useCreateScene, useUpdateScene, useDeleteScene, type ExperienceScene,
 } from "@/hooks/useExperienceScenes";
