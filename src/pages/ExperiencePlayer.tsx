@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { Loader2, ChevronLeft, ChevronRight, Volume2, VolumeX, X, Play, Pause } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Helmet } from "react-helmet-async";
+// document title handled via effect below
 import { useExperienceBySlug } from "@/hooks/useExperiences";
 import { useScenes } from "@/hooks/useExperienceScenes";
 import { useInteractions } from "@/hooks/useExperienceInteractions";
