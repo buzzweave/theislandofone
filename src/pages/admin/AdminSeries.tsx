@@ -39,6 +39,7 @@ const emptyForm: Partial<ExperienceSeries> = {
 
 export default function AdminSeries() {
   const { data: seriesList = [], isLoading } = useExperienceSeriesList();
+  const { data: allExperiences = [] } = useExperiences();
   const createMut = useCreateSeries();
   const updateMut = useUpdateSeries();
   const deleteMut = useDeleteSeries();
