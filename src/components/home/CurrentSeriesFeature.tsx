@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCurrentSeries } from "@/hooks/useCurrentSeries";
 import { supabase } from "@/integrations/supabase/client";
+import { isYouTubeUrl, toYouTubeEmbed } from "@/lib/youtube";
 
 function formatRuntime(seconds: number | null | undefined) {
   if (!seconds) return null;
