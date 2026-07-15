@@ -262,6 +262,16 @@ export default function ExperiencePlayer() {
             {total > 0 && `${idx + 1} / ${total}`}
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white hover:bg-white/10"
+              onClick={() => experience && toggleSaved.mutate({ experienceId: experience.id, saved: isSaved })}
+              aria-label={isSaved ? "Remove from library" : "Save to library"}
+              disabled={toggleSaved.isPending}
+            >
+              {isSaved ? <BookmarkCheck className="h-4 w-4 text-primary" /> : <Bookmark className="h-4 w-4" />}
+            </Button>
             <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={() => setMuted((m) => !m)}>
               {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
             </Button>
