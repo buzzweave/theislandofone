@@ -53,11 +53,18 @@ export default function AdminSeries() {
 
   const save = async () => {
     try {
-      const payload = {
+      const payload: Partial<ExperienceSeries> = {
         ...form,
         title: form.title?.trim() || "Untitled Series",
         slug: form.slug?.trim() || slugify(form.title || "series"),
       };
+      // If marking this as the primary current series, clear the flag on any other.
+      if (payload.is_current_series) {
+        const others = seriesList.filter((s) => s.is_current_series && (!editing || s.id !== editing.id));
+        for (const o of others) {
+          await updateMut.mutateAsync({ id: o.id, is_current_series: false });
+        }
+      }
       if (editing) {
         await updateMut.mutateAsync({ id: editing.id, ...payload });
         toast.success("Series updated");
