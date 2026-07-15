@@ -219,7 +219,7 @@ export default function CurrentSeriesFeature() {
                 <video src={trailer} controls autoPlay className="h-full w-full" />
               ) : (
                 <iframe
-                  src={trailer}
+                  src={toYouTubeEmbed(trailer, { autoplay: true, controls: true }) || trailer}
                   className="h-full w-full"
                   allow="autoplay; encrypted-media; fullscreen"
                   allowFullScreen
