@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useSermonsEnabled } from "@/hooks/useSermonsEnabled";
 import { supabaseImageUrl, supabaseImageSrcSet } from "@/lib/supabaseImage";
+import CurrentSeriesFeature from "@/components/home/CurrentSeriesFeature";
 
 const SubscribeForm = lazy(() => import("@/components/SubscribeForm"));
 
