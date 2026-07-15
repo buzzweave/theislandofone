@@ -66,6 +66,11 @@ function EditorInner({ experience }: { experience: ImmersiveExperience }) {
             {experience.status}
           </Badge>
           {experience.members_only && <Badge variant="outline">Members Only</Badge>}
+          <Button size="sm" variant="outline" asChild>
+            <a href={`/experiences/${experience.slug}`} target="_blank" rel="noreferrer">
+              <ExternalLink className="h-4 w-4 mr-1" /> Open Player
+            </a>
+          </Button>
         </div>
       </div>
       <div>
