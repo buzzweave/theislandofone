@@ -72,6 +72,7 @@ const ExperiencePlayer = lazy(() => import("./pages/ExperiencePlayer"));
 const ExperiencesDiscovery = lazy(() => import("./pages/ExperiencesDiscovery"));
 const ExperienceSeriesPage = lazy(() => import("./pages/ExperienceSeriesPage"));
 const AdminSeries = lazy(() => import("./pages/admin/AdminSeries"));
+const PrayerWall = lazy(() => import("./pages/PrayerWall"));
 
 const VideoStudio = lazy(() => import("./pages/admin/VideoStudio"));
 const VideoLibrary = lazy(() => import("./pages/admin/VideoLibrary"));
