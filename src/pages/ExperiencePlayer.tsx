@@ -302,9 +302,18 @@ export default function ExperiencePlayer() {
           className={`relative z-10 h-full w-full flex flex-col items-${scene?.text_align === "left" ? "start" : scene?.text_align === "right" ? "end" : "center"} justify-center px-6 md:px-16 text-${scene?.text_align ?? "center"} animate-fade-in`}
         >
           {total === 0 ? (
-            <div className="max-w-3xl">
-              <h1 className="font-display text-4xl md:text-6xl font-semibold mb-4">{experience.title}</h1>
-              {experience.short_description && <p className="text-lg opacity-90">{experience.short_description}</p>}
+            <div className="max-w-4xl w-full space-y-6">
+              <h1 className="font-display text-3xl md:text-5xl font-semibold text-center">{experience.title}</h1>
+              {experience.short_description && (
+                <p className="text-base md:text-lg opacity-90 text-center max-w-2xl mx-auto">
+                  {experience.short_description}
+                </p>
+              )}
+              {experience.video_url && (
+                <div className="mx-auto w-full max-w-4xl rounded-lg overflow-hidden shadow-2xl">
+                  <YouTubePlayer url={experience.video_url} title={experience.title} poster={experience.featured_image} />
+                </div>
+              )}
             </div>
           ) : (
             <div className="max-w-3xl space-y-5">
