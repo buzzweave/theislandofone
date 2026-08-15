@@ -28,10 +28,16 @@ export function supabaseImageUrl(
       "/storage/v1/object/public/",
       "/storage/v1/render/image/public/"
     );
-    if (opts.width) u.searchParams.set("width", String(opts.width));
-    if (opts.height) u.searchParams.set("height", String(opts.height));
+    // Supabase's renderer keeps the ORIGINAL height when only `width` is given,
+    // which squeezes/distorts the image. Always send both dimensions and use
+    // `contain` so the image is scaled proportionally, never stretched or cropped.
+    const width = opts.width;
+    const height = opts.height ?? (width ? Math.round(width * 3) : undefined);
+    if (width) u.searchParams.set("width", String(width));
+    if (height) u.searchParams.set("height", String(height));
     u.searchParams.set("quality", String(opts.quality ?? 70));
-    if (opts.resize) u.searchParams.set("resize", opts.resize);
+    u.searchParams.set("resize", opts.resize ?? "contain");
+
     return u.toString();
   } catch {
     return url;
