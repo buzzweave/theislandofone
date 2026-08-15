@@ -107,7 +107,7 @@ serve(async (req) => {
         },
       ],
       mode: "payment",
-      metadata: { item_type: type, item_id: itemId },
+      metadata: { item_type: type, item_id: itemId, user_id: user.id, user_email: user.email ?? "" },
       success_url: `${origin}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: cancelUrlMap[type] || `${origin}`,
     });

@@ -40,6 +40,27 @@ serve(async (req) => {
       });
     }
 
+    // Ownership check: the caller must be the person who paid for this session.
+    // Without this, any authenticated user could claim someone else's session_id.
+    const sessionEmail = (
+      session.customer_details?.email ||
+      session.customer_email ||
+      (session.metadata?.user_email as string | undefined) ||
+      ""
+    ).toLowerCase();
+    const metadataUserId = session.metadata?.user_id as string | undefined;
+    const ownsSession = metadataUserId
+      ? metadataUserId === user.id
+      : !!sessionEmail && sessionEmail === (user.email || "").toLowerCase();
+
+    if (!ownsSession) {
+      return new Response(
+        JSON.stringify({ success: false, reason: "session_owner_mismatch" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 403 }
+      );
+    }
+
+
     // For one-time purchases, record in purchases table
     if (session.mode === "payment" && session.metadata?.item_type && session.metadata?.item_id) {
       // Check if already recorded
