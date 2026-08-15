@@ -49,20 +49,20 @@ export default function Books() {
         )}
 
         {/* Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 max-w-5xl mx-auto pb-24 items-start">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-6 max-w-6xl mx-auto pb-24 items-start">
           {filtered.map((book) => (
             <Link
               key={book.id}
               to={`/books/${book.id}`}
               className="group flex flex-col items-center rounded-xl bg-card border border-border hover:border-primary/30 transition-all duration-300 text-left hover:shadow-gold p-3 sm:p-4"
             >
-              <div className="flex items-center justify-center overflow-hidden bg-[#0f172a] rounded-[10px] w-[150px] h-[235px] sm:w-[180px] sm:h-[280px]">
+              <div className="flex items-center justify-center overflow-hidden bg-[#0f172a] rounded-[10px] w-full aspect-[2/3]">
                 {book.cover_image ? (
                   <img
                     src={supabaseImageUrl(book.cover_image, { width: 500, quality: 72 })}
                     srcSet={`${supabaseImageUrl(book.cover_image, { width: 300, quality: 65 })} 300w, ${supabaseImageUrl(book.cover_image, { width: 500, quality: 72 })} 500w, ${supabaseImageUrl(book.cover_image, { width: 800, quality: 75 })} 800w`}
-                    sizes="180px"
-                    alt={book.title}
+                    sizes="(min-width: 1280px) 220px, (min-width: 1024px) 260px, (min-width: 640px) 30vw, 45vw"
+                    alt={`${book.title} book cover`}
                     className="w-full h-full object-contain object-center block transition-transform duration-500 group-hover:scale-105"
                     loading="lazy"
                     decoding="async"
@@ -71,6 +71,7 @@ export default function Books() {
                   <BookOpen className="h-12 w-12 text-muted-foreground" />
                 )}
               </div>
+
 
               <div className="pt-4 w-full text-center">
                 <span className="text-xs text-primary uppercase tracking-wider">{book.category}</span>
