@@ -125,7 +125,7 @@ export function useAddSermon() {
     mutationFn: async (sermon: Partial<Sermon>) => {
       await requireDbSession("create a sermon");
       const payload = normalizePayload({ access_tiers: [], ...sermon });
-      const { data, error } = await supabase.from("sermons").insert(payload).select().single();
+      const { data, error } = await supabase.from("sermons").insert(payload as any).select().single();
       if (error) {
         console.error("Sermon insert error:", error);
         throw describeError(error, "create sermon");
