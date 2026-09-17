@@ -423,6 +423,16 @@ export default function AdminSermonEditor() {
             </CardContent>
           </Card>
 
+          {saveError && (
+            <div
+              role="alert"
+              className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"
+            >
+              <p className="font-semibold">Sermon was not saved</p>
+              <p className="mt-1">{saveError}</p>
+            </div>
+          )}
+
           {/* Actions */}
           <div className="flex flex-wrap items-center gap-3 pb-8">
             <Button onClick={handleSave} disabled={updateSermon.isPending || !dirty}>

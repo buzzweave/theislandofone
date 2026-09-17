@@ -19,9 +19,9 @@ function formatAccessLabel(level?: string) {
 const SermonCard = memo(function SermonCard({ sermon }: { sermon: any }) {
   const accessLevel = sermon.access_level ?? "free";
   const priceNum = Number(sermon.price ?? 0);
-  const isFree = accessLevel === "free" || sermon.is_free === true;
-  const hasPrice = priceNum > 0;
-  const isLocked = !isFree;
+  const hasPrice = isSermonPaid(sermon);
+  const isLocked = isSermonLocked(sermon);
+  const isFree = !isLocked;
 
   return (
     <Link

@@ -230,6 +230,7 @@ export default function SermonDetail() {
   const auth: any = useAuth();
   const user = auth?.user ?? null;
   const isSubscribed = Boolean(auth?.isSubscribed);
+  const subscription = auth?.subscription;
   const checkPurchase = auth?.checkPurchase;
 
   const [purchased, setPurchased] = useState(false);
@@ -266,16 +267,15 @@ export default function SermonDetail() {
       "",
   );
 
-  const isFreeFlag = Boolean((sermon as any)?.is_free === true);
   const accessLevel = safeText((sermon as any)?.access_level || "free");
-  const chargeEnabled = Boolean((sermon as any)?.charge_enabled ?? (sermon as any)?.charge_for_sermon ?? false);
   const price = safeMoney((sermon as any)?.price);
+  const userTier = membershipTierFromProductId(subscription?.product_id);
 
-  const isLocked = useMemo(() => {
-    if (isFreeFlag || accessLevel === "free") return false;
-    if (price > 0 || chargeEnabled) return true;
-    return accessLevel !== "free";
-  }, [isFreeFlag, accessLevel, price, chargeEnabled]);
+  const access = useMemo(
+    () => resolveSermonAccess({ sermon: sermon as any, userTier, isSubscribed, purchased }),
+    [sermon, userTier, isSubscribed, purchased],
+  );
+  const isLocked = access.locked;
 
   useEffect(() => {
     let alive = true;
@@ -320,13 +320,7 @@ export default function SermonDetail() {
     };
   }, [user, id, isLocked, checkPurchase]);
 
-  const isFullAccess = useMemo(() => {
-    if (!isLocked) return true;
-    if (!user) return false;
-    if (purchased) return true;
-    if (isSubscribed) return true;
-    return false;
-  }, [isLocked, user, purchased, isSubscribed]);
+  const isFullAccess = access.hasAccess;
 
   const sanitizedHtml = useMemo(() => {
     const looksHtml = manuscriptRaw.includes("<") && manuscriptRaw.includes(">");
@@ -419,6 +413,17 @@ export default function SermonDetail() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#050816] text-white/70">Loading sermon…</div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div
+        role="alert"
+        className="min-h-screen flex items-center justify-center bg-[#050816] px-6 text-center text-red-300"
+      >
+        We could not load this sermon. {error instanceof Error ? error.message : "Please refresh and try again."}
+      </div>
     );
   }
 
