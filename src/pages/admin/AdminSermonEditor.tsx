@@ -43,6 +43,8 @@ export default function AdminSermonEditor() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Partial<Sermon>>({});
   const [dirty, setDirty] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
   const aiContent = useAIContent();
   const isMobile = useIsMobile();
 
