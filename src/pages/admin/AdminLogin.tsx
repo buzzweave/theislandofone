@@ -109,8 +109,8 @@ export default function AdminLogin() {
     } else {
       setResetSent(true);
       toast({
-        title: "Reset email sent",
-        description: "Check your inbox for password reset instructions.",
+        title: "Verification code sent",
+        description: "Enter the six-digit code from your email.",
       });
     }
   };
@@ -269,7 +269,7 @@ export default function AdminLogin() {
               ) : (
                 <form onSubmit={handleForgotPassword} className="space-y-4">
                   <p className="text-sm text-muted-foreground">
-                    Enter your admin email and we'll send you a link to reset your password.
+                    Enter your admin email and we'll send you a six-digit code to reset your password.
                   </p>
                   <div className="space-y-2">
                     <Label htmlFor="reset-email">Email</Label>
@@ -292,7 +292,23 @@ export default function AdminLogin() {
 
                   <Button type="submit" className="w-full" size="lg" disabled={resetSending}>
                     {resetSending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Send Reset Link
+                    Send Verification Code
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      if (!resetEmail.trim()) {
+                        setError("Enter the email address that received the code.");
+                        return;
+                      }
+                      setError("");
+                      setResetSent(true);
+                    }}
+                  >
+                    I Already Have a Code
                   </Button>
 
                   <Button
