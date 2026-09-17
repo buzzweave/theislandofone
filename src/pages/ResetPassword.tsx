@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,8 @@ import { toast } from "sonner";
 
 export default function ResetPassword() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isAdminReset = new URLSearchParams(location.search).get("admin") === "1";
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -31,7 +33,7 @@ export default function ResetPassword() {
       toast.error(error.message);
     } else {
       toast.success("Password updated successfully!");
-      navigate("/", { replace: true });
+      navigate(isAdminReset ? "/admin/login" : "/", { replace: true });
     }
   };
 

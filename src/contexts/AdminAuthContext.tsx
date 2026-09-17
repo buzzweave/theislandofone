@@ -84,15 +84,18 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   // Token refresh every 4 minutes
   useEffect(() => {
     if (!isAuthenticated) return;
-    const interval = setInterval(async () => {
-      try {
-        const data = await api.post<{ token: string }>("/api/auth/refresh");
-        if (data?.token) api.setToken(data.token);
-      } catch {
-        api.clearToken();
-        setIsAuthenticated(false);
-      }
-    }, 4 * 60 * 1000);
+    const interval = setInterval(
+      async () => {
+        try {
+          const data = await api.post<{ token: string }>("/api/auth/refresh");
+          if (data?.token) api.setToken(data.token);
+        } catch {
+          api.clearToken();
+          setIsAuthenticated(false);
+        }
+      },
+      4 * 60 * 1000,
+    );
     return () => clearInterval(interval);
   }, [isAuthenticated]);
 
@@ -138,12 +141,14 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   );
 
   const forgotPassword = useCallback(async (email: string): Promise<boolean> => {
-    try {
-      await api.post("/api/auth/forgot-password", { email });
-      return true;
-    } catch {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password?admin=1`,
+    });
+    if (error) {
+      console.error("Admin password reset failed", error);
       return false;
     }
+    return true;
   }, []);
 
   const logout = useCallback(() => {
