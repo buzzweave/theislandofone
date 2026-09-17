@@ -47,20 +47,21 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     let mounted = true;
 
     const init = async () => {
+      // A database session with the admin role is required: without it every
+      // admin write (sermons, books, …) is silently rejected by row-level security.
       let authenticated = false;
 
-      try {
-        if (api.hasToken()) {
-          await api.get("/api/auth/me");
-          authenticated = true;
-        }
-      } catch {
-        api.clearToken();
-      }
+      const { data } = await supabase.auth.getUser();
+      if (data.user) authenticated = await hasAdminRole(data.user.id);
 
-      if (!authenticated) {
-        const { data } = await supabase.auth.getUser();
-        if (data.user) authenticated = await hasAdminRole(data.user.id);
+      if (authenticated) {
+        try {
+          if (api.hasToken()) await api.get("/api/auth/me");
+        } catch {
+          api.clearToken();
+        }
+      } else {
+        api.clearToken();
       }
 
       if (mounted) setIsAuthenticated(authenticated);
@@ -101,23 +102,24 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
       try {
         let authenticated = false;
 
-        try {
-          const data = await api.post<{ token: string }>("/api/auth/login", { email, password });
-          if (data?.token) {
-            api.setToken(data.token);
-            authenticated = true;
-          }
-        } catch {
-          api.clearToken();
-        }
-
+        // The database session is what authorises admin writes, so it is required.
         const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
         if (!authError && authData.user) {
           authenticated = await hasAdminRole(authData.user.id);
           if (!authenticated) await supabase.auth.signOut();
         }
 
-        if (!authenticated) throw new Error("Invalid admin credentials");
+        if (!authenticated) {
+          api.clearToken();
+          throw new Error("Invalid admin credentials");
+        }
+
+        try {
+          const data = await api.post<{ token: string }>("/api/auth/login", { email, password });
+          if (data?.token) api.setToken(data.token);
+        } catch {
+          api.clearToken();
+        }
 
         setIsAuthenticated(true);
         setFailedAttempts(0);

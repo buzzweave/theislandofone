@@ -43,6 +43,8 @@ export default function AdminSermonEditor() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Partial<Sermon>>({});
   const [dirty, setDirty] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
   const aiContent = useAIContent();
   const isMobile = useIsMobile();
 
@@ -100,14 +102,19 @@ export default function AdminSermonEditor() {
         category: "Faith",
         price: 0,
         is_free: 1,
+        is_published: false,
         preview_cutoff: 2,
         featured: 0,
         audio_url: "",
+        access_tiers: [],
       });
       setActiveId(result.id);
-    } catch (err) {
+      setSaveError(null);
+      toast.success("Sermon created");
+    } catch (err: any) {
       console.error(err);
-      toast.error("Failed to create sermon");
+      setSaveError(err?.message || "Failed to create sermon");
+      toast.error(err?.message || "Failed to create sermon");
     }
   };
 
@@ -118,15 +125,21 @@ export default function AdminSermonEditor() {
         setActiveId(sermonList.find((s) => s.id !== id)?.id ?? null);
       }
       toast.success("Sermon deleted");
-    } catch {
-      toast.error("Failed to delete sermon");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to delete sermon");
     }
   };
 
   const handleSave = async () => {
     if (!draft.id) return;
     try {
-      await updateSermon.mutateAsync({
+      const tiers = Array.isArray(draft.access_tiers)
+        ? draft.access_tiers
+        : draft.access_tiers
+          ? String(draft.access_tiers).split(",").map((t) => t.trim()).filter(Boolean)
+          : [];
+
+      const saved = await updateSermon.mutateAsync({
         id: draft.id,
         title: draft.title,
         scripture: draft.scripture,
@@ -141,11 +154,18 @@ export default function AdminSermonEditor() {
         preview_cutoff: draft.preview_cutoff,
         featured: draft.featured ? 1 : 0,
         audio_url: draft.audio_url || "",
+        access_tiers: tiers,
       });
+      // Only report success once the database has confirmed the write.
+      setDraft(saved);
       setDirty(false);
-      toast.success("Sermon saved!");
-    } catch {
-      toast.error("Failed to save sermon");
+      setSaveError(null);
+      setSavedAt(Date.now());
+      toast.success("Sermon saved");
+    } catch (err: any) {
+      console.error(err);
+      setSaveError(err?.message || "Failed to save sermon");
+      toast.error(err?.message || "Failed to save sermon");
     }
   };
 
