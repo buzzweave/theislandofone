@@ -47,20 +47,21 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     let mounted = true;
 
     const init = async () => {
+      // A database session with the admin role is required: without it every
+      // admin write (sermons, books, …) is silently rejected by row-level security.
       let authenticated = false;
 
-      try {
-        if (api.hasToken()) {
-          await api.get("/api/auth/me");
-          authenticated = true;
-        }
-      } catch {
-        api.clearToken();
-      }
+      const { data } = await supabase.auth.getUser();
+      if (data.user) authenticated = await hasAdminRole(data.user.id);
 
-      if (!authenticated) {
-        const { data } = await supabase.auth.getUser();
-        if (data.user) authenticated = await hasAdminRole(data.user.id);
+      if (authenticated) {
+        try {
+          if (api.hasToken()) await api.get("/api/auth/me");
+        } catch {
+          api.clearToken();
+        }
+      } else {
+        api.clearToken();
       }
 
       if (mounted) setIsAuthenticated(authenticated);
