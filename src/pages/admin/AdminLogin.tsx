@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Label } from "@/components/ui/label";
 import { ShieldAlert, Lock, Eye, EyeOff, Loader2, ArrowLeft, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 function generateCaptcha() {
   const a = Math.floor(Math.random() * 10) + 1;
@@ -31,6 +32,9 @@ export default function AdminLogin() {
   const [resetEmail, setResetEmail] = useState("");
   const [resetSending, setResetSending] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  const [resetCode, setResetCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   // Simple CAPTCHA
   const [captcha, setCaptcha] = useState(() => generateCaptcha());
@@ -111,6 +115,56 @@ export default function AdminLogin() {
     }
   };
 
+  const handleVerifyReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (!/^\d{6}$/.test(resetCode.trim())) {
+      setError("Enter the six-digit code from your email.");
+      return;
+    }
+    if (newPassword.length < 6) {
+      setError("Password must be at least six characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    setResetSending(true);
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+      email: resetEmail.trim(),
+      token: resetCode.trim(),
+      type: "recovery",
+    });
+
+    if (verifyError) {
+      setResetSending(false);
+      setError(verifyError.message || "The code is invalid or expired. Request a new code.");
+      return;
+    }
+
+    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+    setResetSending(false);
+
+    if (updateError) {
+      setError(updateError.message || "Unable to update the password.");
+      return;
+    }
+
+    await supabase.auth.signOut();
+    setResetCode("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setResetSent(false);
+    setShowForgotPassword(false);
+    toast({
+      title: "Password updated",
+      description: "Sign in with your new admin password.",
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -127,11 +181,7 @@ export default function AdminLogin() {
       <Card className="w-full max-w-md border-border shadow-gold">
         <CardHeader className="text-center space-y-1">
           <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-            {showForgotPassword ? (
-              <Mail className="h-6 w-6 text-primary" />
-            ) : (
-              <Lock className="h-6 w-6 text-primary" />
-            )}
+            {showForgotPassword ? <Mail className="h-6 w-6 text-primary" /> : <Lock className="h-6 w-6 text-primary" />}
           </div>
           <CardTitle className="font-display text-2xl">
             {showForgotPassword ? "Reset Password" : "Admin Sign In"}
@@ -145,35 +195,77 @@ export default function AdminLogin() {
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10">
                 <ShieldAlert className="h-7 w-7 text-destructive" />
               </div>
-              <p className="text-sm text-destructive font-medium">
-                Too many failed attempts. Account locked.
-              </p>
+              <p className="text-sm text-destructive font-medium">Too many failed attempts. Account locked.</p>
               <p className="text-xs text-muted-foreground">
-                Try again in{" "}
-                <span className="font-mono text-foreground">{lockCountdown || "..."}</span>
+                Try again in <span className="font-mono text-foreground">{lockCountdown || "..."}</span>
               </p>
             </div>
           ) : showForgotPassword ? (
             <div className="space-y-5">
               {resetSent ? (
-                <div className="space-y-4 text-center">
+                <form onSubmit={handleVerifyReset} className="space-y-4">
                   <p className="text-sm text-muted-foreground">
-                    We've sent a password reset link to <strong>{resetEmail}</strong>. Check your inbox and follow the instructions.
+                    Enter the six-digit code sent to <strong>{resetEmail}</strong>, then choose a new admin password.
                   </p>
+                  <div className="space-y-2">
+                    <Label htmlFor="reset-code">Six-Digit Code</Label>
+                    <Input
+                      id="reset-code"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      maxLength={6}
+                      value={resetCode}
+                      onChange={(e) => setResetCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      placeholder="000000"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-admin-password">New Password</Label>
+                    <Input
+                      id="new-admin-password"
+                      type="password"
+                      autoComplete="new-password"
+                      minLength={6}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="At least 6 characters"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-admin-password">Confirm New Password</Label>
+                    <Input
+                      id="confirm-admin-password"
+                      type="password"
+                      autoComplete="new-password"
+                      minLength={6}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Re-enter password"
+                    />
+                  </div>
+                  {error && (
+                    <p className="text-sm text-destructive flex items-center gap-1.5">
+                      <ShieldAlert className="h-3.5 w-3.5" />
+                      {error}
+                    </p>
+                  )}
+                  <Button type="submit" className="w-full" size="lg" disabled={resetSending}>
+                    {resetSending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Verify Code & Update Password
+                  </Button>
                   <Button
-                    variant="outline"
-                    className="w-full"
+                    type="button"
+                    variant="ghost"
+                    className="w-full text-muted-foreground"
                     onClick={() => {
-                      setShowForgotPassword(false);
                       setResetSent(false);
-                      setResetEmail("");
+                      setResetCode("");
                       setError("");
                     }}
                   >
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back to Sign In
+                    Request a New Code
                   </Button>
-                </div>
+                </form>
               ) : (
                 <form onSubmit={handleForgotPassword} className="space-y-4">
                   <p className="text-sm text-muted-foreground">
@@ -274,9 +366,7 @@ export default function AdminLogin() {
                   <ShieldAlert className="h-3.5 w-3.5" />
                   {error}
                   {failedAttempts > 0 && failedAttempts < 5 && (
-                    <span className="text-muted-foreground ml-auto text-xs">
-                      {5 - failedAttempts} attempts left
-                    </span>
+                    <span className="text-muted-foreground ml-auto text-xs">{5 - failedAttempts} attempts left</span>
                   )}
                 </p>
               )}
