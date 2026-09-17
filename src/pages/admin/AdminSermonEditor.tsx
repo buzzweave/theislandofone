@@ -6,26 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  FileText,
-  Plus,
-  Save,
-  Eye,
-  Trash2,
-  Star,
-  DollarSign,
-  Lock,
-  BookOpen,
-  ArrowLeft,
-  Crown,
-} from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FileText, Plus, Save, Eye, Trash2, Star, DollarSign, Lock, BookOpen, ArrowLeft, Crown } from "lucide-react";
 import { useSermons, useAddSermon, useUpdateSermon, useDeleteSermon, type Sermon } from "@/hooks/useSermons";
 import { useAIContent } from "@/contexts/AIContentContext";
 import AudioGenerator from "@/components/admin/AudioGenerator";
@@ -136,7 +118,10 @@ export default function AdminSermonEditor() {
       const tiers = Array.isArray(draft.access_tiers)
         ? draft.access_tiers
         : draft.access_tiers
-          ? String(draft.access_tiers).split(",").map((t) => t.trim()).filter(Boolean)
+          ? String(draft.access_tiers)
+              .split(",")
+              .map((t) => t.trim())
+              .filter(Boolean)
           : [];
 
       const saved = await updateSermon.mutateAsync({
@@ -182,7 +167,9 @@ export default function AdminSermonEditor() {
     <div className={`flex ${isMobile ? "flex-col" : ""} gap-4 md:gap-6 h-[calc(100vh-8rem)]`}>
       {/* Sermon List */}
       {showList && (
-        <div className={`${isMobile ? "w-full" : "w-64 shrink-0"} flex flex-col border border-border rounded-lg bg-card overflow-hidden ${isMobile ? "h-[calc(100vh-8rem)]" : ""}`}>
+        <div
+          className={`${isMobile ? "w-full" : "w-64 shrink-0"} flex flex-col border border-border rounded-lg bg-card overflow-hidden ${isMobile ? "h-[calc(100vh-8rem)]" : ""}`}
+        >
           <div className="p-3 border-b border-border flex items-center justify-between">
             <span className="text-sm font-semibold">Sermons</span>
             <Button size="icon" variant="ghost" onClick={addNew} title="New sermon" disabled={addSermon.isPending}>
@@ -204,7 +191,9 @@ export default function AdminSermonEditor() {
                   {s.featured && <Star className="h-3 w-3 text-primary shrink-0" />}
                   <span className="truncate font-medium">{s.title}</span>
                   {s.is_published === false && (
-                    <span className="text-[9px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-semibold uppercase shrink-0">Draft</span>
+                    <span className="text-[9px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-semibold uppercase shrink-0">
+                      Draft
+                    </span>
                   )}
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
@@ -238,37 +227,33 @@ export default function AdminSermonEditor() {
             </div>
             <div>
               <Label>Scripture</Label>
-              <Input
-                value={draft.scripture || ""}
-                onChange={(e) => update({ scripture: e.target.value })}
-              />
+              <Input value={draft.scripture || ""} onChange={(e) => update({ scripture: e.target.value })} />
             </div>
             <div>
               <Label>Category</Label>
               <Select value={draft.category || "Faith"} onValueChange={(v) => update({ category: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   {["Faith", "Worship", "Calling", "Leadership", "Deliverance", "Prayer", "Family"].map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label>Date</Label>
-              <Input
-                type="date"
-                value={draft.date || ""}
-                onChange={(e) => update({ date: e.target.value })}
-              />
+              <Input type="date" value={draft.date || ""} onChange={(e) => update({ date: e.target.value })} />
             </div>
             <div>
               <Label>Access Level</Label>
-              <Select
-                value={draft.access_level || "free"}
-                onValueChange={(v) => update({ access_level: v })}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select value={draft.access_level || "free"} onValueChange={(v) => update({ access_level: v })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="free">Free</SelectItem>
                   <SelectItem value="member">Member</SelectItem>
@@ -281,11 +266,7 @@ export default function AdminSermonEditor() {
           {/* Excerpt */}
           <div>
             <Label>Excerpt / Summary</Label>
-            <Textarea
-              value={draft.excerpt || ""}
-              onChange={(e) => update({ excerpt: e.target.value })}
-              rows={2}
-            />
+            <Textarea value={draft.excerpt || ""} onChange={(e) => update({ excerpt: e.target.value })} rows={2} />
           </div>
 
           {/* Manuscript */}
@@ -325,12 +306,11 @@ export default function AdminSermonEditor() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium">Publish Sermon</p>
-                  <p className="text-xs text-muted-foreground">When off, this sermon is a draft and hidden from visitors.</p>
+                  <p className="text-xs text-muted-foreground">
+                    When off, this sermon is a draft and hidden from visitors.
+                  </p>
                 </div>
-                <Switch
-                  checked={!!draft.is_published}
-                  onCheckedChange={(v) => update({ is_published: v })}
-                />
+                <Switch checked={!!draft.is_published} onCheckedChange={(v) => update({ is_published: v })} />
               </div>
 
               <div className="flex items-center justify-between">
@@ -338,10 +318,7 @@ export default function AdminSermonEditor() {
                   <p className="text-sm font-medium">Feature on Front Page</p>
                   <p className="text-xs text-muted-foreground">Show this sermon in the featured section.</p>
                 </div>
-                <Switch
-                  checked={!!draft.featured}
-                  onCheckedChange={(v) => update({ featured: v })}
-                />
+                <Switch checked={!!draft.featured} onCheckedChange={(v) => update({ featured: v })} />
               </div>
 
               <div className="flex items-center justify-between">
@@ -353,9 +330,7 @@ export default function AdminSermonEditor() {
                 </div>
                 <Switch
                   checked={!draft.is_free}
-                  onCheckedChange={(v) =>
-                    update({ is_free: !v, price: v ? (draft.price || 4.99) : 0 })
-                  }
+                  onCheckedChange={(v) => update({ is_free: !v, price: v ? draft.price || 4.99 : 0 })}
                 />
               </div>
 
@@ -400,10 +375,16 @@ export default function AdminSermonEditor() {
                 <p className="text-sm font-medium flex items-center gap-1.5 mb-2">
                   <Crown className="h-3.5 w-3.5" /> Membership Access
                 </p>
-                <p className="text-xs text-muted-foreground mb-3">Select which membership tiers can access this sermon for free.</p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Select which membership tiers can access this sermon for free.
+                </p>
                 <div className="flex flex-wrap gap-3">
                   {(["reader", "pastor", "inner-circle"] as const).map((tier) => {
-                    const tiers = Array.isArray(draft.access_tiers) ? draft.access_tiers : (draft.access_tiers ? String(draft.access_tiers).split(",").filter(Boolean) : []);
+                    const tiers = Array.isArray(draft.access_tiers)
+                      ? draft.access_tiers
+                      : draft.access_tiers
+                        ? String(draft.access_tiers).split(",").filter(Boolean)
+                        : [];
                     const checked = tiers.includes(tier);
                     return (
                       <label key={tier} className="flex items-center gap-2 text-sm cursor-pointer">
@@ -416,7 +397,9 @@ export default function AdminSermonEditor() {
                           }}
                           className="accent-primary h-4 w-4"
                         />
-                        <span className="capitalize">{tier === "inner-circle" ? "Inner Circle" : tier.charAt(0).toUpperCase() + tier.slice(1)}</span>
+                        <span className="capitalize">
+                          {tier === "inner-circle" ? "Inner Circle" : tier.charAt(0).toUpperCase() + tier.slice(1)}
+                        </span>
                       </label>
                     );
                   })}
@@ -444,12 +427,17 @@ export default function AdminSermonEditor() {
           <div className="flex flex-wrap items-center gap-3 pb-8">
             <Button onClick={handleSave} disabled={updateSermon.isPending || !dirty}>
               <Save className="h-4 w-4 mr-2" />
-              {updateSermon.isPending ? "Saving…" : dirty ? "Save Sermon" : "Saved"}
+              {updateSermon.isPending
+                ? "Saving…"
+                : saveError
+                  ? "Retry Save"
+                  : dirty
+                    ? "Save Sermon"
+                    : savedAt
+                      ? "Saved to database"
+                      : "No changes"}
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => window.open(`/sermons/${draft.id}`, "_blank")}
-            >
+            <Button variant="outline" onClick={() => window.open(`/sermons/${draft.id}`, "_blank")}>
               <Eye className="h-4 w-4 mr-2" /> Preview
             </Button>
             <Button
@@ -464,7 +452,8 @@ export default function AdminSermonEditor() {
           </div>
         </div>
       ) : (
-        !isMobile && !draft.id && (
+        !isMobile &&
+        !draft.id && (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
             <p>Select a sermon or create a new one.</p>
           </div>

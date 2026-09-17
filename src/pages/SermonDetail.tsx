@@ -13,6 +13,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { supabaseImageUrl } from "@/lib/supabaseImage";
+import { membershipTierFromProductId, resolveSermonAccess } from "@/lib/sermonAccess";
 
 import {
   ArrowLeft,
@@ -224,7 +225,7 @@ export default function SermonDetail() {
   const id = params.id ?? "";
   const navigate = useNavigate();
 
-  const { data: sermon, isLoading } = useSermon(id);
+  const { data: sermon, isLoading, isError, error } = useSermon(id);
 
   const auth: any = useAuth();
   const user = auth?.user ?? null;
@@ -552,11 +553,21 @@ export default function SermonDetail() {
             {/* Show audiobook cover if available */}
             {audiobookCover && (
               <div className="flex items-center gap-4 mb-4">
-                <img src={supabaseImageUrl(audiobookCover, { width: 200, quality: 70 })} alt="Audio cover" loading="lazy" decoding="async" width={80} height={112} className="w-20 h-28 object-cover rounded-lg border border-white/10 shrink-0" />
+                <img
+                  src={supabaseImageUrl(audiobookCover, { width: 200, quality: 70 })}
+                  alt="Audio cover"
+                  loading="lazy"
+                  decoding="async"
+                  width={80}
+                  height={112}
+                  className="w-20 h-28 object-cover rounded-lg border border-white/10 shrink-0"
+                />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <Headphones className="h-5 w-5 text-[#d4af37]" />
-                    <span className="text-sm font-semibold text-white/90 uppercase tracking-[0.12em]">Audio Version</span>
+                    <span className="text-sm font-semibold text-white/90 uppercase tracking-[0.12em]">
+                      Audio Version
+                    </span>
                   </div>
                   <p className="text-xs text-white/50">Listen or download the audio version of this sermon.</p>
                   <button
@@ -567,7 +578,9 @@ export default function SermonDetail() {
                         const ext = blob.type.includes("png") ? "png" : "jpg";
                         const { triggerDownload } = await import("@/lib/downloadHelper");
                         await triggerDownload(blob, `${title.replace(/\s+/g, "-").toLowerCase()}-cover.${ext}`);
-                      } catch { window.open(audiobookCover, "_blank"); }
+                      } catch {
+                        window.open(audiobookCover, "_blank");
+                      }
                     }}
                     className="mt-2 inline-flex items-center gap-1.5 text-[10px] font-semibold text-white/60 hover:text-white transition-colors"
                   >
@@ -582,7 +595,12 @@ export default function SermonDetail() {
                 <span className="text-sm font-semibold text-white/90 uppercase tracking-[0.12em]">Listen to Audio</span>
               </div>
             )}
-            <audio controls className="w-full" style={{ filter: "invert(1) hue-rotate(180deg)", opacity: 0.85 }} src={audioUrl}>
+            <audio
+              controls
+              className="w-full"
+              style={{ filter: "invert(1) hue-rotate(180deg)", opacity: 0.85 }}
+              src={audioUrl}
+            >
               Your browser does not support the audio element.
             </audio>
             <a

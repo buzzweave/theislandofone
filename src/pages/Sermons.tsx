@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, memo } from "react";
 import { Link } from "react-router-dom";
 import { BookOpen, Lock, Eye, ShoppingCart } from "lucide-react";
-import { useSermons } from "@/hooks/useSermons";
+import { usePublishedSermons } from "@/hooks/useSermons";
+import { isSermonLocked, isSermonPaid } from "@/lib/sermonAccess";
 
 const PAGE_SIZE = 20;
 const accessFilters = ["All", "free", "member", "pastor", "inner_circle"];
@@ -31,9 +32,7 @@ const SermonCard = memo(function SermonCard({ sermon }: { sermon: any }) {
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-              {sermon.category}
-            </span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-primary">{sermon.category}</span>
             {isFree ? (
               <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/5 text-primary/70 border border-primary/10">
                 Free
@@ -63,9 +62,13 @@ const SermonCard = memo(function SermonCard({ sermon }: { sermon: any }) {
           <span className="text-xs text-muted-foreground whitespace-nowrap">{sermon.date}</span>
           <div className="flex items-center gap-1 text-xs text-muted-foreground group-hover:text-primary transition-colors">
             {isFree ? (
-              <><Eye className="h-3 w-3" /> Read</>
+              <>
+                <Eye className="h-3 w-3" /> Read
+              </>
             ) : (
-              <><ShoppingCart className="h-3 w-3" /> {isLocked ? "Preview" : "Read"}</>
+              <>
+                <ShoppingCart className="h-3 w-3" /> {isLocked ? "Preview" : "Read"}
+              </>
             )}
           </div>
         </div>
@@ -75,7 +78,7 @@ const SermonCard = memo(function SermonCard({ sermon }: { sermon: any }) {
 });
 
 export default function Sermons() {
-  const { data: sermons = [], isLoading } = useSermons();
+  const { data: sermons = [], isLoading, isError, error } = usePublishedSermons();
   const categories = ["All", ...Array.from(new Set(sermons.map((s: any) => s.category).filter(Boolean)))];
   const [activeCategory, setActiveCategory] = useState("All");
   const [accessFilter, setAccessFilter] = useState("All");
@@ -93,14 +96,18 @@ export default function Sermons() {
   const hasMore = visibleCount < filtered.length;
 
   // Reset on filter change
-  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [activeCategory, accessFilter]);
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [activeCategory, accessFilter]);
 
   // Infinite scroll
   useEffect(() => {
     if (!hasMore || !sentinelRef.current) return;
     const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) setVisibleCount(p => p + PAGE_SIZE); },
-      { rootMargin: "400px" }
+      ([entry]) => {
+        if (entry.isIntersecting) setVisibleCount((p) => p + PAGE_SIZE);
+      },
+      { rootMargin: "400px" },
     );
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
@@ -153,16 +160,23 @@ export default function Sermons() {
             ))}
           </div>
         </div>
-
         {/* Disclaimer */}
         <div className="max-w-3xl mx-auto mb-10 p-4 rounded-lg border border-border bg-card text-sm text-muted-foreground text-center">
           <BookOpen className="h-4 w-4 inline mr-2 text-primary" />
           These sermons are provided as a resource for pastors. Please adapt them for your congregation and give
           appropriate credit.
         </div>
-
-        {isLoading && <p className="text-center text-muted-foreground animate-pulse">Loading sermons…</p>}
-
+        {isLoading && <p className="text-center text-muted-foreground animate-pulse">Loading sermons…</p>}{" "}
+        {isError && (
+          <div
+            role="alert"
+            className="max-w-3xl mx-auto mb-8 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-center text-sm text-destructive"
+          >
+            {" "}
+            We could not load the sermon library.{" "}
+            {error instanceof Error ? error.message : "Please refresh and try again."}{" "}
+          </div>
+        )}
         {/* Sermons List */}
         <div className="max-w-3xl mx-auto space-y-4 pb-24">
           {visible.map((sermon: any) => (
