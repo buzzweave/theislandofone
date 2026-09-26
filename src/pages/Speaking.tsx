@@ -4,6 +4,8 @@ import { speakingTopics } from "@/data/content";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { useAdminAuth } from "@/contexts/AdminAuthContext";
 
 const speakingRequestSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100, "Name must be under 100 characters"),
@@ -19,6 +21,25 @@ const speakingRequestSchema = z.object({
 export default function Speaking() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const { isAuthenticated } = useAdminAuth();
+  const pastorIntro = useSiteSettings(
+    "pastor_intro",
+    "A clear, Christ-centered ministry partner for revivals, leadership events, conferences, and church services.",
+  );
+  const statementFaith = useSiteSettings(
+    "statement_of_faith",
+    "We believe the Bible is the inspired Word of God; in one God eternally existing as Father, Son, and Holy Spirit; in salvation by grace through faith in Jesus Christ; in the local church; and in the call to make disciples of all nations.",
+  );
+  const accountability = useSiteSettings(
+    "ministry_accountability",
+    "The Island of One Ministries welcomes questions from church leadership about doctrine, ministry experience, references, and event expectations before an invitation is confirmed.",
+  );
+  const pastoralReferences = useSiteSettings(
+    "pastoral_references",
+    "Pastoral references are available upon request. Verified endorsements may be added here from pastors who have personally heard Bryant preach or hosted the ministry.",
+  );
+  const speakerKitUrl = useSiteSettings("speaker_kit_url", "");
+  const highlightVideoUrl = useSiteSettings("speaker_highlight_video_url", "");
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -90,12 +111,137 @@ export default function Speaking() {
                 <span className="text-secondary-foreground">{topic}</span>
               </div>
             ))}
-          </div>
+          </div>{" "}
+          {/* Pastor trust center */}
+          <section className="mb-16 space-y-8" aria-labelledby="pastor-trust-heading">
+            <div className="text-center max-w-2xl mx-auto">
+              <p className="text-primary font-semibold tracking-widest text-xs uppercase mb-2">
+                For Pastors & Church Leaders
+              </p>
+              <h2 id="pastor-trust-heading" className="font-display text-3xl font-bold mb-4">
+                A ministry partner you can know before you invite
+              </h2>
+              <p className="text-muted-foreground leading-relaxed">{pastorIntro.value}</p>
+            </div>
 
+            {highlightVideoUrl.value && (
+              <div className="rounded-2xl border border-border bg-card p-6 text-center">
+                <h3 className="font-display text-xl font-bold mb-2">Watch a preaching highlight</h3>
+                <p className="text-muted-foreground text-sm mb-4">
+                  Hear the message and ministry heart before extending an invitation.
+                </p>
+                <a
+                  href={highlightVideoUrl.value}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold"
+                >
+                  Watch Highlight Video
+                </a>
+              </div>
+            )}
+
+            <div className="grid md:grid-cols-3 gap-5">
+              <article className="rounded-2xl border border-border bg-card p-6">
+                <h3 className="font-display text-xl font-bold mb-3">Statement of Faith</h3>
+                <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line">
+                  {statementFaith.value}
+                </p>
+              </article>
+              <article className="rounded-2xl border border-border bg-card p-6">
+                <h3 className="font-display text-xl font-bold mb-3">Ministry Accountability</h3>
+                <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line">
+                  {accountability.value}
+                </p>
+              </article>
+              <article className="rounded-2xl border border-border bg-card p-6">
+                <h3 className="font-display text-xl font-bold mb-3">Pastoral References</h3>
+                <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line">
+                  {pastoralReferences.value}
+                </p>
+              </article>
+            </div>
+
+            <div className="rounded-2xl border border-primary/30 bg-primary/5 p-6 sm:p-8 flex flex-col sm:flex-row gap-5 items-start sm:items-center justify-between">
+              <div>
+                <h3 className="font-display text-2xl font-bold mb-2">Plan the invitation with confidence</h3>
+                <p className="text-muted-foreground">
+                  Request doctrine, references, travel expectations, technical needs, biography, and promotional
+                  materials before confirming your date.
+                </p>
+              </div>
+              {speakerKitUrl.value ? (
+                <a
+                  href={speakerKitUrl.value}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="shrink-0 inline-flex px-5 py-2.5 rounded-full border border-primary text-primary font-semibold hover:bg-primary hover:text-primary-foreground transition-colors"
+                >
+                  Download Speaker Kit
+                </a>
+              ) : (
+                <a
+                  href="#speaker-request"
+                  className="shrink-0 inline-flex px-5 py-2.5 rounded-full border border-primary text-primary font-semibold hover:bg-primary hover:text-primary-foreground transition-colors"
+                >
+                  Request Ministry Details
+                </a>
+              )}
+            </div>
+          </section>
+          {isAuthenticated && (
+            <section
+              className="mb-16 rounded-2xl border-2 border-dashed border-primary/40 bg-card p-6"
+              aria-label="Pastor page editor"
+            >
+              <h2 className="font-display text-2xl font-bold mb-2">Edit Pastor Trust Sections</h2>
+              <p className="text-muted-foreground text-sm mb-6">
+                You are signed in as an administrator. Edit a field and click outside it to save.
+              </p>
+              <div className="grid gap-5">
+                {[
+                  ["Pastor introduction", pastorIntro],
+                  ["Statement of faith", statementFaith],
+                  ["Ministry accountability", accountability],
+                  ["Pastoral references / endorsements", pastoralReferences],
+                ].map(([label, setting]) => (
+                  <label key={label as string} className="grid gap-2 text-sm font-semibold">
+                    {label as string}
+                    <textarea
+                      defaultValue={(setting as typeof pastorIntro).value}
+                      onBlur={(e) => (setting as typeof pastorIntro).updateValue(e.currentTarget.value)}
+                      rows={4}
+                      className="w-full rounded-lg border border-border bg-background p-3 font-normal"
+                    />
+                  </label>
+                ))}
+                <label className="grid gap-2 text-sm font-semibold">
+                  Preaching highlight URL
+                  <input
+                    defaultValue={highlightVideoUrl.value}
+                    onBlur={(e) => highlightVideoUrl.updateValue(e.currentTarget.value)}
+                    className="rounded-lg border border-border bg-background p-3 font-normal"
+                    placeholder="https://youtube.com/..."
+                  />
+                </label>
+                <label className="grid gap-2 text-sm font-semibold">
+                  Speaker kit URL
+                  <input
+                    defaultValue={speakerKitUrl.value}
+                    onBlur={(e) => speakerKitUrl.updateValue(e.currentTarget.value)}
+                    className="rounded-lg border border-border bg-background p-3 font-normal"
+                    placeholder="https://.../speaker-kit.pdf"
+                  />
+                </label>
+              </div>
+            </section>
+          )}
           {/* Form */}
-          <div className="rounded-2xl border border-border bg-card p-8">
+          <div id="speaker-request" className="rounded-2xl border border-border bg-card p-8 scroll-mt-24">
             <h2 className="font-display text-2xl font-bold mb-2">Request a Speaker</h2>
-            <p className="text-muted-foreground text-sm mb-4">No fees or commitments — just fill out the form and we'll be in touch.</p>
+            <p className="text-muted-foreground text-sm mb-4">
+              No fees or commitments — just fill out the form and we'll be in touch.
+            </p>
             <a
               href="tel:9362380102"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors shadow-gold mb-8"
@@ -120,25 +266,50 @@ export default function Speaking() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
                     <label className="block text-sm font-medium mb-1.5 text-foreground">Your Name *</label>
-                    <input required name="name" type="text" maxLength={100} className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                    <input
+                      required
+                      name="name"
+                      type="text"
+                      maxLength={100}
+                      className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1.5 text-foreground">Email *</label>
-                    <input required name="email" type="email" maxLength={255} className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                    <input
+                      required
+                      name="email"
+                      type="email"
+                      maxLength={255}
+                      className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1.5 text-foreground">Organization</label>
-                    <input name="organization" type="text" maxLength={200} className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                    <input
+                      name="organization"
+                      type="text"
+                      maxLength={200}
+                      className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1.5 text-foreground">Phone</label>
-                    <input name="phone" type="tel" maxLength={30} className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                    <input
+                      name="phone"
+                      type="tel"
+                      maxLength={30}
+                      className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
                     <label className="block text-sm font-medium mb-1.5 text-foreground">Event Type</label>
-                    <select name="event_type" className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
+                    <select
+                      name="event_type"
+                      className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    >
                       <option>Church Service</option>
                       <option>Conference</option>
                       <option>Leadership Summit</option>
@@ -148,17 +319,36 @@ export default function Speaking() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1.5 text-foreground">Event Date (Approximate) *</label>
-                    <input required name="event_date" type="date" className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                    <label className="block text-sm font-medium mb-1.5 text-foreground">
+                      Event Date (Approximate) *
+                    </label>
+                    <input
+                      required
+                      name="event_date"
+                      type="date"
+                      className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
                   </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1.5 text-foreground">Event Location</label>
-                  <input name="event_location" type="text" maxLength={300} placeholder="City, State" className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+                  <input
+                    name="event_location"
+                    type="text"
+                    maxLength={300}
+                    placeholder="City, State"
+                    className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1.5 text-foreground">Tell us about your event *</label>
-                  <textarea required name="message" rows={4} maxLength={2000} className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none" />
+                  <textarea
+                    required
+                    name="message"
+                    rows={4}
+                    maxLength={2000}
+                    className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+                  />
                 </div>
                 <button
                   type="submit"
