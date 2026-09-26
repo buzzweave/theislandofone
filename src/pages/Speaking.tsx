@@ -28,7 +28,7 @@ export default function Speaking() {
   );
   const statementFaith = useSiteSettings(
     "statement_of_faith",
-    "We believe the Bible is the inspired Word of God; in one God eternally existing as Father, Son, and Holy Spirit; in salvation by grace through faith in Jesus Christ; in the local church; and in the call to make disciples of all nations.",
+    "We believe salvation is made possible through the death, burial, and resurrection of Jesus Christ. In obedience to the gospel as the church modeled in Acts 2, a person responds through repentance from sin and faith in Jesus Christ; water baptism by immersion in the name of Jesus Christ for the remission of sins; and receiving the gift of the Holy Spirit, with speaking in other tongues as the Spirit gives utterance.\n\nWe believe salvation is entirely dependent upon God’s grace and is received through obedient faith—not earned by human works.\n\nWe believe the Bible is the inspired, authoritative Word of God; in divine healing; in the gifts and work of the Holy Spirit; in the mission of the Church to make disciples of all nations; and in the personal return of Jesus Christ, the resurrection of the dead, and everlasting life with Him.",
   );
   const accountability = useSiteSettings(
     "ministry_accountability",
